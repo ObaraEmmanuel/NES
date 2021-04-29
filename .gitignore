@@ -1,0 +1,5 @@
+roms/
+Makefile
+dist/
+cmake-build-debug/
+build/
