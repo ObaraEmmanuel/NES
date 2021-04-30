@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdlib.h>
 
 #include "ppu.h"
 #include "utils.h"
@@ -172,6 +171,11 @@ void set_ctrl(PPU* ppu, uint8_t ctrl){
 }
 
 void execute_ppu(PPU* ppu){
+    if(ppu->scanlines < VISIBLE_SCAN_LINES && ppu->cycles < SCANLINE_VISIBLE_DOTS){
+        // update sprite zero hit
+        ppu->ppu_status &= ~BIT_6;
+        ppu->ppu_status |= ppu->OAM[0] == ppu->scanlines && ppu->cycles == ppu->OAM[3] && ppu->ppu_mask & BIT_4 ? BIT_6 : 0;
+    }
     ppu->cycles++;
     if(ppu->cycles >= 341){
         ppu->cycles = 0;
@@ -190,8 +194,8 @@ void execute_ppu(PPU* ppu){
         }
         else if(ppu->scanlines >= 262){
             ppu->scanlines = 0;
-            // reset v-blank
-            ppu->ppu_status &= ~BIT_7;
+            // reset v-blank and sprite zero hit
+            ppu->ppu_status &= ~(BIT_7 | BIT_6);
             ppu->render = 1;
         }
     }
