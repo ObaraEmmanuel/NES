@@ -38,7 +38,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 set_ctrl(ppu, value);
                 break;
             case PPU_MASK:
-                ppu->ppu_mask = value;
+                ppu->mask = value;
                 break;
             case PPU_SCROLL:
                 set_scroll(ppu, value);

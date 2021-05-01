@@ -34,16 +34,16 @@ typedef struct {
     uint8_t sprite_list[64];
     uint8_t palette[0x20];
     uint8_t sprites;
-    uint8_t ppu_ctrl;
-    uint8_t ppu_mask;
-    uint8_t ppu_status;
+    uint8_t ctrl;
+    uint8_t mask;
+    uint8_t status;
     uint8_t even_frame;
     size_t cycles;
     size_t scanlines;
 
-    uint16_t address;
-    uint16_t temp_address;
-    uint8_t fine_x_scroll;
+    uint16_t v;
+    uint16_t t;
+    uint8_t x;
     uint8_t waiting_value;
     uint8_t oam_address;
     uint8_t buffer;

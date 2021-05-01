@@ -23,26 +23,26 @@ void init_ppu(PPU* ppu){
 void reset_ppu(PPU* ppu){
     ppu->render = 1;
     ppu->state = PRE_RENDER;
-    ppu->address = ppu->waiting_value = ppu->oam_address = ppu->temp_address = ppu->fine_x_scroll = ppu->cycles = ppu->scanlines = 0;
+    ppu->v = ppu->waiting_value = ppu->oam_address = ppu->t = ppu->x = ppu->cycles = ppu->scanlines = 0;
     ppu->even_frame = 1;
-    ppu->ppu_ctrl &= ~0xFC;
-    ppu->ppu_mask &= ~(BIT_0 | BIT_4 | BIT_3);
-    ppu->ppu_mask |= (BIT_4 | BIT_3);
-    ppu->ppu_status = 0;
+    ppu->ctrl &= ~0xFC;
+    ppu->mask &= ~(BIT_0 | BIT_4 | BIT_3);
+    ppu->mask |= (BIT_4 | BIT_3);
+    ppu->status = 0;
     memset(ppu->screen, 0, sizeof(ppu->screen));
 }
 
 void set_address(PPU* ppu, uint8_t address){
     if(ppu->waiting_value){
         // second write
-        ppu->temp_address &= 0xff00;
-        ppu->temp_address |= address;
-        ppu->address = ppu->temp_address;
+        ppu->t &= 0xff00;
+        ppu->t |= address;
+        ppu->v = ppu->t;
         ppu->waiting_value = 0;
     }else{
         // first write
-        ppu->temp_address &= 0xff;
-        ppu->temp_address |= (address & 0x3f) << 8; // store only upto bit 14
+        ppu->t &= 0xff;
+        ppu->t |= (address & 0x3f) << 8; // store only upto bit 14
         ppu->waiting_value = 1;
     }
 }
@@ -63,33 +63,33 @@ void write_oam(PPU* ppu, uint8_t value){
 void set_scroll(PPU* ppu, uint8_t coord){
     if(ppu->waiting_value){
         // second write
-        ppu->temp_address &= ~Y_SCROLL_BITS;
-        ppu->temp_address |= ((coord & 0x7) << 12) | ((coord & 0xF8) << 2);
+        ppu->t &= ~Y_SCROLL_BITS;
+        ppu->t |= ((coord & 0x7) << 12) | ((coord & 0xF8) << 2);
         ppu->waiting_value = 0;
     }else{
         // first write
-        ppu->temp_address &= ~X_SCROLL_BITS;
-        ppu->temp_address |= (coord >> 3) & X_SCROLL_BITS;
-        ppu->fine_x_scroll = coord & 0x7;
+        ppu->t &= ~X_SCROLL_BITS;
+        ppu->t |= (coord >> 3) & X_SCROLL_BITS;
+        ppu->x = coord & 0x7;
         ppu->waiting_value = 1;
     }
 }
 
 uint8_t read_ppu(PPU* ppu){
-    uint8_t data = read_vram(ppu, ppu->address);
-    if(ppu->address < 0x3F00){
+    uint8_t data = read_vram(ppu, ppu->v);
+    if(ppu->v < 0x3F00){
         // reads in this range are read from buffer and the current value buffered
         uint8_t temp = ppu->buffer;
         ppu->buffer = data;
         data = temp;
     }
-    ppu->address += ((ppu->ppu_ctrl & BIT_2) ? 32 : 1);
+    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
     return data;
 }
 
 void write_ppu(PPU* ppu, uint8_t value){
-    write_vram(ppu, ppu->address, value);
-    ppu->address += ((ppu->ppu_ctrl & BIT_2) ? 32 : 1);
+    write_vram(ppu, ppu->v, value);
+    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
 }
 
 void dma(PPU* ppu, struct Memory* memory, uint8_t address){
@@ -157,24 +157,24 @@ static void write_vram(PPU* ppu, uint16_t address, uint8_t value){
 }
 
 uint8_t read_status(PPU* ppu){
-    uint8_t status = ppu->ppu_status;
+    uint8_t status = ppu->status;
     ppu->waiting_value = 0;
-    ppu->ppu_status &= ~BIT_7; // reset v_blank
+    ppu->status &= ~BIT_7; // reset v_blank
     return status;
 }
 
 void set_ctrl(PPU* ppu, uint8_t ctrl){
-    ppu->ppu_ctrl = ctrl;
+    ppu->ctrl = ctrl;
     // set name table in temp address
-    ppu->temp_address &= ~0xc00;
-    ppu->temp_address |= (ctrl & (BIT_0 | BIT_1)) << 10;
+    ppu->t &= ~0xc00;
+    ppu->t |= (ctrl & (BIT_0 | BIT_1)) << 10;
 }
 
 void execute_ppu(PPU* ppu){
     if(ppu->scanlines < VISIBLE_SCAN_LINES && ppu->cycles < SCANLINE_VISIBLE_DOTS){
         // update sprite zero hit
-        ppu->ppu_status &= ~BIT_6;
-        ppu->ppu_status |= ppu->OAM[0] == ppu->scanlines && ppu->cycles == ppu->OAM[3] && ppu->ppu_mask & BIT_4 ? BIT_6 : 0;
+        ppu->status &= ~BIT_6;
+        ppu->status |= ppu->OAM[0] == ppu->scanlines && ppu->cycles == ppu->OAM[3] && ppu->mask & BIT_4 ? BIT_6 : 0;
     }
     ppu->cycles++;
     if(ppu->cycles >= 341){
@@ -186,8 +186,8 @@ void execute_ppu(PPU* ppu){
         }
         else if(ppu->scanlines == 241){
             // set v-blank
-            ppu->ppu_status |= BIT_7;
-            if(ppu->ppu_ctrl & BIT_7){
+            ppu->status |= BIT_7;
+            if(ppu->ctrl & BIT_7){
                 // generate NMI
                 interrupt(ppu->mem->cpu, NMI);
             }
@@ -195,14 +195,14 @@ void execute_ppu(PPU* ppu){
         else if(ppu->scanlines >= 262){
             ppu->scanlines = 0;
             // reset v-blank and sprite zero hit
-            ppu->ppu_status &= ~(BIT_7 | BIT_6);
+            ppu->status &= ~(BIT_7 | BIT_6);
             ppu->render = 1;
         }
     }
 }
 
 static void render_background(PPU* ppu) {
-    uint16_t bank = ppu->ppu_ctrl & (BIT_4) ? 0x1000 : 0;
+    uint16_t bank = ppu->ctrl & (BIT_4) ? 0x1000 : 0;
     for(int i = 0; i < 0x3C0; i++){
         size_t tile_x = i % 32;
         size_t tile_y = i / 32;
@@ -230,7 +230,7 @@ static void render_sprites(PPU* ppu){
     // byte 1 -> tile index
     // byte 2 -> render info
     // byte 3 -> x index
-    uint16_t bank = ppu->ppu_ctrl & (BIT_3) ? 0x1000 : 0;
+    uint16_t bank = ppu->ctrl & (BIT_3) ? 0x1000 : 0;
 
     for(int i = 0x100 - 4; i >= 0; i-=4){
         uint16_t tile_index = ppu->OAM[i + 1];
