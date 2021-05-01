@@ -48,9 +48,6 @@ int main(int argc, char *argv[]) {
     struct timespec m_start, m_end, start, end;
     int64_t latency = timing_latency(&start, &end);
     LOG(DEBUG, "Timing latency: %ld ns", latency);
-    // should take about 9 billion years for this variable to overflow at 60Hz frame rate
-    // good luck gaming that long :)
-    uint64_t frames = 0;
     timespec_get(&m_start, TIME_UTC);
     while (!quit) {
         timespec_get(&start, TIME_UTC);
@@ -86,7 +83,6 @@ int main(int argc, char *argv[]) {
             }
             render_graphics(&g_ctx, ppu.screen);
             ppu.render = 0;
-            frames++;
             timespec_get(&end, TIME_UTC);
             int64_t frame_time = compute_diff(&start, &end, latency);
 
@@ -98,7 +94,7 @@ int main(int argc, char *argv[]) {
     }
      timespec_get(&m_end, TIME_UTC);
      unsigned long total_elapsed = m_end.tv_sec - m_start.tv_sec;
-     LOG(DEBUG, "Average frame rate: %.2f Hz", (double)frames / (double)total_elapsed);
+     LOG(DEBUG, "Average frame rate: %.2f Hz", (double)ppu.frames / (double)total_elapsed);
 
 
     free_graphics(&g_ctx);

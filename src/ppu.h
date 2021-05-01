@@ -5,57 +5,64 @@
 #include "utils.h"
 #include "mapper.h"
 
-#define Y_SCROLL_BITS 0x73E0
-#define X_SCROLL_BITS 0x1f
-#define HORIZONTAL_BITS 0x41F
-#define VERTICAL_BITS 0x7BE0
-#define FINE_Y_SCROLL_BITS 0x7
-#define COARSE_Y_SCROLL_BITS 0xF8
+#define VISIBLE_SCANLINES 240
+#define VISIBLE_DOTS 256
+#define SCANLINES_PER_FRAME 261
+#define DOTS_PER_SCANLINE 341
+#define END_DOT 340
 
-#define VISIBLE_SCAN_LINES 240
-#define SCANLINE_VISIBLE_DOTS 256
-#define FRAME_END_SCANLINE 261
-#define SCANLINE_CYCLES 341
-#define SCANLINE_END_CYCLE 340
-
-typedef enum {
-    PRE_RENDER,
-    RENDER,
-    POST_RENDER,
-    V_BLANK
-} PPUState;
+enum{
+    BG_TABLE        = 1 << 4,
+    SPRITE_TABLE    = 1 << 3,
+    SHOW_BG_8       = 1 << 1,
+    SHOW_SPRITE_8   = 1 << 2,
+    SHOW_BG         = 1 << 3,
+    SHOW_SPRITE     = 1 << 4,
+    LONG_SPRITE     = 1 << 5,
+    SPRITE_0_HIT    = 1 << 6,
+    FLIP_HORIZONTAL = 1 << 6,
+    FLIP_VERTICAL   = 1 << 7,
+    V_BLANK         = 1 << 7,
+    GENERATE_NMI    = 1 << 7,
+    RENDER_ENABLED  = 0x18,
+    BASE_NAMETABLE  = 0x3,
+    FINE_Y          = 0x7000,
+    COARSE_Y        = 0x3E0,
+    COARSE_X        = 0x1F,
+    VERTICAL_BITS   = 0x7BE0,
+    HORIZONTAL_BITS = 0x41F,
+    X_SCROLL_BITS   = 0x1f,
+    Y_SCROLL_BITS   = 0x73E0
+};
 
 struct Memory;
 
 typedef struct {
-    uint32_t screen[SCANLINE_VISIBLE_DOTS * VISIBLE_SCAN_LINES];
+    size_t frames;
+    uint32_t screen[VISIBLE_DOTS * VISIBLE_SCANLINES];
     uint8_t V_RAM[0x800];
     uint8_t OAM[256];
-    uint8_t sprite_list[64];
+    uint8_t OAM_cache[8];
     uint8_t palette[0x20];
+    uint8_t OAM_cache_len;
     uint8_t sprites;
     uint8_t ctrl;
     uint8_t mask;
     uint8_t status;
-    uint8_t even_frame;
-    size_t cycles;
+    size_t dots;
     size_t scanlines;
 
     uint16_t v;
     uint16_t t;
     uint8_t x;
-    uint8_t waiting_value;
+    uint8_t w;
     uint8_t oam_address;
     uint8_t buffer;
 
     uint8_t render;
-    PPUState state;
 
     Mapper* mapper;
     struct Memory* mem;
-
-    // internal use
-    uint8_t render_flags; // bit: 0 - bg opaque 1 - sprite opaque 2 - sprite fg 3 -> 7 - palette addr
 
 } PPU;
 
@@ -85,4 +92,3 @@ void set_address(PPU* ppu, uint8_t address);
 void set_oam_address(PPU* ppu, uint8_t address);
 uint8_t read_oam(PPU* ppu);
 void write_oam(PPU* ppu, uint8_t value);
-void show_tile(PPU* ppu, const uint8_t* bank, size_t tile);
