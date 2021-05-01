@@ -147,8 +147,10 @@ static void write_vram(PPU* ppu, uint16_t address, uint8_t value){
 
     else if(address < 0x4000) {
         address = (address - 0x3F00) % 0x20;
-        if(address == 0x10)
-            ppu->palette[0] = value;
+        if(address % 4 == 0) {
+            ppu->palette[address] = value;
+            ppu->palette[address ^ 0x10] = value;
+        }
         else
             ppu->palette[address] = value;
     }
