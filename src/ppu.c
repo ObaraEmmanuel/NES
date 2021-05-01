@@ -74,15 +74,15 @@ void set_scroll(PPU* ppu, uint8_t coord){
 }
 
 uint8_t read_ppu(PPU* ppu){
-    uint8_t data = read_vram(ppu, ppu->v);
-    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
+    uint8_t prev_buff = ppu->buffer, data;
+    // $2000 - $2fff are mirrored at $3000 - $3fff
+    ppu->buffer = read_vram(ppu, 0x2000 + (ppu->v - 0x2000) % 0x1000);
 
-    if(ppu->v < 0x3F00){
-        // reads in this range are read from buffer and the current value buffered
-        uint8_t temp = ppu->buffer;
-        ppu->buffer = data;
-        data = temp;
-    }
+    if(ppu->v >= 0x3F00)
+        data = read_vram(ppu, ppu->v);
+    else
+        data = prev_buff;
+    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
     return data;
 }
 
