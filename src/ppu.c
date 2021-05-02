@@ -16,17 +16,20 @@ void init_ppu(PPU* ppu){
     memset(ppu->OAM_cache, 0, 64);
     memset(ppu->V_RAM, 0, 0x800);
     memset(ppu->OAM, 0, 256);
+    ppu->oam_address = 0;
+    ppu->v = 0;
     reset_ppu(ppu);
 }
 
 void reset_ppu(PPU* ppu){
     ppu->render = 1;
-    ppu->v = ppu->w = ppu->oam_address = ppu->t = ppu->x = ppu->dots = ppu->scanlines = 0;
+    ppu->w = ppu->t = ppu->x = ppu->dots = ppu->scanlines = 0;
     ppu->ctrl &= ~0xFC;
-    ppu->mask &= ~(BIT_0 | BIT_4 | BIT_3);
-    ppu->mask |= (BIT_4 | BIT_3);
+    ppu->mask = 0;
     ppu->status = 0;
     ppu->frames = 0;
+    ppu->OAM_cache_len = 0;
+    memset(ppu->OAM_cache, 0, 8);
     memset(ppu->screen, 0, sizeof(ppu->screen));
 }
 
@@ -129,7 +132,7 @@ static uint8_t read_vram(PPU* ppu, uint16_t address){
 }
 
 static void write_vram(PPU* ppu, uint16_t address, uint8_t value){
-    address = address % 0x4000;
+    //address = address % 0x4000;
 
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);
