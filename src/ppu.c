@@ -22,8 +22,8 @@ void init_ppu(PPU* ppu){
 }
 
 void reset_ppu(PPU* ppu){
-    ppu->render = 1;
-    ppu->w = ppu->t = ppu->x = ppu->dots = ppu->scanlines = 0;
+    ppu->t = ppu->x = ppu->dots = ppu->scanlines = 0;
+    ppu->w = 1;
     ppu->ctrl &= ~0xFC;
     ppu->mask = 0;
     ppu->status = 0;
@@ -132,7 +132,7 @@ static uint8_t read_vram(PPU* ppu, uint16_t address){
 }
 
 static void write_vram(PPU* ppu, uint16_t address, uint8_t value){
-    //address = address % 0x4000;
+    address = address % 0x4000;
 
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);
