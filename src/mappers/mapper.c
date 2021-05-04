@@ -65,7 +65,7 @@ void load_file(char* file_name, Mapper* mapper){
     fread(&mapper->CHR_banks, 1, 1, file);
 
     LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
-    LOG(INFO, "CHR banks (8KB): %u", mapper->PRG_banks);
+    LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
 
     uint8_t ROM_ctrl1, ROM_ctrl2;
 
@@ -95,6 +95,8 @@ void load_file(char* file_name, Mapper* mapper){
     fread(&ROM_ctrl2, 1, 1, file);
     mapper->mapper_num |= ROM_ctrl2 & 0xF0;
 
+    LOG(INFO, "Using mapper #%d", mapper->mapper_num);
+
     fread(&mapper->RAM_banks, 1, 1, file);
 
     if(mapper->RAM_banks == 0)
@@ -108,7 +110,7 @@ void load_file(char* file_name, Mapper* mapper){
 
     if(mapper->CHR_banks) {
         mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
-        fread(mapper->CHR_RAM, 1, 0x2000 * mapper->PRG_banks, file);
+        fread(mapper->CHR_RAM, 1, 0x2000 * mapper->CHR_banks, file);
         LOG(INFO, "CHR-ROM : Available");
     }
 
