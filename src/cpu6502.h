@@ -174,6 +174,7 @@ typedef struct c6502{
     uint8_t sr;
     uint8_t sp;
     uint8_t cycles;
+    uint8_t odd_cycle;
     const Instruction* instruction;
     Memory* memory;
     PPU* ppu;

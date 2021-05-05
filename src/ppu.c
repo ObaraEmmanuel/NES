@@ -102,7 +102,8 @@ void dma(PPU* ppu, struct Memory* memory, uint8_t address){
         // wrap around and copy from start to OAM address if OAM is not 0x00
         memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
     memory->cpu->cycles += 513;
-    // TODO : Handle oddity
+    // skip extra cycle on odd cycle
+    memory->cpu->cycles += memory->cpu->odd_cycle;
 }
 
 
