@@ -12,14 +12,22 @@
 
 #define BILLION 1000000000L
 #define LATENCY_CHECK_COUNT 10
+
 // frame rate in Hz, anything above 60 for some reason will not work
 #define FRAME_RATE 60
 
+// turbo keys toggle rate (Hz)
+// value should be a factor of FRAME_RATE
+// and should never exceed FRAME_RATE for best result
+#define TURBO_RATE 30
+
 static const uint64_t PERIOD = BILLION / FRAME_RATE;
+static const uint16_t TURBO_SKIP = FRAME_RATE / TURBO_RATE;
 
 static void init_sys(Mapper* mapper, PPU* ppu, c6502* cpu, Memory* mmu);
 static int64_t timing_latency(struct timespec* start, struct timespec* end);
 static int64_t compute_diff(struct timespec* start, struct timespec* end, int64_t latency);
+static void turbo(Memory* mem);
 
 
 int main(int argc, char *argv[]) {
@@ -70,6 +78,8 @@ int main(int argc, char *argv[]) {
                     quit = 1;
             }
         }
+        // trigger turbo events
+        turbo(&mmu);
 
         if(!pause){
             size_t c = 0;
@@ -113,6 +123,13 @@ static void init_sys(Mapper* mapper, PPU* ppu, c6502* cpu, Memory* mmu){
     init_mem(mmu);
     init_ppu(ppu);
     reset_cpu(cpu);
+}
+
+static void turbo(Memory* mem){
+    if(mem->ppu->frames % TURBO_SKIP == 0) {
+        turbo_trigger(&mem->joy1);
+        turbo_trigger(&mem->joy2);
+    }
 }
 
 static int64_t timing_latency(struct timespec* start, struct timespec* end){

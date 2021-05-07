@@ -25,7 +25,7 @@ void write_joypad(struct JoyPad* joyPad, uint8_t data){
 }
 
 void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
-    uint8_t key = 0;
+    uint16_t key = 0;
     switch (event->key.keysym.sym) {
         case SDLK_RIGHT:
             key = RIGHT;
@@ -51,7 +51,18 @@ void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
         case SDLK_k:
             key = BUTTON_B;
             break;
+        case SDLK_l:
+            key = TURBO_B;
+            break;
+        case SDLK_h:
+            key = TURBO_A;
+            break;
+
     }
+    // let handling be done by the turbo buttons
+    if(key & (joyPad->status >> 8))
+        return;
+
     if(key){
         if(event->type == SDL_KEYDOWN){
             joyPad->status |= key;
@@ -59,4 +70,9 @@ void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
             joyPad->status &= ~key;
         }
     }
+}
+
+void turbo_trigger(struct JoyPad* joyPad){
+    // toggle BUTTON_A AND BUTTON_B if TURBO_A and TURBO_B are set respectively
+    joyPad->status ^= joyPad->status >> 8;
 }
