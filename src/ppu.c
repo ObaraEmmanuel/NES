@@ -22,7 +22,8 @@ void init_ppu(PPU* ppu){
 }
 
 void reset_ppu(PPU* ppu){
-    ppu->t = ppu->x = ppu->dots = ppu->scanlines = 0;
+    ppu->t = ppu->x = ppu->dots = 0;
+    ppu->scanlines = 261;
     ppu->w = 1;
     ppu->ctrl &= ~0xFC;
     ppu->mask = 0;
@@ -203,7 +204,7 @@ void execute_ppu(PPU* ppu){
             palette_addr = !palette_addr ? ppu->palette[0] : ppu->palette[palette_addr];
             ppu->screen[ppu->scanlines * VISIBLE_DOTS + ppu->dots - 1] = nes_palette[palette_addr];
         }
-        else if(ppu->dots == VISIBLE_DOTS + 1 && (ppu->mask & RENDER_ENABLED)){
+        if(ppu->dots == VISIBLE_DOTS + 1 && ppu->mask & SHOW_BG){
             if((ppu->v & FINE_Y) != FINE_Y) {
                 // increment coarse x
                 ppu->v += 0x1000;
