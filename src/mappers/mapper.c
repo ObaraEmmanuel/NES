@@ -15,6 +15,8 @@ static void select_mapper(Mapper* mapper){
             load_UXROM(mapper);
             break;
         case MMC1:
+            load_MMC1(mapper);
+            break;
         case CNROM:
         case MMC3:
         default:
@@ -34,11 +36,17 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
             memcpy(mapper->name_table_map, (const uint16_t [4]){0, 0x400, 0, 0x400}, 4);
             LOG(DEBUG, "Using mirroring: Vertical");
             break;
+        case ONE_SCREEN_LOWER:
         case ONE_SCREEN:
             memset(mapper->name_table_map, 0, 4);
-            LOG(DEBUG, "Using mirroring: Single screen");
+            LOG(DEBUG, "Using mirroring: Single screen lower");
+            break;
+        case ONE_SCREEN_UPPER:
+            memcpy(mapper->name_table_map, (const uint16_t [4]){0x400, 0x400, 0x400, 0x400}, 4);
+            LOG(DEBUG, "Using mirroring: Single screen upper");
             break;
         default:
+            memset(mapper->name_table_map, 0, 4);
             LOG(ERROR, "Unknown mirroring %u", mirroring);
     }
 }
@@ -125,4 +133,6 @@ void free_mapper(Mapper* mapper){
         free(mapper->PRG_ROM);
     if(mapper->CHR_RAM != NULL)
         free(mapper->CHR_RAM);
+    if(mapper->extension != NULL)
+        free(mapper->extension);
 }
