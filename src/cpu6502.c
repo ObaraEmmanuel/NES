@@ -1,6 +1,3 @@
-#include <stdio.h>
-#include <stdlib.h>
-
 #include "cpu6502.h"
 #include "utils.h"
 
@@ -338,11 +335,13 @@ void execute(c6502* ctx){
         // system functions
 
         case BRK:
+            // BRK instruction is 2 bytes
+            ctx->pc++;
             push_address(ctx, ctx->pc);
-            // 6502 quirk, bit 4 and 5 are set to 01 respectively during push
-            push(ctx, (ctx->sr | BIT_5) & ~BIT_4);
+            // 6502 quirk, bit 4 and 5 are always set
+            push(ctx, ctx->sr | BIT_5 | BIT_4);
             ctx->pc = read_abs_address(ctx->memory, IRQ_ADDRESS);
-            ctx->sr |= (BREAK | INTERRUPT);
+            ctx->sr |= INTERRUPT;
             break;
         case RTI:
             // ignore bit 4 and 5
@@ -356,13 +355,36 @@ void execute(c6502* ctx){
         // unofficial
 
         case ALR:
+            ctx->ac &= read_mem(ctx->memory, address);
+            ctx->ac = shift_r(ctx, ctx->ac);
             break;
         case ANC:
+            ctx->ac = ctx->ac & read_mem(ctx->memory, address);
+            ctx->sr &= ~(CARRY | ZERO | NEGATIVE);
+            ctx->sr = (ctx->ac & NEGATIVE) ? (CARRY | NEGATIVE): 0;
+            ctx->sr |= ((!ctx->ac)? ZERO: 0);
             break;
-        case ARR:
+        case ARR: {
+            uint8_t val = ctx->ac & read_mem(ctx->memory, address);
+            uint8_t rotated = val >> 1;
+            rotated |= (ctx->sr & CARRY) << 7;
+            ctx->sr &= ~(CARRY | ZERO | NEGATIVE | OVERFLOW);
+            ctx->sr |= (rotated & BIT_6) ? CARRY: 0;
+            ctx->sr |= ((rotated & BIT_6) ^ (rotated & BIT_5)) ? OVERFLOW: 0;
+            fast_set_ZN(ctx, rotated);
+            ctx->ac = rotated;
             break;
-        case AXS:
+        }
+        case AXS: {
+            uint8_t opr = read_mem(ctx->memory, address);
+            ctx->x = ctx->x & ctx->ac;
+            uint16_t diff = ctx->x - opr;
+            ctx->sr &= ~(CARRY | NEGATIVE | ZERO);
+            ctx->sr |= (!(diff & 0xFF00)) ? CARRY : 0;
+            ctx->x = diff;
+            fast_set_ZN(ctx, ctx->x);
             break;
+        }
         case LAX:
             ctx->ac = read_mem(ctx->memory, address);
             ctx->x = ctx->ac;
