@@ -57,6 +57,7 @@ void interrupt(c6502* ctx, Interrupt interrupt){
 
 void execute(c6502* ctx){
     ctx->odd_cycle ^= 1;
+    ctx->t_cycles++;
     if(--ctx->cycles > 0){
         return;
     }
@@ -65,7 +66,7 @@ void execute(c6502* ctx){
     uint8_t opcode = read_mem(ctx->memory, ctx->pc++);
     ctx->instruction = &instructionLookup[opcode];
     uint16_t address = get_address(ctx);
-    ctx->cycles = cycleLookup[opcode];
+    ctx->cycles += cycleLookup[opcode];
     if(address > 0x4020 && address < 0x6000)
         LOG(DEBUG, "Expansion ROM address: $%04X, opcode: %02X", address, opcode);
 
@@ -486,25 +487,26 @@ static uint16_t get_address(c6502* ctx){
             if(has_page_break(addr, addr + ctx->x)) {
                 switch (ctx->instruction->opcode) {
                     // these don't take into account absolute x page breaks
-                    case STA:
-                    case ASL:
-                    case DEC:
-                    case INC:
-                    case LSR:
-                    case ROL:
-                    case ROR:
+                    case STA:case ASL:case DEC:case INC:case LSR:case ROL:case ROR:
+                    // unofficial
+                    case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
                         break;
                     default:
                         ctx->cycles++;
                 }
-                ctx->cycles++;
             }
             return addr + ctx->x;
         case ABS_Y:
             addr = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
-            if(has_page_break(addr, addr + ctx->y) && ctx->instruction->opcode != STA)
-                ctx->cycles++;
+            if(has_page_break(addr, addr + ctx->y)) {
+                switch (ctx->instruction->opcode) {
+                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
+                        break;
+                    default:
+                        ctx->cycles++;
+                }
+            }
             return addr + ctx->y;
         case IND:
             addr = read_abs_address(ctx->memory, ctx->pc);
@@ -524,8 +526,14 @@ static uint16_t get_address(c6502* ctx){
             hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
             addr = (hi << 8) | lo;
-            if(has_page_break(addr, addr + ctx->y) && ctx->instruction->opcode != STA)
-                ctx->cycles++;
+            if(has_page_break(addr, addr + ctx->y)) {
+                switch (ctx->instruction->opcode) {
+                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
+                        break;
+                    default:
+                        ctx->cycles++;
+                }
+            }
             return addr + ctx->y;
     }
     return 0;
