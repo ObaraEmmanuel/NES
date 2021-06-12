@@ -9,6 +9,7 @@
 #include "utils.h"
 #include "gfx.h"
 #include "controller.h"
+#include "gamepad.h"
 
 #define BILLION 1000000000L
 #define LATENCY_CHECK_COUNT 10
@@ -52,6 +53,7 @@ int main(int argc, char *argv[]) {
     get_graphics_context(&g_ctx);
 
     SDL_Event e;
+    init_pads();
     int8_t quit = 0, pause = 0;
     struct timespec m_start, m_end, start, end;
     int64_t latency = timing_latency(&start, &end);

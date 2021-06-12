@@ -1,10 +1,13 @@
 #include "controller.h"
+#include "gamepad.h"
+#include "utils.h"
 
 
-void init_joypad(struct JoyPad* joyPad){
+void init_joypad(struct JoyPad* joyPad, uint8_t player){
     joyPad->strobe = 0;
     joyPad->index = 0;
     joyPad->status = 0;
+    joyPad->player = player;
 }
 
 
@@ -24,7 +27,7 @@ void write_joypad(struct JoyPad* joyPad, uint8_t data){
         joyPad->index = 0;
 }
 
-void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
+uint16_t keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type){
     uint16_t key = 0;
     switch (event->key.keysym.sym) {
         case SDLK_RIGHT:
@@ -59,14 +62,25 @@ void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
             break;
 
     }
+    *type = *type = event->type == SDL_KEYUP ? 1: event->type == SDL_KEYDOWN ? 2: 0;
+    return key;
+}
+
+void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
+    uint8_t type = 0;
+    // try the game controller
+    uint16_t key = gamepad_mapper(joyPad, event, &type);
+    if(!key)
+        // try the keyboard
+        key = keyboard_mapper(joyPad, event, &type);
     // let handling be done by the turbo buttons
     if(key & (joyPad->status >> 8))
         return;
 
     if(key){
-        if(event->type == SDL_KEYDOWN){
+        if(type == 2){
             joyPad->status |= key;
-        } else if(event->type == SDL_KEYUP){
+        } else if(type == 1){
             joyPad->status &= ~key;
         }
     }

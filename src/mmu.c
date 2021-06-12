@@ -4,8 +4,8 @@
 
 void init_mem(Memory* memory){
     memset(memory->RAM, 0, RAM_SIZE);
-    init_joypad(&memory->joy1);
-    init_joypad(&memory->joy2);
+    init_joypad(&memory->joy1, 0);
+    init_joypad(&memory->joy2, 1);
 }
 
 uint8_t* get_ptr(Memory* mem, uint16_t address){
