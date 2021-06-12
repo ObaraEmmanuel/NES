@@ -70,6 +70,11 @@ int main(int argc, char *argv[]) {
                             break;
                         case SDLK_SPACE:
                             pause ^= 1;
+                            break;
+                        case SDLK_F5:
+                            reset_cpu(&cpu);
+                            LOG(INFO, "Resetting emulator");
+                            break;
                         default:
                             break;
                     }
@@ -104,6 +109,7 @@ int main(int argc, char *argv[]) {
     }
      timespec_get(&m_end, TIME_UTC);
      unsigned long total_elapsed = m_end.tv_sec - m_start.tv_sec;
+     LOG(DEBUG, "Average clock speed: %.2f MHz", ((double)cpu.t_cycles / 1000000) / (double)total_elapsed);
      LOG(DEBUG, "Average frame rate: %.2f Hz", (double)ppu.frames / (double)total_elapsed);
 
 
@@ -122,7 +128,7 @@ static void init_sys(Mapper* mapper, PPU* ppu, c6502* cpu, Memory* mmu){
     mmu->cpu = cpu;
     init_mem(mmu);
     init_ppu(ppu);
-    reset_cpu(cpu);
+    init_cpu(cpu);
 }
 
 static void turbo(Memory* mem){

@@ -17,12 +17,19 @@ static uint16_t pop_address(c6502* ctx);
 static void branch(c6502* ctx, uint16_t address, uint8_t mask, uint8_t predicate);
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2);
 
-void reset_cpu(c6502* cpu){
+void init_cpu(c6502* cpu){
     cpu->ac = cpu->x = cpu->y = 0;
     cpu->cycles = 1;
-    cpu->odd_cycle = 0;
+    cpu->odd_cycle = cpu->t_cycles = 0;
     cpu->sr = 0x24;
     cpu->sp = 0xfd;
+    // cpu->pc = 0xC000;
+    cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
+}
+
+void reset_cpu(c6502* cpu){
+    cpu->sr |= INTERRUPT;
+    cpu->sp -= 3;
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
 }
 
