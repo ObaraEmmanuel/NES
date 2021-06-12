@@ -1,5 +1,4 @@
 #include <string.h>
-#include <stdlib.h>
 #include "mmu.h"
 #include "utils.h"
 
@@ -60,13 +59,11 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 break;
             case JOY1:
                 write_joypad(&mem->joy1, value);
-                break;
-            case JOY2:
                 write_joypad(&mem->joy2, value);
                 break;
-
             default:
                 LOG(ERROR, "Cannot write to register 0x%X", address);
+                break;
         }
         return;
     }
