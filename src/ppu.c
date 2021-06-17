@@ -8,7 +8,7 @@
 static uint8_t read_vram(PPU* ppu, uint16_t address);
 static void write_vram(PPU* ppu, uint16_t address, uint8_t value);
 static uint16_t render_background(PPU* ppu);
-static uint16_t render_sprites(PPU* ppu, uint8_t* back_priority);
+static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 
 
 void init_ppu(PPU* ppu){
@@ -196,7 +196,7 @@ void execute_ppu(PPU* ppu){
                 }
             }
             if(ppu->mask & SHOW_SPRITE && ((ppu->mask & SHOW_SPRITE_8) || x >=8)){
-                palette_addr_sp = render_sprites(ppu, &back_priority);
+                palette_addr_sp = render_sprites(ppu, palette_addr, &back_priority);
             }
             if((!palette_addr && palette_addr_sp) || (palette_addr && palette_addr_sp && !back_priority))
                 palette_addr = palette_addr_sp;
@@ -318,7 +318,7 @@ static uint16_t render_background(PPU* ppu){
     return palette_addr | (((attr >> ((ppu->v >> 4) & 4 | ppu->v & 2)) & 0x3) << 2);
 }
 
-static uint16_t render_sprites(PPU* restrict ppu, uint8_t* restrict back_priority){
+static uint16_t render_sprites(PPU* restrict ppu, uint16_t bg_addr, uint8_t* restrict back_priority){
     // 4 bytes per sprite
     // byte 0 -> y index
     // byte 1 -> tile index
@@ -363,7 +363,14 @@ static uint16_t render_sprites(PPU* restrict ppu, uint8_t* restrict back_priorit
         palette_addr |= 0x10 | ((attr & 0x3) << 2);
         *back_priority = attr & BIT_5;
 
-        if (!(ppu->status & SPRITE_0_HIT) && (ppu->mask & SHOW_BG) && i == 0 && palette_addr)
+        // sprite hit evaluation
+
+        if (!(ppu->status & SPRITE_0_HIT)
+            && (ppu->mask & SHOW_BG)
+            && i == 0
+            && palette_addr
+            && bg_addr
+            && x < 255)
             ppu->status |= SPRITE_0_HIT;
         break;
     }
