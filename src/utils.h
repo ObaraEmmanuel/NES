@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 
-#define LOGGER 0
+#define LOGLEVEL 1
 #define TRACER 0
 
 enum {
@@ -18,9 +18,9 @@ enum {
 };
 
 enum LogLevel{
-    INFO,
+    DEBUG = 0,
     ERROR,
-    DEBUG,
+    INFO,
 };
 
 size_t file_size(FILE* file);

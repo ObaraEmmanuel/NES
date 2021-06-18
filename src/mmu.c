@@ -62,7 +62,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 write_joypad(&mem->joy2, value);
                 break;
             default:
-                LOG(ERROR, "Cannot write to register 0x%X", address);
+                LOG(DEBUG, "Cannot write to register 0x%X", address);
                 break;
         }
         return;
@@ -108,7 +108,7 @@ uint8_t read_mem(Memory* mem, uint16_t address){
             case JOY2:
                 return read_joypad(&mem->joy2);
             default:
-                LOG(ERROR, "Cannot read from register 0x%X", address);
+                LOG(DEBUG, "Cannot read from register 0x%X", address);
                 return 0;
         }
     }

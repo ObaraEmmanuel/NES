@@ -12,7 +12,7 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...){
     if(TRACER)
         return;
 
-    if(LOGGER) {
+    if(logLevel >= LOGLEVEL) {
         switch (logLevel) {
             case INFO:
                 printf("INFO  > ");
