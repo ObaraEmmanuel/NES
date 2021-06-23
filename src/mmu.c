@@ -14,7 +14,8 @@ uint8_t* get_ptr(Memory* mem, uint16_t address){
     if(address > 0x6000 && address < 0x8000 && mem->mapper->save_RAM != NULL)
         return mem->mapper->save_RAM + (address - 0x6000);
     LOG(ERROR, "Could not access pointer to address 0x%x", address);
-    return NULL;
+    // continuing will only cause a segmentation fault
+    exit(EXIT_FAILURE);
 }
 
 void write_mem(Memory* mem, uint16_t address, uint8_t value){
