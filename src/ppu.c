@@ -5,8 +5,6 @@
 #include "mmu.h"
 #include "cpu6502.h"
 
-static uint8_t read_vram(PPU* ppu, uint16_t address);
-static void write_vram(PPU* ppu, uint16_t address, uint8_t value);
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 
@@ -109,7 +107,7 @@ void dma(PPU* ppu, struct Memory* memory, uint8_t address){
 
 
 
-static uint8_t read_vram(PPU* ppu, uint16_t address){
+uint8_t read_vram(PPU* ppu, uint16_t address){
     address = address % 0x4000;
 
     if(address < 0x2000)
@@ -133,7 +131,7 @@ static uint8_t read_vram(PPU* ppu, uint16_t address){
     return 0;
 }
 
-static void write_vram(PPU* ppu, uint16_t address, uint8_t value){
+void write_vram(PPU* ppu, uint16_t address, uint8_t value){
     address = address % 0x4000;
 
     if(address < 0x2000)

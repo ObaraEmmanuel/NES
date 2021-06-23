@@ -5,6 +5,9 @@
 #include "mapper.h"
 #include "utils.h"
 
+static void select_mapper(Mapper*  mapper);
+static void set_mapping(Mapper* mapper, uint16_t tr, uint16_t tl, uint16_t br, uint16_t bl);
+
 
 static void select_mapper(Mapper* mapper){
     switch (mapper->mapper_num) {
@@ -26,27 +29,35 @@ static void select_mapper(Mapper* mapper){
 }
 
 
+static void set_mapping(Mapper* mapper, uint16_t tr, uint16_t tl, uint16_t br, uint16_t bl){
+    mapper->name_table_map[0] = tr;
+    mapper->name_table_map[1] = tl;
+    mapper->name_table_map[2] = br;
+    mapper->name_table_map[3] = bl;
+}
+
+
 void set_mirroring(Mapper* mapper, Mirroring mirroring){
     switch (mirroring) {
         case HORIZONTAL:
-            memcpy(mapper->name_table_map, (const uint16_t [4]){0, 0, 0x400, 0x400}, 4);
+            set_mapping(mapper, 0, 0, 0x400, 0x400);
             LOG(DEBUG, "Using mirroring: Horizontal");
             break;
         case VERTICAL:
-            memcpy(mapper->name_table_map, (const uint16_t [4]){0, 0x400, 0, 0x400}, 4);
+            set_mapping(mapper,0, 0x400, 0, 0x400);
             LOG(DEBUG, "Using mirroring: Vertical");
             break;
         case ONE_SCREEN_LOWER:
         case ONE_SCREEN:
-            memset(mapper->name_table_map, 0, 4);
+            set_mapping(mapper,0, 0, 0, 0);
             LOG(DEBUG, "Using mirroring: Single screen lower");
             break;
         case ONE_SCREEN_UPPER:
-            memcpy(mapper->name_table_map, (const uint16_t [4]){0x400, 0x400, 0x400, 0x400}, 4);
+            set_mapping(mapper, 0x400, 0x400, 0x400, 0x400);
             LOG(DEBUG, "Using mirroring: Single screen upper");
             break;
         default:
-            memset(mapper->name_table_map, 0, 4);
+            set_mapping(mapper,0, 0, 0, 0);
             LOG(ERROR, "Unknown mirroring %u", mirroring);
     }
 }

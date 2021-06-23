@@ -37,7 +37,7 @@ enum{
 
 struct Memory;
 
-typedef struct {
+typedef struct PPU{
     size_t frames;
     uint32_t screen[VISIBLE_DOTS * VISIBLE_SCANLINES];
     uint8_t V_RAM[0x800];
@@ -92,3 +92,5 @@ void set_address(PPU* ppu, uint8_t address);
 void set_oam_address(PPU* ppu, uint8_t address);
 uint8_t read_oam(PPU* ppu);
 void write_oam(PPU* ppu, uint8_t value);
+uint8_t read_vram(PPU* ppu, uint16_t address);
+void write_vram(PPU* ppu, uint16_t address, uint8_t value);
