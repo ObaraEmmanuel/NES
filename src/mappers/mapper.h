@@ -52,3 +52,4 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring);
 void load_NROM(Mapper* mapper);
 void load_UXROM(Mapper* mapper);
 void load_MMC1(Mapper* mapper);
+void load_CNROM(Mapper* mapper);

@@ -21,6 +21,8 @@ static void select_mapper(Mapper* mapper){
             load_MMC1(mapper);
             break;
         case CNROM:
+            load_CNROM(mapper);
+            break;
         case MMC3:
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
