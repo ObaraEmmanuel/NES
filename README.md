@@ -40,14 +40,14 @@ over time. Any help is welcome.
     - [x] \#0 NROM
     - [x] \#1 MMC1
     - [x] \#2 UxROM
-    - [ ] \#3 CNROM
+    - [x] \#3 CNROM
     - [ ] \#4 MMC3
     - [ ] \#5 MMC5
     
 ## What can be played
 
 I haven't really taken time to do a survey but based on mappers implemented 
-we can put the estimate at 44% of NES games. This is assuming none of them are 
+we can put the estimate at 51.7% of NES games. This is assuming none of them are 
 using a quirk that I haven't gotten round to implementing. Games using 
 mid-scanline trickery may not work as expected unless I find time to iron
 out timing issues in the PPU. Below are a few demos:
