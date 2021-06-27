@@ -10,7 +10,6 @@ static uint8_t read_CHR(Mapper*, uint16_t);
 static void write_CHR(Mapper*, uint16_t, uint8_t);
 
 void load_CNROM(Mapper* mapper){
-    mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
@@ -20,11 +19,6 @@ void load_CNROM(Mapper* mapper){
         mapper->CHR_RAM = malloc(0x2000);
         memset(mapper->CHR_RAM, 0, 0x2000);
     }
-}
-
-
-static uint8_t read_PRG(Mapper* mapper, uint16_t address){
-    return mapper->PRG_ROM[(address - 0x8000) % (0x4000 * mapper->PRG_banks)];
 }
 
 
@@ -40,9 +34,5 @@ static uint8_t read_CHR(Mapper* mapper, uint16_t address){
 
 
 static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
-    if(mapper->CHR_banks){
-        LOG(DEBUG, "Attempted to write to CHR-ROM");
-        return;
-    }
-    mapper->CHR_RAM[address] = value;
+    LOG(DEBUG, "Attempted to write to CHR-ROM");
 }
