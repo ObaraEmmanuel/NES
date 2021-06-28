@@ -109,58 +109,56 @@ void load_file(char* file_name, Mapper* mapper){
         exit(EXIT_FAILURE);
     }
 
-    char header_start[5];
-    fread(header_start, 1, 4, file);
-    header_start[4] = '\0';
+    uint8_t header[INES_HEADER_SIZE];
+    fread(header, 1, INES_HEADER_SIZE, file);
 
-    if(strncmp(header_start, "NES\x1A", 4) != 0){
+    if(strncmp((char *)header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
         exit(EXIT_FAILURE);
     }
 
-    fread(&mapper->PRG_banks, 1, 1, file);
-    fread(&mapper->CHR_banks, 1, 1, file);
+    mapper->PRG_banks = header[4];
+    mapper->CHR_banks = header[5];
 
     LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
     LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
 
-    uint8_t ROM_ctrl1, ROM_ctrl2;
-
-    fread(&ROM_ctrl1, 1, 1, file);
-
-    if(ROM_ctrl1 & BIT_1){
+    if(header[6] & BIT_1){
         mapper->save_RAM = malloc(0x2000);
         LOG(INFO, "Battery backed save RAM 8KB : Available");
     }
 
-    if(ROM_ctrl1 & BIT_2) {
+    if(header[6] & BIT_2) {
         LOG(ERROR, "Trainer not supported");
         exit(EXIT_FAILURE);
     }
 
-    if(ROM_ctrl1 & BIT_3){
+    if(header[6] & BIT_3){
         mapper->mirroring = FOUR_SCREEN;
     }
-    else if(ROM_ctrl1 & BIT_0) {
+    else if(header[6] & BIT_0) {
         mapper->mirroring = VERTICAL;
     }
     else {
         mapper->mirroring = HORIZONTAL;
     }
 
-    mapper->mapper_num = (ROM_ctrl1 & 0xF0) >> 4;
-    fread(&ROM_ctrl2, 1, 1, file);
-    mapper->mapper_num |= ROM_ctrl2 & 0xF0;
+    mapper->mapper_num = ((header[6] & 0xF0) >> 4) | (header[7] & 0xF0);
 
     LOG(INFO, "Using mapper #%d", mapper->mapper_num);
 
-    fread(&mapper->RAM_banks, 1, 1, file);
+    mapper->RAM_banks = header[8];
 
     if(mapper->RAM_banks == 0)
-        mapper->RAM_banks++;  // assume 1 when set to zero
-    LOG(INFO, "RAM Banks (2kb): %u", mapper->RAM_banks);
+        LOG(INFO, "SRAM Banks (8kb): Not specified");
+    else
+        LOG(INFO, "SRAM Banks (8kb): %u (Not used by emulator)", mapper->RAM_banks);
 
-    fseek(file, 7, SEEK_CUR);
+
+    if((header[10] & 0x3) == 0x2 || (header[10] & BIT_0))
+        LOG(INFO, "ROM type: PAL");
+    else
+        LOG(INFO, "ROM type: NTSC");
 
     mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
     fread(mapper->PRG_ROM, 1, 0x4000 * mapper->PRG_banks, file);
@@ -168,7 +166,6 @@ void load_file(char* file_name, Mapper* mapper){
     if(mapper->CHR_banks) {
         mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
         fread(mapper->CHR_RAM, 1, 0x2000 * mapper->CHR_banks, file);
-        LOG(INFO, "CHR-ROM : Available");
     }
 
     fclose(file);

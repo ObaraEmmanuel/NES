@@ -3,6 +3,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#define INES_HEADER_SIZE 16
+
 typedef enum{
     VERTICAL,
     HORIZONTAL,
