@@ -36,7 +36,6 @@ void load_MMC1(Mapper* mapper){
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
-    mapper->write_CHR = write_CHR;
     MMC1_t* mmc1 = calloc(1, sizeof(MMC1_t));
     mapper->extension = mmc1;
     mmc1->reg = REG_INIT;
@@ -152,13 +151,4 @@ static uint8_t read_CHR(Mapper* mapper, uint16_t address){
         return *(((MMC1_t*)mapper->extension)->CHR_bank1 + address);
     else
         return *(((MMC1_t*)mapper->extension)->CHR_bank2 + (address & 0xfff));
-}
-
-
-static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
-    if(!mapper->CHR_banks){
-        LOG(DEBUG, "Attempted to write to CHR-ROM");
-        return;
-    }
-    mapper->CHR_RAM[address] = value;
 }
