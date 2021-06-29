@@ -20,7 +20,8 @@ typedef enum{
     MMC1,
     UXROM,
     CNROM,
-    MMC3
+    MMC3,
+    GNROM = 66
 } MapperID;
 
 typedef struct Mapper{
@@ -54,3 +55,4 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring);
 void load_UXROM(Mapper* mapper);
 void load_MMC1(Mapper* mapper);
 void load_CNROM(Mapper* mapper);
+void load_GNROM(Mapper* mapper);
