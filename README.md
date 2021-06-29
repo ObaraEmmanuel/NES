@@ -37,12 +37,13 @@ over time. Any help is welcome.
     - [x] Gamepad controller (Multiplayer)
     - [x] Turbo keys
 * Mappers
-    - [x] \#0 NROM
-    - [x] \#1 MMC1
-    - [x] \#2 UxROM
-    - [x] \#3 CNROM
-    - [ ] \#4 MMC3
-    - [ ] \#5 MMC5
+    - [x] \#0   NROM
+    - [x] \#1   MMC1
+    - [x] \#2   UxROM
+    - [x] \#3   CNROM
+    - [ ] \#4   MMC3
+    - [ ] \#5   MMC5
+    - [x] \#66  GNROM
     
 ## What can be played
 
