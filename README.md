@@ -43,6 +43,7 @@ over time. Any help is welcome.
     - [x] \#3   CNROM
     - [ ] \#4   MMC3
     - [ ] \#5   MMC5
+    - [x] \#7   AxROM
     - [x] \#66  GNROM
     
 ## What can be played
