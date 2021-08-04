@@ -4,12 +4,17 @@
 #include "utils.h"
 #include "mmu.h"
 #include "cpu6502.h"
+#include "emulator.h"
 
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 
 
-void init_ppu(PPU* ppu){
+void init_ppu(struct Emulator* emulator){
+    struct PPU* ppu = &emulator->ppu;
+    ppu->emulator = emulator;
+    ppu->mapper = &emulator->mapper;
+
     memset(ppu->palette, 0, 0x20);
     memset(ppu->OAM_cache, 0, 64);
     memset(ppu->V_RAM, 0, 0x800);
@@ -93,16 +98,17 @@ void write_ppu(PPU* ppu, uint8_t value){
     ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
 }
 
-void dma(PPU* ppu, struct Memory* memory, uint8_t address){
+void dma(PPU* ppu, uint8_t address){
+    Memory* memory = &ppu->emulator->mem;
     uint8_t* ptr = get_ptr(memory, address * 0x100);
     // copy from OAM address to the end (256 bytes)
     memcpy(ppu->OAM + ppu->oam_address, ptr, 256 - ppu->oam_address);
     if(ppu->oam_address)
         // wrap around and copy from start to OAM address if OAM is not 0x00
         memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
-    memory->cpu->cycles += 513;
+    ppu->emulator->cpu.cycles += 513;
     // skip extra cycle on odd cycle
-    memory->cpu->cycles += memory->cpu->odd_cycle;
+    ppu->emulator->cpu.cycles += ppu->emulator->cpu.odd_cycle;
 }
 
 
@@ -254,7 +260,7 @@ void execute_ppu(PPU* ppu){
             ppu->status |= V_BLANK;
             if(ppu->ctrl & GENERATE_NMI){
                 // generate NMI
-                interrupt(ppu->mem->cpu, NMI);
+                interrupt(&ppu->emulator->cpu, NMI);
             }
         }
     }

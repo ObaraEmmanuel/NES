@@ -57,18 +57,17 @@ typedef enum{
 
 } IORegister;
 
-struct c6502;
+struct Emulator;
 
 typedef struct Memory {
     uint8_t RAM[RAM_SIZE];
-    PPU* ppu;
-    struct c6502* cpu;
-    Mapper* mapper;
     JoyPad joy1;
     JoyPad joy2;
+    Mapper* mapper;
+    struct Emulator* emulator;
 } Memory;
 
-void init_mem(Memory* memory);
+void init_mem(struct Emulator* emulator);
 void write_mem(Memory* mem, uint16_t address, uint8_t value);
 uint8_t read_mem(Memory* mem, uint16_t address);
 uint8_t* get_ptr(Memory* mem, uint16_t address);

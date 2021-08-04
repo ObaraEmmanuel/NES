@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <SDL2/SDL_rwops.h>
 
 #include "mapper.h"
 #include "utils.h"
@@ -21,6 +22,7 @@ static void select_mapper(Mapper* mapper){
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
+    mapper->extension = NULL;
 
     switch (mapper->mapper_num) {
         case NROM:
@@ -108,7 +110,8 @@ static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
 
 
 void load_file(char* file_name, Mapper* mapper){
-    FILE* file = fopen(file_name, "rb");
+    SDL_RWops *file;
+    file = SDL_RWFromFile(file_name, "rb");
 
     if(file == NULL){
         LOG(ERROR, "file '%s' not found", file_name);
@@ -116,7 +119,7 @@ void load_file(char* file_name, Mapper* mapper){
     }
 
     uint8_t header[INES_HEADER_SIZE];
-    fread(header, 1, INES_HEADER_SIZE, file);
+    SDL_RWread(file, header, INES_HEADER_SIZE, 1);
 
     if(strncmp((char *)header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
@@ -167,14 +170,15 @@ void load_file(char* file_name, Mapper* mapper){
         LOG(INFO, "ROM type: NTSC");
 
     mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    fread(mapper->PRG_ROM, 1, 0x4000 * mapper->PRG_banks, file);
+    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
 
     if(mapper->CHR_banks) {
         mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
-        fread(mapper->CHR_RAM, 1, 0x2000 * mapper->CHR_banks, file);
-    }
+        SDL_RWread(file, mapper->CHR_RAM, 0x2000 * mapper->CHR_banks, 1);
+    }else
+        mapper->CHR_RAM = NULL;
 
-    fclose(file);
+    SDL_RWclose(file);
 
     select_mapper(mapper);
     set_mirroring(mapper, mapper->mirroring);
@@ -187,4 +191,5 @@ void free_mapper(Mapper* mapper){
         free(mapper->CHR_RAM);
     if(mapper->extension != NULL)
         free(mapper->extension);
+    LOG(DEBUG, "Mapper cleanup complete");
 }

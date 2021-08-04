@@ -29,4 +29,4 @@ uint8_t read_joypad(struct JoyPad* joyPad);
 void write_joypad(struct JoyPad* joyPad, uint8_t data);
 void update_joypad(struct JoyPad* joyPad, SDL_Event* event);
 void turbo_trigger(struct JoyPad* joyPad);
-uint16_t keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type);
+void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event);

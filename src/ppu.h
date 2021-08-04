@@ -35,7 +35,7 @@ enum{
     Y_SCROLL_BITS   = 0x73E0
 };
 
-struct Memory;
+struct Emulator;
 
 typedef struct PPU{
     size_t frames;
@@ -45,7 +45,6 @@ typedef struct PPU{
     uint8_t OAM_cache[8];
     uint8_t palette[0x20];
     uint8_t OAM_cache_len;
-    uint8_t sprites;
     uint8_t ctrl;
     uint8_t mask;
     uint8_t status;
@@ -61,9 +60,8 @@ typedef struct PPU{
 
     uint8_t render;
 
+    struct Emulator* emulator;
     Mapper* mapper;
-    struct Memory* mem;
-
 } PPU;
 
 
@@ -81,12 +79,12 @@ static const uint32_t nes_palette[64] = {
 
 void execute_ppu(PPU* ppu);
 void reset_ppu(PPU* ppu);
-void init_ppu(PPU* ppu);
+void init_ppu(struct Emulator* emulator);
 uint8_t read_status(PPU* ppu);
 uint8_t read_ppu(PPU* ppu);
 void set_ctrl(PPU* ppu, uint8_t ctrl);
 void write_ppu(PPU* ppu, uint8_t value);
-void dma(PPU* ppu, struct Memory* memory, uint8_t value);
+void dma(PPU* ppu, uint8_t value);
 void set_scroll(PPU* ppu, uint8_t coord);
 void set_address(PPU* ppu, uint8_t address);
 void set_oam_address(PPU* ppu, uint8_t address);

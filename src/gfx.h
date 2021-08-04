@@ -1,13 +1,18 @@
 #pragma once
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
-typedef struct{
+typedef struct GraphicsContext{
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
+    TTF_Font * font;
+    SDL_Rect dest;
     int width;
     int height;
+    int screen_width;
+    int screen_height;
     float scale;
 
 } GraphicsContext;

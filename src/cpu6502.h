@@ -188,6 +188,7 @@ static const uint8_t cycleLookup[256] = {
 /* F */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
 };
 
+struct Emulator;
 
 typedef struct c6502{
     size_t t_cycles;
@@ -199,9 +200,9 @@ typedef struct c6502{
     uint8_t sp;
     uint8_t cycles;
     uint8_t odd_cycle;
+    struct Emulator* emulator;
     const Instruction* instruction;
     Memory* memory;
-    PPU* ppu;
 } c6502;
 
 typedef enum {
@@ -210,7 +211,7 @@ typedef enum {
     IRQ,    // interrupt request
 } Interrupt;
 
-void init_cpu(c6502* ctx);
+void init_cpu(struct Emulator* emulator);
 void reset_cpu(c6502* ctx);
 void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt interrupt);

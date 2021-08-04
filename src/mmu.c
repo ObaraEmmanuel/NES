@@ -1,11 +1,16 @@
 #include <string.h>
 #include "mmu.h"
+#include "emulator.h"
 #include "utils.h"
 
-void init_mem(Memory* memory){
-    memset(memory->RAM, 0, RAM_SIZE);
-    init_joypad(&memory->joy1, 0);
-    init_joypad(&memory->joy2, 1);
+void init_mem(struct Emulator* emulator){
+    Memory* mem = &emulator->mem;
+    mem->emulator = emulator;
+    mem->mapper = &emulator->mapper;
+
+    memset(mem->RAM, 0, RAM_SIZE);
+    init_joypad(&mem->joy1, 0);
+    init_joypad(&mem->joy2, 1);
 }
 
 uint8_t* get_ptr(Memory* mem, uint16_t address){
@@ -31,7 +36,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
 
     // handle all IO registers
     if(address < IO_REG_END){
-        PPU* ppu = mem->ppu;
+        PPU* ppu = &mem->emulator->ppu;
 
         switch (address) {
             case PPU_CTRL:
@@ -53,7 +58,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 set_oam_address(ppu, value);
                 break;
             case OAM_DMA:
-                dma(ppu, mem, value);
+                dma(ppu, value);
                 break;
             case OAM_DATA:
                 write_oam(ppu, value);
@@ -96,7 +101,7 @@ uint8_t read_mem(Memory* mem, uint16_t address){
 
     // handle all IO registers
     if(address < IO_REG_END){
-        PPU* ppu = mem->ppu;
+        PPU* ppu = &mem->emulator->ppu;
         switch (address) {
             case PPU_STATUS:
                 return read_status(ppu);

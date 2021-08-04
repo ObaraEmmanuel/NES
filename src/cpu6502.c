@@ -1,4 +1,5 @@
 #include "cpu6502.h"
+#include "emulator.h"
 #include "utils.h"
 
 
@@ -17,7 +18,11 @@ static uint16_t pop_address(c6502* ctx);
 static void branch(c6502* ctx, uint16_t address, uint8_t mask, uint8_t predicate);
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2);
 
-void init_cpu(c6502* cpu){
+void init_cpu(struct Emulator* emulator){
+    struct c6502* cpu = &emulator->cpu;
+    cpu->emulator = emulator;
+    cpu->memory = &emulator->mem;
+
     cpu->ac = cpu->x = cpu->y = 0;
     cpu->cycles = 1;
     cpu->odd_cycle = cpu->t_cycles = 0;

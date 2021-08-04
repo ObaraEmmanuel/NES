@@ -140,7 +140,7 @@ void print_cpu_trace(const c6502* ctx){
             break;
     }
 
-    printf(
+    PRINTF(
         "%04X  %s %s%s %s  A:%02X X:%02X Y:%02X P:%02X SP:%02X\n",
         ctx->pc,
         opcode_hex_str,
