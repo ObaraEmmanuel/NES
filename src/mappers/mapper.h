@@ -15,12 +15,13 @@ typedef enum{
 
 } Mirroring;
 
-typedef enum{
+typedef enum MapperID {
     NROM = 0,
     MMC1,
     UXROM,
     CNROM,
     MMC3,
+    AOROM = 7,
     GNROM = 66
 } MapperID;
 
@@ -56,3 +57,4 @@ void load_UXROM(Mapper* mapper);
 void load_MMC1(Mapper* mapper);
 void load_CNROM(Mapper* mapper);
 void load_GNROM(Mapper* mapper);
+void load_AOROM(Mapper* mapper);
