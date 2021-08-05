@@ -8,11 +8,11 @@ static int is_official(uint8_t op_hex, Opcode opcode);
 
 void print_cpu_trace(const c6502* ctx){
     static uint64_t traces = 0;
-    #if TRACER == 1
+#if TRACER == 1
     // for use with the golden log
     if(traces >= 8991)
         exit(1);
-    #endif
+#endif
     char opcode_str[4], address_str[27], opcode_hex_str[9];
     uint16_t addr, pc = ctx->pc, hi, lo;
     uint8_t opcode;

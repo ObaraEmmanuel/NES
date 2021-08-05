@@ -23,19 +23,19 @@ static void interrupt_(c6502* ctx);
 void init_cpu(struct Emulator* emulator){
     struct c6502* cpu = &emulator->cpu;
     cpu->emulator = emulator;
-    cpu->interrupt = NOI
+    cpu->interrupt = NOI;
     cpu->memory = &emulator->mem;
 
     cpu->ac = cpu->x = cpu->y = cpu->state = 0;
-    cpu->cycles = 0;
+    cpu->cycles = cpu->dma_cycles = 0;
     cpu->odd_cycle = cpu->t_cycles = 0;
     cpu->sr = 0x24;
     cpu->sp = 0xfd;
-    #if TRACER == 1
+#if TRACER == 1
     cpu->pc = 0xC000;
-    #else
+#else
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
-    #endif
+#endif
 }
 
 void reset_cpu(c6502* cpu){
@@ -139,9 +139,9 @@ void execute(c6502* ctx){
         return;
     }
     if(ctx->cycles == 0) {
-        #if TRACER == 1
+#if TRACER == 1
         print_cpu_trace(ctx);
-        #endif
+#endif
         if(ctx->interrupt != NOI){
             // prepare for interrupts
             ctx->state |= INTERRUPT_PENDING;
