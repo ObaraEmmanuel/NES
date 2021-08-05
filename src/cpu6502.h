@@ -190,9 +190,23 @@ static const uint8_t cycleLookup[256] = {
 
 struct Emulator;
 
+typedef enum {
+    NOI = 0,    // no interrupt
+    NMI,    // Non maskable interrupt
+    RSI,    // reset interrupt
+    IRQ,    // interrupt request
+} Interrupt;
+
+enum{
+    BRANCH_STATE = 1,
+    INTERRUPT_PENDING = 1 << 1
+};
+
 typedef struct c6502{
     size_t t_cycles;
     uint16_t pc;
+    uint16_t address;
+    uint16_t dma_cycles;
     uint8_t ac;
     uint8_t x;
     uint8_t y;
@@ -201,15 +215,11 @@ typedef struct c6502{
     uint8_t cycles;
     uint8_t odd_cycle;
     struct Emulator* emulator;
+    uint8_t state;  // (0) -> branch, (1) -> interrupt pending
+    Interrupt interrupt;
     const Instruction* instruction;
     Memory* memory;
 } c6502;
-
-typedef enum {
-    NMI,    // Non maskable interrupt
-    RSI,    // reset interrupt
-    IRQ,    // interrupt request
-} Interrupt;
 
 void init_cpu(struct Emulator* emulator);
 void reset_cpu(c6502* ctx);

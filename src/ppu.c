@@ -106,9 +106,9 @@ void dma(PPU* ppu, uint8_t address){
     if(ppu->oam_address)
         // wrap around and copy from start to OAM address if OAM is not 0x00
         memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
-    ppu->emulator->cpu.cycles += 513;
+    ppu->emulator->cpu.dma_cycles += 513;
     // skip extra cycle on odd cycle
-    ppu->emulator->cpu.cycles += ppu->emulator->cpu.odd_cycle;
+    ppu->emulator->cpu.dma_cycles += ppu->emulator->cpu.odd_cycle;
 }
 
 

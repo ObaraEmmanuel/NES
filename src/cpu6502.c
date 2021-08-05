@@ -15,21 +15,27 @@ static void push(c6502* ctx, uint8_t value);
 static void push_address(c6502* ctx, uint16_t address);
 static uint8_t pop(c6502* ctx);
 static uint16_t pop_address(c6502* ctx);
-static void branch(c6502* ctx, uint16_t address, uint8_t mask, uint8_t predicate);
+static void branch(c6502* ctx, uint8_t mask, uint8_t predicate);
+static void prep_branch(c6502* ctx);
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2);
+static void interrupt_(c6502* ctx);
 
 void init_cpu(struct Emulator* emulator){
     struct c6502* cpu = &emulator->cpu;
     cpu->emulator = emulator;
+    cpu->interrupt = NOI
     cpu->memory = &emulator->mem;
 
-    cpu->ac = cpu->x = cpu->y = 0;
-    cpu->cycles = 1;
+    cpu->ac = cpu->x = cpu->y = cpu->state = 0;
+    cpu->cycles = 0;
     cpu->odd_cycle = cpu->t_cycles = 0;
     cpu->sr = 0x24;
     cpu->sp = 0xfd;
-    // cpu->pc = 0xC000;
+    #if TRACER == 1
+    cpu->pc = 0xC000;
+    #else
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
+    #endif
 }
 
 void reset_cpu(c6502* cpu){
@@ -38,13 +44,16 @@ void reset_cpu(c6502* cpu){
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
 }
 
-void interrupt(c6502* ctx, Interrupt interrupt){
-    if((ctx->sr & INTERRUPT) && interrupt != NMI)
+static void interrupt_(c6502* ctx){
+    // handle interrupt
+    if((ctx->sr & INTERRUPT) && ctx->interrupt != NMI) {
+        ctx->interrupt = NOI;
         return;
+    }
 
     uint16_t addr;
 
-    switch (interrupt) {
+    switch (ctx->interrupt) {
         case NMI:
             addr = NMI_ADDRESS;
             break;
@@ -55,6 +64,9 @@ void interrupt(c6502* ctx, Interrupt interrupt){
         case RSI:
             addr = RESET_ADDRESS;
             break;
+        case NOI:
+            LOG(ERROR, "No interrupt set");
+            return;
         default:
             LOG(ERROR, "Unknown interrupt");
             return;
@@ -65,22 +77,103 @@ void interrupt(c6502* ctx, Interrupt interrupt){
     ctx->sr &= ~INTERRUPT;
     ctx->sr |= INTERRUPT;
     ctx->pc = read_abs_address(ctx->memory, addr);
+    ctx->interrupt = NOI;
+}
+
+void interrupt(c6502* ctx, Interrupt interrupt){
+    // the cpu will handle interrupt when ready
+    ctx->interrupt = interrupt;
+}
+
+
+static void branch(c6502* ctx, uint8_t mask, uint8_t predicate){
+    if(((ctx->sr & mask) > 0) == predicate){
+        // increment cycles if branching to a different page
+        ctx->cycles += has_page_break(ctx->pc, ctx->address);
+        ctx->cycles++;
+        // tell the cpu to perform a branch when it is ready
+        ctx->state |= BRANCH_STATE;
+    }else {
+        // remove branch state
+        ctx->state &= ~BRANCH_STATE;
+    }
+}
+
+static void prep_branch(c6502* ctx){
+    switch(ctx->instruction->opcode){
+        case BCC:
+            branch(ctx, CARRY, 0);
+            break;
+        case BCS:
+            branch(ctx, CARRY, 1);
+            break;
+        case BEQ:
+            branch(ctx, ZERO, 1);
+            break;
+        case BMI:
+            branch(ctx, NEGATIVE, 1);
+            break;
+        case BNE:
+            branch(ctx, ZERO, 0);
+            break;
+        case BPL:
+            branch(ctx, NEGATIVE, 0);
+            break;
+        case BVC:
+            branch(ctx, OVERFLOW, 0);
+            break;
+        case BVS:
+            branch(ctx, OVERFLOW, 1);
+            break;
+        default:
+            ctx->state &= ~BRANCH_STATE;
+    }
 }
 
 void execute(c6502* ctx){
     ctx->odd_cycle ^= 1;
     ctx->t_cycles++;
-    if(--ctx->cycles > 0){
+    if (ctx->dma_cycles != 0){
+        // DMA CPU suspend
+        ctx->dma_cycles--;
         return;
     }
-    if(TRACER)
+    if(ctx->cycles == 0) {
+        #if TRACER == 1
         print_cpu_trace(ctx);
-    uint8_t opcode = read_mem(ctx->memory, ctx->pc++);
-    ctx->instruction = &instructionLookup[opcode];
-    uint16_t address = get_address(ctx);
-    ctx->cycles += cycleLookup[opcode];
-    if(address > 0x4020 && address < 0x6000)
-        LOG(DEBUG, "Expansion ROM address: $%04X, opcode: %02X", address, opcode);
+        #endif
+        if(ctx->interrupt != NOI){
+            // prepare for interrupts
+            ctx->state |= INTERRUPT_PENDING;
+            // takes 7 cycles and this is one of them so only 6 are left
+            ctx->cycles = 6;
+            return;
+        }
+        uint8_t opcode = read_mem(ctx->memory, ctx->pc++);
+        ctx->instruction = &instructionLookup[opcode];
+        ctx->address = get_address(ctx);
+        ctx->cycles += cycleLookup[opcode];
+        // prepare for branching and adjust cycles accordingly
+        prep_branch(ctx);
+        ctx->cycles--;
+        return;
+    } else if(ctx->cycles == 1){
+        ctx->cycles--;
+        // proceed to execution
+    } else{
+        // delay execution
+        ctx->cycles--;
+        return;
+    }
+
+    // handle interrupt
+    if(ctx->state & INTERRUPT_PENDING) {
+        interrupt_(ctx);
+        ctx->state &= ~INTERRUPT_PENDING;
+        return;
+    }
+
+    uint16_t address = ctx->address;
 
     switch (ctx->instruction->opcode) {
 
@@ -296,29 +389,11 @@ void execute(c6502* ctx){
 
         // branching opcodes
 
-        case BCC:
-            branch(ctx, address, CARRY, 0);
-            break;
-        case BCS:
-            branch(ctx, address, CARRY, 1);
-            break;
-        case BEQ:
-            branch(ctx, address, ZERO, 1);
-            break;
-        case BMI:
-            branch(ctx, address, NEGATIVE, 1);
-            break;
-        case BNE:
-            branch(ctx, address, ZERO, 0);
-            break;
-        case BPL:
-            branch(ctx, address, NEGATIVE, 0);
-            break;
-        case BVC:
-            branch(ctx, address, OVERFLOW, 0);
-            break;
-        case BVS:
-            branch(ctx, address, OVERFLOW, 1);
+        case BCC:case BCS:case BEQ:case BMI:case BNE:case BPL:case BVC:case BVS:
+            if(ctx->state & BRANCH_STATE) {
+                ctx->pc = ctx->address;
+                ctx->state &= ~BRANCH_STATE;
+            }
             break;
 
         // status flag changes
@@ -613,15 +688,6 @@ static uint8_t rot_r(c6502* ctx, uint8_t val){
     ctx->sr |= val & CARRY;
     fast_set_ZN(ctx, rotated);
     return rotated;
-}
-
-static void branch(c6502* ctx, uint16_t address, uint8_t mask, uint8_t predicate){
-    if(((ctx->sr & mask) > 0) == predicate){
-        // increment cycles if branching to a different page
-        ctx->cycles += has_page_break(ctx->pc, address);
-        ctx->pc = address;
-        ctx->cycles++;
-    }
 }
 
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2){
