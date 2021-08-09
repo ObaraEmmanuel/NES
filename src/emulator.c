@@ -59,6 +59,10 @@ void run_emulator(struct Emulator* emulator){
     emulator->m_start = SDL_GetTicks();
 
     while (!emulator->exit) {
+#if PROFILE
+        if(ppu->frames >= PROFILE_STOP_FRAME)
+            break;
+#endif
         start = SDL_GetTicks();
         while (SDL_PollEvent(&e)) {
             update_joypad(joy1, &e);
@@ -103,9 +107,10 @@ void run_emulator(struct Emulator* emulator){
             // 30000 cycles infinite loop fail-safe in case render flag is not set
             // loop will on normal occasion hit scanline 261 long before that
             // if ppu.render is set a frame is complete
-            while(!ppu->render && ++c < 30000){
-                for (size_t i = 0; i < 3; i++)
-                    execute_ppu(ppu);
+            while(!ppu->render){
+                execute_ppu(ppu);
+                execute_ppu(ppu);
+                execute_ppu(ppu);
                 execute(cpu);
             }
             render_graphics(g_ctx, ppu->screen);

@@ -114,21 +114,14 @@ void dma(PPU* ppu, uint8_t address){
 
 
 uint8_t read_vram(PPU* ppu, uint16_t address){
-    address = address % 0x4000;
+    address = address & 0x3fff;
 
     if(address < 0x2000)
         return ppu->mapper->read_CHR(ppu->mapper, address);
 
     if(address < 0x3F00){
-        address = (address - 0x2000) % 0x1000;
-        if(address < 0x400)
-            return ppu->V_RAM[ppu->mapper->name_table_map[0] + address % 0x400];
-        else if(address < 0x800)
-            return ppu->V_RAM[ppu->mapper->name_table_map[1] + address % 0x400];
-        else if(address < 0xC00)
-            return ppu->V_RAM[ppu->mapper->name_table_map[2] + address % 0x400];
-        else
-            return ppu->V_RAM[ppu->mapper->name_table_map[3] + address % 0x400];
+        address = (address - 0x2000) % 0xfff;
+        return ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
     }
 
     if(address < 0x4000)
@@ -138,20 +131,13 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
 }
 
 void write_vram(PPU* ppu, uint16_t address, uint8_t value){
-    address = address % 0x4000;
+    address = address & 0x3fff;
 
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);
     else if(address < 0x3F00){
-        address = (address - 0x2000) % 0x1000;
-        if(address < 0x400)
-            ppu->V_RAM[ppu->mapper->name_table_map[0] + address % 0x400] = value;
-        else if(address < 0x800)
-            ppu->V_RAM[ppu->mapper->name_table_map[1] + address % 0x400] = value;
-        else if(address < 0xC00)
-            ppu->V_RAM[ppu->mapper->name_table_map[2] + address % 0x400] = value;
-        else
-            ppu->V_RAM[ppu->mapper->name_table_map[3] + address % 0x400] = value;
+        address = (address - 0x2000) & 0xfff;
+        ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)] = value;
     }
 
     else if(address < 0x4000) {
