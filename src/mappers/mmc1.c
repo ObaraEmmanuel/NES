@@ -1,5 +1,4 @@
 #include <stdlib.h>
-#include <string.h>
 
 #include "mapper.h"
 #include "utils.h"
@@ -41,10 +40,7 @@ void load_MMC1(Mapper* mapper){
     mmc1->reg = REG_INIT;
     mmc1->PRG_mode = 3;
 
-    if(!mapper->CHR_banks){
-        mapper->CHR_RAM = malloc(0x2000);
-        memset(mapper->CHR_RAM, 0, 0x2000);
-    }else
+    if(mapper->CHR_banks)
         mmc1->CHR_bank1 = mmc1->CHR_bank2 = mapper->CHR_RAM;
 
     mmc1->PRG_bank1 = mapper->PRG_ROM;

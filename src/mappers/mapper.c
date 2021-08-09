@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <SDL2/SDL_rwops.h>
@@ -22,7 +21,12 @@ static void select_mapper(Mapper* mapper){
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
-    mapper->extension = NULL;
+    mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
+
+    if(!mapper->CHR_banks) {
+        mapper->CHR_RAM = malloc(0x2000);
+        memset(mapper->CHR_RAM, 0, 0x2000);
+    }
 
     switch (mapper->mapper_num) {
         case NROM:
@@ -86,7 +90,7 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
 
 
 static uint8_t read_PRG(Mapper* mapper, uint16_t address){
-    return mapper->PRG_ROM[(address - 0x8000) % (0x4000 * mapper->PRG_banks)];
+    return mapper->PRG_ROM[(address - 0x8000) & mapper->clamp];
 }
 
 
@@ -117,6 +121,9 @@ void load_file(char* file_name, Mapper* mapper){
         LOG(ERROR, "file '%s' not found", file_name);
         exit(EXIT_FAILURE);
     }
+
+    // clear mapper
+    memset(mapper, 0, sizeof(Mapper));
 
     uint8_t header[INES_HEADER_SIZE];
     SDL_RWread(file, header, INES_HEADER_SIZE, 1);
