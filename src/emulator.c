@@ -14,7 +14,11 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
         exit(EXIT_FAILURE);
     }
 
-    load_file(argv[1], &emulator->mapper);
+    char* genie = NULL;
+    if(argc == 3 || argc == 5)
+        genie = argv[argc - 1];
+
+    load_file(argv[1], genie, &emulator->mapper);
     init_mem(emulator);
     init_ppu(emulator);
     init_cpu(emulator);

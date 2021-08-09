@@ -25,6 +25,8 @@ typedef enum MapperID {
     GNROM = 66
 } MapperID;
 
+struct Genie;
+
 typedef struct Mapper{
     uint8_t* CHR_RAM;
     uint8_t* PRG_ROM;
@@ -47,9 +49,11 @@ typedef struct Mapper{
     // memory should be allocated dynamically and should
     // not be freed since this is done by the generic mapper functions
     void* extension;
+    // pointer to game genie if any
+    struct Genie* genie;
 } Mapper;
 
-void load_file(char* file_name, Mapper* mapper);
+void load_file(char* file_name, char* game_genie, Mapper* mapper);
 void free_mapper(struct Mapper* mapper);
 void set_mirroring(Mapper* mapper, Mirroring mirroring);
 

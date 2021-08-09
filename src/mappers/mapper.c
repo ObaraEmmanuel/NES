@@ -3,6 +3,7 @@
 #include <SDL2/SDL_rwops.h>
 
 #include "mapper.h"
+#include "genie.h"
 #include "utils.h"
 
 static void select_mapper(Mapper*  mapper);
@@ -113,7 +114,7 @@ static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
 }
 
 
-void load_file(char* file_name, Mapper* mapper){
+void load_file(char* file_name, char* game_genie, Mapper* mapper){
     SDL_RWops *file;
     file = SDL_RWFromFile(file_name, "rb");
 
@@ -189,6 +190,11 @@ void load_file(char* file_name, Mapper* mapper){
 
     select_mapper(mapper);
     set_mirroring(mapper, mapper->mirroring);
+
+    if(game_genie != NULL){
+        LOG(INFO, "-------- Game Genie Cartridge info ---------");
+        load_genie(game_genie, mapper);
+    }
 }
 
 void free_mapper(Mapper* mapper){
@@ -198,5 +204,7 @@ void free_mapper(Mapper* mapper){
         free(mapper->CHR_RAM);
     if(mapper->extension != NULL)
         free(mapper->extension);
+    if(mapper->genie != NULL)
+        free(mapper->genie);
     LOG(DEBUG, "Mapper cleanup complete");
 }
