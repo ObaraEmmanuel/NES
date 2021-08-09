@@ -45,6 +45,7 @@ over time. Any help is welcome.
     - [ ] \#5   MMC5
     - [x] \#7   AxROM
     - [x] \#66  GNROM
+* Game genie (for cheat codes)
     
 ## What can be played
 
@@ -110,4 +111,9 @@ You can now run the built emulator
 
 ```shell
 $ ./nes ~/nes/roms/Contra.nes
+```
+
+To run with *Game Genie* enabled provide path to the original game genie ROM as an extra argument
+```shell
+$ ./nes ~/nes/roms/Contra.nes ~/nes/roms/game_genie.nes
 ```
