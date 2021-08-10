@@ -67,7 +67,7 @@ void get_graphics_context(GraphicsContext* ctx){
 
     ctx->texture = SDL_CreateTexture(
         ctx->renderer,
-        SDL_PIXELFORMAT_RGBA8888,
+        SDL_PIXELFORMAT_ABGR8888,
         SDL_TEXTUREACCESS_TARGET,
         ctx->width,
         ctx->height

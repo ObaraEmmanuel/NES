@@ -11,6 +11,7 @@ static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priorit
 
 
 void init_ppu(struct Emulator* emulator){
+    to_pixel_format(nes_palette_raw, nes_palette, 64, SDL_PIXELFORMAT_ABGR8888);
     struct PPU* ppu = &emulator->ppu;
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;

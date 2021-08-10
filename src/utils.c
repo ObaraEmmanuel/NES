@@ -98,13 +98,13 @@ int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius){
 }
 
 
-int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius){
+int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius) {
     int offsetx, offsety, d;
     int status;
 
     offsetx = 0;
     offsety = radius;
-    d = radius -1;
+    d = radius - 1;
     status = 0;
 
     while (offsety >= offsetx) {
@@ -123,20 +123,35 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius){
             break;
         }
 
-        if (d >= 2*offsetx) {
-            d -= 2*offsetx + 1;
-            offsetx +=1;
-        }
-        else if (d < 2 * (radius - offsety)) {
+        if (d >= 2 * offsetx) {
+            d -= 2 * offsetx + 1;
+            offsetx += 1;
+        } else if (d < 2 * (radius - offsety)) {
             d += 2 * offsety - 1;
             offsety -= 1;
-        }
-        else {
+        } else {
             d += 2 * (offsety - offsetx - 1);
             offsety -= 1;
             offsetx += 1;
         }
     }
+}
 
-    return status;
+
+void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format){
+    for(int i = 0; i < size; i++) {
+        switch (format) {
+            case SDL_PIXELFORMAT_ARGB8888:{
+                out[i] = in[i];
+                break;
+            }
+            case SDL_PIXELFORMAT_ABGR8888:{
+                out[i] = (in[i] & 0xff000000) | ((in[i] << 16) & 0x00ff0000) | (in[i] & 0x0000ff00) | ((in[i] >> 16) & 0x000000ff);
+                break;
+            }
+            default:
+                LOG(DEBUG, "Unsupported format");
+                exit(EXIT_FAILURE);
+        }
+    }
 }
