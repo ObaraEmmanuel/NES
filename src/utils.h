@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 
+#ifndef EXIT_FAILURE
+#define EXIT_FAILURE 1
+#endif
+
 #ifdef __ANDROID__
 
 #include <android/log.h>

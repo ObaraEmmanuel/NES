@@ -3,3 +3,12 @@ Makefile
 dist/
 cmake-build-debug/
 build/
+vendor/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Debug/
+.vs/
+.idea/
+x64/
+x86/

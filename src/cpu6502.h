@@ -12,7 +12,7 @@
 
 typedef enum{
     NEGATIVE    = 1 << 7,
-    OVERFLOW    = 1 << 6,
+    OVERFLW     = 1 << 6,
     BREAK       = 1 << 4,
     DECIMAL     = 1 << 3,
     INTERRUPT   = 1 << 2,

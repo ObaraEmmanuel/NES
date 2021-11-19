@@ -120,10 +120,10 @@ static void prep_branch(c6502* ctx){
             branch(ctx, NEGATIVE, 0);
             break;
         case BVC:
-            branch(ctx, OVERFLOW, 0);
+            branch(ctx, OVERFLW, 0);
             break;
         case BVS:
-            branch(ctx, OVERFLOW, 1);
+            branch(ctx, OVERFLW, 1);
             break;
         default:
             ctx->state &= ~BRANCH_STATE;
@@ -262,9 +262,9 @@ void execute(c6502* ctx){
             break;
         case BIT: {
             uint8_t opr = read_mem(ctx->memory, address);
-            ctx->sr &= ~(NEGATIVE | OVERFLOW | ZERO);
+            ctx->sr &= ~(NEGATIVE | OVERFLW | ZERO);
             ctx->sr |= (!(opr & ctx->ac) ? ZERO: 0);
-            ctx->sr |= (opr & (NEGATIVE | OVERFLOW));
+            ctx->sr |= (opr & (NEGATIVE | OVERFLW));
             break;
         }
 
@@ -273,9 +273,9 @@ void execute(c6502* ctx){
         case ADC: {
             uint8_t opr = read_mem(ctx->memory, address);
             uint16_t sum = ctx->ac + opr + ((ctx->sr & CARRY) != 0);
-            ctx->sr &= ~(CARRY | OVERFLOW | NEGATIVE | ZERO);
+            ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
             ctx->sr |= (sum & 0xFF00 ? CARRY: 0);
-            ctx->sr |= ((ctx->ac ^ sum) & (opr ^ sum) & 0x80) ? OVERFLOW: 0;
+            ctx->sr |= ((ctx->ac ^ sum) & (opr ^ sum) & 0x80) ? OVERFLW: 0;
             ctx->ac = sum;
             fast_set_ZN(ctx, ctx->ac);
             break;
@@ -283,9 +283,9 @@ void execute(c6502* ctx){
         case SBC: {
             uint8_t opr = read_mem(ctx->memory, address);
             uint16_t diff = ctx->ac - opr - ((ctx->sr & CARRY) == 0);
-            ctx->sr &= ~(CARRY | OVERFLOW | NEGATIVE | ZERO);
+            ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
             ctx->sr |= (!(diff & 0xFF00)) ? CARRY : 0;
-            ctx->sr |= ((ctx->ac ^ diff) & (~opr ^ diff) & 0x80) ? OVERFLOW: 0;
+            ctx->sr |= ((ctx->ac ^ diff) & (~opr ^ diff) & 0x80) ? OVERFLW: 0;
             ctx->ac = diff;
             fast_set_ZN(ctx, ctx->ac);
             break;
@@ -408,7 +408,7 @@ void execute(c6502* ctx){
             ctx->sr &= ~INTERRUPT;
             break;
         case CLV:
-            ctx->sr &= ~OVERFLOW;
+            ctx->sr &= ~OVERFLW;
             break;
         case SEC:
             ctx->sr |= CARRY;
@@ -456,9 +456,9 @@ void execute(c6502* ctx){
             uint8_t val = ctx->ac & read_mem(ctx->memory, address);
             uint8_t rotated = val >> 1;
             rotated |= (ctx->sr & CARRY) << 7;
-            ctx->sr &= ~(CARRY | ZERO | NEGATIVE | OVERFLOW);
+            ctx->sr &= ~(CARRY | ZERO | NEGATIVE | OVERFLW);
             ctx->sr |= (rotated & BIT_6) ? CARRY: 0;
-            ctx->sr |= ((rotated & BIT_6) ^ (rotated & BIT_5)) ? OVERFLOW: 0;
+            ctx->sr |= ((rotated & BIT_6) ^ (rotated & BIT_5)) ? OVERFLW: 0;
             fast_set_ZN(ctx, rotated);
             ctx->ac = rotated;
             break;
@@ -492,9 +492,9 @@ void execute(c6502* ctx){
             uint8_t m = read_mem(ctx->memory, address) + 1;
             write_mem(ctx->memory, address, m);
             uint16_t diff = ctx->ac - m - ((ctx->sr & CARRY) == 0);
-            ctx->sr &= ~(CARRY | OVERFLOW | NEGATIVE | ZERO);
+            ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
             ctx->sr |= (!(diff & 0xFF00)) ? CARRY : 0;
-            ctx->sr |= ((ctx->ac ^ diff) & (~m ^ diff) & 0x80) ? OVERFLOW: 0;
+            ctx->sr |= ((ctx->ac ^ diff) & (~m ^ diff) & 0x80) ? OVERFLW: 0;
             ctx->ac = diff;
             fast_set_ZN(ctx, ctx->ac);
             break;
@@ -510,9 +510,9 @@ void execute(c6502* ctx){
             uint8_t m = rot_r(ctx, read_mem(ctx->memory, address));
             write_mem(ctx->memory, address, m);
             uint16_t sum = ctx->ac + m + ((ctx->sr & CARRY) != 0);
-            ctx->sr &= ~(CARRY | OVERFLOW | NEGATIVE | ZERO);
+            ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
             ctx->sr |= (sum & 0xFF00 ? CARRY : 0);
-            ctx->sr |= ((ctx->ac ^ sum) & (m ^ sum) & 0x80) ? OVERFLOW : 0;
+            ctx->sr |= ((ctx->ac ^ sum) & (m ^ sum) & 0x80) ? OVERFLW : 0;
             ctx->ac = sum;
             fast_set_ZN(ctx, sum);
             break;

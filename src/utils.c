@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <SDL2/SDL.h>
 
+
 size_t file_size(FILE* file){
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
@@ -135,6 +136,8 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius) {
             offsetx += 1;
         }
     }
+
+    return status;
 }
 
 
