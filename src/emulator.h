@@ -5,6 +5,7 @@
 #include "mmu.h"
 #include "mapper.h"
 #include "gfx.h"
+#include "timers.h"
 
 
 // frame rate in Hz, anything above 60 for some reason will not work
@@ -18,7 +19,7 @@
 // sleep time when emulator is paused in milliseconds
 #define IDLE_SLEEP 1000
 
-static const uint64_t PERIOD = 1000 / FRAME_RATE;
+static const uint64_t PERIOD = 1000000000 / FRAME_RATE;
 static const uint16_t TURBO_SKIP = FRAME_RATE / TURBO_RATE;
 
 
@@ -28,8 +29,9 @@ typedef struct Emulator{
     struct Memory mem;
     struct Mapper mapper;
     struct GraphicsContext g_ctx;
+    struct Timer timer;
 
-    uint32_t m_start, m_end;
+    double time_diff;
 
     uint8_t exit;
     uint8_t pause;

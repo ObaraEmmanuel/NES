@@ -4,6 +4,10 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 
+#if defined(_WIN32) || defined(_WIN64)
+#define _WIN 1
+#endif
+
 #ifndef EXIT_FAILURE
 #define EXIT_FAILURE 1
 #endif

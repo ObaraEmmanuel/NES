@@ -6,6 +6,7 @@
 #include "controller.h"
 #include "gfx.h"
 #include "mapper.h"
+#include "timers.h"
 
 
 void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
@@ -22,6 +23,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     init_mem(emulator);
     init_ppu(emulator);
     init_cpu(emulator);
+    init_timer(&emulator->timer, PERIOD);
 
     GraphicsContext* g_ctx = &emulator->g_ctx;
 
@@ -58,16 +60,18 @@ void run_emulator(struct Emulator* emulator){
     struct PPU* ppu = &emulator->ppu;
     struct c6502* cpu = &emulator->cpu;
     struct GraphicsContext* g_ctx = &emulator->g_ctx;
+    struct Timer* timer = &emulator->timer;
     SDL_Event e;
     uint32_t start, end;
-    emulator->m_start = SDL_GetTicks();
+    Timer frame_timer;
+    mark_start(&frame_timer);
 
     while (!emulator->exit) {
 #if PROFILE
         if(ppu->frames >= PROFILE_STOP_FRAME)
             break;
 #endif
-        start = SDL_GetTicks();
+        mark_start(timer);
         while (SDL_PollEvent(&e)) {
             update_joypad(joy1, &e);
             update_joypad(joy2, &e);
@@ -119,16 +123,15 @@ void run_emulator(struct Emulator* emulator){
             }
             render_graphics(g_ctx, ppu->screen);
             ppu->render = 0;
-            end = SDL_GetTicks();
-            uint32_t diff = end - start;
-            if(diff < PERIOD)
-                SDL_Delay(PERIOD - diff);
+            mark_end(timer);
+            adjusted_wait(timer);
         }else{
-            SDL_Delay(IDLE_SLEEP);
+            wait(IDLE_SLEEP);
         }
     }
 
-    emulator->m_end = SDL_GetTicks();
+    mark_end(&frame_timer);
+    emulator->time_diff = get_diff_ms(&frame_timer);
 }
 
 void free_emulator(struct Emulator* emulator){
