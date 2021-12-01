@@ -31,7 +31,7 @@ void init_pads(){
     }
 }
 
-uint16_t gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type){
+void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = 0;
     switch (event->type) {
         case SDL_JOYDEVICEADDED: {
@@ -64,45 +64,50 @@ uint16_t gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type){
             if(joyPad->player != pad_index(pad))
                 // the joypad is not interested in the active controller's input
                 // this check allows management of multiple controllers
-                return 0;
-
+                return;
             switch (event->type) {
                 case SDL_JOYBUTTONDOWN:
                 case SDL_JOYBUTTONUP:
                     if (event->jbutton.button >= 0 && event->jbutton.button < 10) {
                         key = key_map[event->jbutton.button];
                     }
-                    *type = *type = event->type == SDL_JOYBUTTONUP ? 1 : event->type == SDL_JOYBUTTONDOWN ? 2 : 0;
+
+                    if(event->type == SDL_JOYBUTTONDOWN)
+                        joyPad->status |= key;
+                    else if(event->type == SDL_JOYBUTTONUP)
+                        joyPad->status &= ~key;
                     break;
                 case SDL_JOYHATMOTION:
                     if (event->jhat.value & SDL_HAT_LEFT)
                         key |= LEFT;
-                    if (event->jhat.value & SDL_HAT_RIGHT)
+                    else if (event->jhat.value & SDL_HAT_RIGHT)
                         key |= RIGHT;
                     if (event->jhat.value & SDL_HAT_UP)
                         key |= UP;
-                    if (event->jhat.value & SDL_HAT_DOWN)
+                    else if (event->jhat.value & SDL_HAT_DOWN)
                         key |= DOWN;
-                    *type = 2;
 
                     if (event->jhat.value == SDL_HAT_CENTERED) {
                         // Reset hat
                         key = RIGHT | LEFT | UP | DOWN;
-                        *type = 1;
+                        joyPad->status &= ~key;
+                    } else {
+                        joyPad->status |= key;
                     }
                     break;
                 case SDL_JOYAXISMOTION:
-                    *type = 2;
                     if (event->jaxis.value < -3200) {
                         if (event->jaxis.axis == 0)
                             key = LEFT;
                         else if (event->jaxis.axis == 1)
                             key = UP;
+                        joyPad->status |= key;
                     } else if (event->jaxis.value > 3200) {
                         if (event->jaxis.axis == 0)
                             key = RIGHT;
                         else if (event->jaxis.axis == 1)
                             key = DOWN;
+                        joyPad->status |= key;
                     } else {
                         // Reset axis
                         if (event->jaxis.axis == 0)
@@ -110,13 +115,12 @@ uint16_t gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type){
                         else if (event->jaxis.axis == 1)
                             key = UP | DOWN;
 
-                        *type = 1;
+                        joyPad->status &= ~key;
                     }
                     break;
             }
         }
     }
-    return key;
 }
 
 static int pad_index(GamePad* pad){

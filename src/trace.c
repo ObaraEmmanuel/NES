@@ -13,7 +13,7 @@ void print_cpu_trace(const c6502* ctx){
     if(traces >= 8991)
         exit(1);
 #endif
-    char opcode_str[4], address_str[27], opcode_hex_str[9];
+    char opcode_str[4], address_str[28], opcode_hex_str[9];
     uint16_t addr, pc = ctx->pc, hi, lo;
     uint8_t opcode;
     opcode = read_mem(ctx->memory, pc++);

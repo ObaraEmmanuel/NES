@@ -9,4 +9,4 @@ typedef SDL_Joystick GamePad;
 struct JoyPad;
 
 void init_pads();
-uint16_t gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event, uint8_t* type);
+void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event);
