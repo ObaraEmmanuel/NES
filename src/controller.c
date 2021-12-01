@@ -28,7 +28,7 @@ void write_joypad(struct JoyPad* joyPad, uint8_t data){
 }
 
 void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
-    uint16_t key;
+    uint16_t key = 0;
     switch (event->key.keysym.sym) {
         case SDLK_RIGHT:
             key = RIGHT;

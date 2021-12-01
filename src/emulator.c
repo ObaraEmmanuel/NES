@@ -62,8 +62,8 @@ void run_emulator(struct Emulator* emulator){
     struct GraphicsContext* g_ctx = &emulator->g_ctx;
     struct Timer* timer = &emulator->timer;
     SDL_Event e;
-    uint32_t start, end;
     Timer frame_timer;
+    init_timer(&frame_timer, PERIOD);
     mark_start(&frame_timer);
 
     while (!emulator->exit) {
@@ -83,6 +83,7 @@ void run_emulator(struct Emulator* emulator){
                             break;
                         case SDLK_SPACE:
                             emulator->pause ^= 1;
+                            TOGGLE_TIMER_RESOLUTION();
                             break;
                         case SDLK_F5:
                             reset_cpu(cpu);
@@ -111,9 +112,6 @@ void run_emulator(struct Emulator* emulator){
         }
 
         if(!emulator->pause){
-            size_t c = 0;
-            // 30000 cycles infinite loop fail-safe in case render flag is not set
-            // loop will on normal occasion hit scanline 261 long before that
             // if ppu.render is set a frame is complete
             while(!ppu->render){
                 execute_ppu(ppu);
@@ -132,6 +130,7 @@ void run_emulator(struct Emulator* emulator){
 
     mark_end(&frame_timer);
     emulator->time_diff = get_diff_ms(&frame_timer);
+    release_timer(&frame_timer);
 }
 
 void free_emulator(struct Emulator* emulator){
@@ -139,5 +138,6 @@ void free_emulator(struct Emulator* emulator){
     free_mapper(&emulator->mapper);
     ANDROID_FREE_TOUCH_PAD();
     free_graphics(&emulator->g_ctx);
+    release_timer(&emulator->timer);
     LOG(DEBUG, "Emulator session successfully terminated");
 }

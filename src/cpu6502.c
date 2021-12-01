@@ -402,7 +402,7 @@ void execute(c6502* ctx){
             ctx->sr &= ~CARRY;
             break;
         case CLD:
-            ctx->sr &= ~DECIMAL;
+            ctx->sr &= ~DECIMAL_;
             break;
         case CLI:
             ctx->sr &= ~INTERRUPT;
@@ -414,7 +414,7 @@ void execute(c6502* ctx){
             ctx->sr |= CARRY;
             break;
         case SED:
-            ctx->sr |= DECIMAL;
+            ctx->sr |= DECIMAL_;
             break;
         case SEI:
             ctx->sr |= INTERRUPT;

@@ -18,6 +18,8 @@ target_link_libraries(nes ${SDL2_LIBRARIES})
 
 IF (NOT WIN32)
   target_link_libraries(nes m)
+ELSE()
+  target_link_libraries(nes winmm.lib)
 ENDIF()
 
 if(WIN32)

@@ -14,7 +14,7 @@ typedef enum{
     NEGATIVE    = 1 << 7,
     OVERFLW     = 1 << 6,
     BREAK       = 1 << 4,
-    DECIMAL     = 1 << 3,
+    DECIMAL_    = 1 << 3,
     INTERRUPT   = 1 << 2,
     ZERO        = 1 << 1,
     CARRY       = 1
