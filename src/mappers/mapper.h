@@ -5,6 +5,12 @@
 
 #define INES_HEADER_SIZE 16
 
+typedef enum TVSystem{
+    NTSC,
+    PAL,
+    DENDY
+} TVSystem;
+
 typedef enum{
     VERTICAL,
     HORIZONTAL,
@@ -37,6 +43,7 @@ typedef struct Mapper{
     uint8_t CHR_banks;
     uint8_t RAM_banks;
     Mirroring mirroring;
+    TVSystem type;
     uint16_t name_table_map[4];
     uint32_t clamp;
     uint8_t mapper_num;

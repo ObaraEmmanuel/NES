@@ -134,6 +134,10 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         exit(EXIT_FAILURE);
     }
 
+    if((header[7]&0x0C)==0x08){
+        LOG(ERROR, "NES2.0 format not supported");
+    }
+
     mapper->PRG_banks = header[4];
     mapper->CHR_banks = header[5];
 
@@ -171,11 +175,26 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     else
         LOG(INFO, "SRAM Banks (8kb): %u (Not used by emulator)", mapper->RAM_banks);
 
-
-    if((header[10] & 0x3) == 0x2 || (header[10] & BIT_0))
-        LOG(INFO, "ROM type: PAL");
-    else
-        LOG(INFO, "ROM type: NTSC");
+    switch (header[10] & 0x3) {
+        case 0:
+            if(header[9] & 1){
+                mapper->type = PAL;
+                LOG(INFO, "ROM type: PAL");
+            }else {
+                mapper->type = NTSC;
+                LOG(INFO, "ROM type: NTSC");
+            }
+            break;
+        case 2:
+            mapper->type = PAL;
+            LOG(INFO, "ROM type: PAL");
+            break;
+        case 1:
+        case 3:
+            mapper->type = NTSC;
+            LOG(INFO, "ROM type: Dual compatible, using NTSC");
+            break;
+    }
 
     mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
     SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);

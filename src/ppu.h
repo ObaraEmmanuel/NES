@@ -7,7 +7,8 @@
 
 #define VISIBLE_SCANLINES 240
 #define VISIBLE_DOTS 256
-#define SCANLINES_PER_FRAME 261
+#define NTSC_SCANLINES_PER_FRAME 261
+#define PAL_SCANLINES_PER_FRAME 311
 #define DOTS_PER_SCANLINE 341
 #define END_DOT 340
 
@@ -50,6 +51,7 @@ typedef struct PPU{
     uint8_t status;
     size_t dots;
     size_t scanlines;
+    uint16_t scanlines_per_frame;
 
     uint16_t v;
     uint16_t t;

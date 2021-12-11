@@ -8,19 +8,18 @@
 #include "timers.h"
 
 
-// frame rate in Hz, anything above 60 for some reason will not work
-#define FRAME_RATE 60
+// frame rate in Hz
+#define NTSC_FRAME_RATE 60
+#define PAL_FRAME_RATE 50
 
 // turbo keys toggle rate (Hz)
 // value should be a factor of FRAME_RATE
 // and should never exceed FRAME_RATE for best result
-#define TURBO_RATE 30
+#define NTSC_TURBO_RATE 30
+#define PAL_TURBO_RATE 25
 
 // sleep time when emulator is paused in milliseconds
 #define IDLE_SLEEP 1000
-
-static const uint64_t PERIOD = 1000000000 / FRAME_RATE;
-static const uint16_t TURBO_SKIP = FRAME_RATE / TURBO_RATE;
 
 
 typedef struct Emulator{
@@ -30,6 +29,8 @@ typedef struct Emulator{
     struct Mapper mapper;
     struct GraphicsContext g_ctx;
     struct Timer timer;
+
+    TVSystem type;
 
     double time_diff;
 

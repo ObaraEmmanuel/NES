@@ -15,6 +15,7 @@ void init_ppu(struct Emulator* emulator){
     struct PPU* ppu = &emulator->ppu;
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;
+    ppu->scanlines_per_frame = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;
 
     memset(ppu->palette, 0, 0x20);
     memset(ppu->OAM_cache, 0, 64);
@@ -238,10 +239,10 @@ void execute_ppu(PPU* ppu){
         }
     }
     else if(ppu->scanlines == VISIBLE_SCANLINES){
-        // post render scanline 240
+        // post render scanline 240/239
     }
-    else if(ppu->scanlines < SCANLINES_PER_FRAME){
-        // v blanking scanlines 241 - 260
+    else if(ppu->scanlines < ppu->scanlines_per_frame){
+        // v blanking scanlines 241 - 261/311
         if(ppu->dots == 1 && ppu->scanlines == VISIBLE_SCANLINES + 1){
             // set v-blank
             ppu->status |= V_BLANK;
@@ -252,7 +253,7 @@ void execute_ppu(PPU* ppu){
         }
     }
     else{
-        // pre-render scanline 261
+        // pre-render scanline 262/312
         if(ppu->dots == 1){
             // reset v-blank and sprite zero hit
             ppu->status &= ~(V_BLANK | SPRITE_0_HIT);
@@ -265,8 +266,8 @@ void execute_ppu(PPU* ppu){
             ppu->v &= ~VERTICAL_BITS;
             ppu->v |= ppu->t & VERTICAL_BITS;
         }
-        else if(ppu->dots == END_DOT - 1 && ppu->frames & 1 && ppu->mask & RENDER_ENABLED) {
-            // skip one cycle on odd frames if rendering is enabled
+        else if(ppu->dots == END_DOT - 1 && ppu->frames & 1 && ppu->mask & RENDER_ENABLED && ppu->emulator->type == NTSC) {
+            // skip one cycle on odd frames if rendering is enabled for NTSC
             ppu->dots++;
         }
 
@@ -280,7 +281,7 @@ void execute_ppu(PPU* ppu){
     // increment dots and scanlines
 
     if(++ppu->dots >= DOTS_PER_SCANLINE) {
-        if (ppu->scanlines++ >= SCANLINES_PER_FRAME)
+        if (ppu->scanlines++ >= ppu->scanlines_per_frame)
             ppu->scanlines = 0;
         ppu->dots = 0;
     }

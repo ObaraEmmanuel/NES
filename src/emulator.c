@@ -8,6 +8,8 @@
 #include "mapper.h"
 #include "timers.h"
 
+static uint64_t PERIOD;
+static uint16_t TURBO_SKIP;
 
 void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     if(argc < 2) {
@@ -20,6 +22,15 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
         genie = argv[argc - 1];
 
     load_file(argv[1], genie, &emulator->mapper);
+    emulator->type = emulator->mapper.type;
+    if(emulator->type == NTSC) {
+        PERIOD = 1000000000 / NTSC_FRAME_RATE;
+        TURBO_SKIP = NTSC_FRAME_RATE / NTSC_TURBO_RATE;
+    }else{
+        PERIOD = 1000000000 / PAL_FRAME_RATE;
+        TURBO_SKIP = PAL_FRAME_RATE / PAL_TURBO_RATE;
+    }
+
     init_mem(emulator);
     init_ppu(emulator);
     init_cpu(emulator);
@@ -50,7 +61,6 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
 
     emulator->exit = 0;
     emulator->pause = 0;
-
 }
 
 
@@ -113,11 +123,29 @@ void run_emulator(struct Emulator* emulator){
 
         if(!emulator->pause){
             // if ppu.render is set a frame is complete
-            while(!ppu->render){
-                execute_ppu(ppu);
-                execute_ppu(ppu);
-                execute_ppu(ppu);
-                execute(cpu);
+            if(emulator->type == NTSC) {
+                while (!ppu->render) {
+                    execute_ppu(ppu);
+                    execute_ppu(ppu);
+                    execute_ppu(ppu);
+                    execute(cpu);
+                }
+            }else{
+                // PAL
+                uint8_t check = 0;
+                while (!ppu->render) {
+                    execute_ppu(ppu);
+                    execute_ppu(ppu);
+                    execute_ppu(ppu);
+                    check++;
+                    if(check == 5) {
+                        // on the fifth run execute an extra ppu clock
+                        // this produces 3.2 scanlines per cpu clock
+                        execute_ppu(ppu);
+                        check = 0;
+                    }
+                    execute(cpu);
+                }
             }
             render_graphics(g_ctx, ppu->screen);
             ppu->render = 0;

@@ -27,7 +27,7 @@
 #define LOGLEVEL 1
 #define TRACER 0
 #define PROFILE 0
-#define PROFILE_STOP_FRAME 1800
+#define PROFILE_STOP_FRAME 1
 
 enum {
     BIT_7 = 1<<7,

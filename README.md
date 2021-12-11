@@ -23,7 +23,7 @@ over time. Any help is welcome.
     - [ ] Open-bus behaviour
 * PPU (Picture Processing Unit)
     - [x] NTSC
-    - [ ] PAL
+    - [x] PAL
     - [ ] Dendy
 * APU (Audio Processing Unit)
     - [ ] Pulse channel
@@ -75,18 +75,18 @@ _1943: Battle of Midway_
 Xbox and Playstation controllers have not been tested on the emulator and are not guaranteed to work
 as shown here.
 
-**Key** | **Keyboard** | **Playstation** | **Xbox**|
------|----------|-------|-------|
-Start | Enter | Start| Menu|
-Select | Shift| Select| View|
-A | J | ▢ | X|
-B | K | ◯ | B|
-Turbo A | H | △| Y |
-Turbo B | B | X | A |
-up | Up | D-pad/stick Up | D-pad/stick Up |
-down | Down | D-pad/stick Down | D-pad/stick Down |
-left  | Left | D-pad/stick Left | D-pad/stick Left |
-right | Right | D-pad/stick Right | D-pad/stick Right |
+| **Key** | **Keyboard** | **Playstation**   | **Xbox**          |
+|---------|--------------|-------------------|-------------------|
+ | Start   | Enter        | Start             | Menu              |
+ | Select  | Shift        | Select            | View              |
+ | A       | J            | ▢                 | X                 |
+ | B       | K            | ◯                 | B                 |
+ | Turbo A | H            | △                 | Y                 |
+ | Turbo B | B            | X                 | A                 |
+ | up      | Up           | D-pad/stick Up    | D-pad/stick Up    |
+ | down    | Down         | D-pad/stick Down  | D-pad/stick Down  |
+ | left    | Left         | D-pad/stick Left  | D-pad/stick Left  |
+ | right   | Right        | D-pad/stick Right | D-pad/stick Right |
 
 ## Compiling
 
