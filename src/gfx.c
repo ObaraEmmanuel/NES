@@ -78,6 +78,22 @@ void get_graphics_context(GraphicsContext* ctx){
         exit(EXIT_FAILURE);
     }
 
+    SDL_AudioSpec want;
+    SDL_zero(want);
+    /* Set the audio format */
+    want.freq = 43680;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;    /* 1 = mono, 2 = stereo */
+    // want.samples = 1024;  /* Good low-latency value for callback */
+    want.callback = NULL;
+    want.userdata = NULL;
+
+    ctx->audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+    if (ctx->audio_device == 0) {
+        LOG(ERROR , SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
+
     SDL_SetRenderDrawColor(ctx->renderer, 0, 0, 0, 255);
     SDL_RenderClear(ctx->renderer);
     SDL_RenderPresent(ctx->renderer);
@@ -106,6 +122,7 @@ void free_graphics(GraphicsContext* ctx){
     SDL_DestroyTexture(ctx->texture);
     SDL_DestroyRenderer(ctx->renderer);
     SDL_DestroyWindow(ctx->window);
+    SDL_CloseAudioDevice(ctx->audio_device);
     SDL_Quit();
     LOG(DEBUG, "Graphics clean up complete");
 }

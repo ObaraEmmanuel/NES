@@ -10,6 +10,7 @@ typedef struct GraphicsContext{
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
+    SDL_AudioDeviceID audio_device;
 #ifdef __ANDROID__
     TTF_Font* font;
 #endif // __ANDROID__

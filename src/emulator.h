@@ -3,6 +3,7 @@
 #include "cpu6502.h"
 #include "ppu.h"
 #include "mmu.h"
+#include "apu.h"
 #include "mapper.h"
 #include "gfx.h"
 #include "timers.h"
@@ -25,6 +26,7 @@
 typedef struct Emulator{
     struct c6502 cpu;
     struct PPU ppu;
+    struct APU apu;
     struct Memory mem;
     struct Mapper mapper;
     struct GraphicsContext g_ctx;

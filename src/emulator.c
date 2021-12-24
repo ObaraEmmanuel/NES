@@ -34,6 +34,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     init_mem(emulator);
     init_ppu(emulator);
     init_cpu(emulator);
+    init_APU(emulator);
     init_timer(&emulator->timer, PERIOD);
 
     GraphicsContext* g_ctx = &emulator->g_ctx;
@@ -69,8 +70,10 @@ void run_emulator(struct Emulator* emulator){
     struct JoyPad* joy2 = &emulator->mem.joy2;
     struct PPU* ppu = &emulator->ppu;
     struct c6502* cpu = &emulator->cpu;
+    struct APU* apu = &emulator->apu;
     struct GraphicsContext* g_ctx = &emulator->g_ctx;
     struct Timer* timer = &emulator->timer;
+    SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 0);
     SDL_Event e;
     Timer frame_timer;
     init_timer(&frame_timer, PERIOD);
@@ -129,6 +132,7 @@ void run_emulator(struct Emulator* emulator){
                     execute_ppu(ppu);
                     execute_ppu(ppu);
                     execute(cpu);
+                    execute_apu(apu);
                 }
             }else{
                 // PAL
@@ -145,9 +149,11 @@ void run_emulator(struct Emulator* emulator){
                         check = 0;
                     }
                     execute(cpu);
+                    execute_apu(apu);
                 }
             }
             render_graphics(g_ctx, ppu->screen);
+            queue_audio(apu, g_ctx);
             ppu->render = 0;
             mark_end(timer);
             adjusted_wait(timer);
@@ -160,6 +166,7 @@ void run_emulator(struct Emulator* emulator){
     emulator->time_diff = get_diff_ms(&frame_timer);
     release_timer(&frame_timer);
 }
+
 
 void free_emulator(struct Emulator* emulator){
     LOG(DEBUG, "Starting emulator clean up");

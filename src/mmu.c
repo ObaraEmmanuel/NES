@@ -37,6 +37,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
     // handle all IO registers
     if(address < IO_REG_END){
         PPU* ppu = &mem->emulator->ppu;
+        APU* apu = &mem->emulator->apu;
 
         switch (address) {
             case PPU_CTRL:
@@ -66,6 +67,60 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
             case JOY1:
                 write_joypad(&mem->joy1, value);
                 write_joypad(&mem->joy2, value);
+                break;
+            case APU_P1_CTRL:
+                set_pulse_ctrl(&apu->pulse1, value);
+                break;
+            case APU_P2_CTRL:
+                set_pulse_ctrl(&apu->pulse2, value);
+                break;
+            case APU_P1_RAMP:
+                set_pulse_sweep(&apu->pulse1, value);
+                break;
+            case APU_P2_RAMP:
+                set_pulse_sweep(&apu->pulse2, value);
+                break;
+            case APU_P1_FT:
+                set_pulse_timer(&apu->pulse1, value);
+                break;
+            case APU_P2_FT:
+                set_pulse_timer(&apu->pulse2, value);
+                break;
+            case APU_P1_CT:
+                set_pulse_length_counter(&apu->pulse1, value);
+                break;
+            case APU_P2_CT:
+                set_pulse_length_counter(&apu->pulse2, value);
+                break;
+            case APU_TRI_LINEAR_COUNTER:
+                set_tri_counter(&apu->triangle, value);
+                break;
+            case APU_TRI_FREQ1:
+                set_tri_timer_low(&apu->triangle, value);
+                break;
+            case APU_TRI_FREQ2:
+                set_tri_length(&apu->triangle, value);
+                break;
+            case APU_NOISE_CTRL:
+                set_noise_ctrl(&apu->noise, value);
+                break;
+            case APU_NOISE_FREQ1:
+                set_noise_period(&apu->noise, value);
+                break;
+            case APU_NOISE_FREQ2:
+                set_noise_length(&apu->noise, value);
+                break;
+            case APU_MOD_ADDR:
+            case APU_MOD_CTRL:
+            case APU_MOD_DA:
+            case APU_MOD_LEN:
+                // LOG(ERROR, "DMC write attempted");
+                break;
+            case FRAME_COUNTER:
+                set_frame_counter_ctrl(apu, value);
+                break;
+            case APU_STATUS:
+                set_status(apu, value);
                 break;
             default:
                 LOG(DEBUG, "Cannot write to register 0x%X", address);
@@ -113,6 +168,8 @@ uint8_t read_mem(Memory* mem, uint16_t address){
                 return read_joypad(&mem->joy1);
             case JOY2:
                 return read_joypad(&mem->joy2);
+            case APU_STATUS:
+                return read_apu_status(&mem->emulator->apu);
             default:
                 LOG(DEBUG, "Cannot read from register 0x%X", address);
                 return 0;

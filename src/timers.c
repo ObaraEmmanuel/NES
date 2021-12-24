@@ -12,8 +12,8 @@ static int timerPeriod = 0;
 static void set_resolution();
 static void reset_resolution();
 
-void init_timer(Timer* timer, uint64_t period){
-    timer->period_ms = period / M;
+void init_timer(Timer* timer, uint64_t sweep){
+    timer->period_ms = sweep / M;
     if(!QueryPerformanceFrequency(&timer->frequency)){
         LOG(ERROR, "Could not acquire timer resolution ");
         exit(EXIT_FAILURE);

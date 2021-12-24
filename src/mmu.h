@@ -34,9 +34,8 @@ typedef enum{
     APU_P2_FT,
     APU_P2_CT,
 
-    APU_TRI_CTRL1,
-    APU_TRI_CTRL2,
-    APU_TRI_FREQ1,
+    APU_TRI_LINEAR_COUNTER,
+    APU_TRI_FREQ1 = 0x400A,
     APU_TRI_FREQ2,
 
     APU_NOISE_CTRL,
@@ -50,9 +49,11 @@ typedef enum{
 
     OAM_DMA,
 
-    APU_SIG,
+    APU_CTRL,
+    APU_STATUS = 0x4015,
     JOY1,
     JOY2,
+    FRAME_COUNTER = 0x4017
 
 
 } IORegister;
