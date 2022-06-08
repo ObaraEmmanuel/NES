@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginStart="20dp"
+    android:layout_marginTop="20dp"
+    android:layout_weight="0.5"
+    android:background="@color/surface"
+    android:minWidth="150dp"
+    android:orientation="vertical"
+    app:cardCornerRadius="10dp"
+    app:layout_constraintWidth_min="150dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/surface"
+        android:orientation="vertical">
+
+        <ImageView
+            android:id="@+id/gameImage"
+            android:layout_width="match_parent"
+            android:layout_height="120dp"
+            android:background="@drawable/box_gradient"
+            android:contentDescription="@string/game_avatar"
+            android:scaleType="fitXY"
+            tools:srcCompat="@tools:sample/backgrounds/scenic" />
+
+        <TextView
+            android:id="@+id/gameName"
+            android:layout_width="match_parent"
+            android:layout_height="30dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="0dp"
+            android:background="@color/surface"
+            android:gravity="center"
+            android:text="TextView"
+            android:textAlignment="center"
+            android:textColor="@color/onBackground"
+            android:textSize="16sp" />
+
+        <Button
+            android:id="@+id/playButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="10dp"
+            android:background="@drawable/button_border"
+            android:elevation="2dp"
+            android:gravity="center"
+            android:minHeight="35dp"
+            android:text="@string/play"
+            android:textColor="@color/onSurface"
+            tools:ignore="TouchTargetSizeCheck" />
+
+    </LinearLayout>
+
+</androidx.cardview.widget.CardView>
