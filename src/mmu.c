@@ -105,7 +105,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 set_noise_ctrl(&apu->noise, value);
                 break;
             case APU_NOISE_FREQ1:
-                set_noise_period(&apu->noise, value);
+                set_noise_period(apu, value);
                 break;
             case APU_NOISE_FREQ2:
                 set_noise_length(&apu->noise, value);

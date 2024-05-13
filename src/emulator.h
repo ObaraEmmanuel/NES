@@ -10,9 +10,8 @@
 
 
 // frame rate in Hz
-// I've slightly sped these up to minimize audio drop-outs
-#define NTSC_FRAME_RATE 63
-#define PAL_FRAME_RATE 53
+#define NTSC_FRAME_RATE 60
+#define PAL_FRAME_RATE 50
 
 // turbo keys toggle rate (Hz)
 // value should be a factor of FRAME_RATE
