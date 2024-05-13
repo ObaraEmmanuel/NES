@@ -153,8 +153,8 @@ void run_emulator(struct Emulator* emulator){
                 }
             }
             render_graphics(g_ctx, ppu->screen);
-            queue_audio(apu, g_ctx);
             ppu->render = 0;
+            // queue_audio(apu, g_ctx);
             mark_end(timer);
             adjusted_wait(timer);
         }else{
@@ -170,6 +170,7 @@ void run_emulator(struct Emulator* emulator){
 
 void free_emulator(struct Emulator* emulator){
     LOG(DEBUG, "Starting emulator clean up");
+    exit_APU();
     free_mapper(&emulator->mapper);
     ANDROID_FREE_TOUCH_PAD();
     free_graphics(&emulator->g_ctx);

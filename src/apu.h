@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define AUDIO_BUFF_SIZE 728
+#define AUDIO_BUFF_SIZE 800
 
 struct Emulator;
 struct GraphicsContext;
@@ -15,8 +15,8 @@ enum {
 };
 
 typedef struct {
-    ssize_t period;
-    ssize_t counter;
+    long long period;
+    long long counter;
     uint32_t step;
     uint32_t limit;
     uint32_t from;
@@ -41,11 +41,11 @@ typedef struct {
 
 
 typedef struct {
-    Divider t;
-    uint8_t l;
-    uint8_t r;
-    uint8_t counter;
-    uint8_t reload;
+    Divider sequencer;
+    uint8_t length_counter;
+    uint8_t linear_reload;
+    uint8_t linear_counter;
+    uint8_t linear_reload_flag;
     uint8_t halt;
     uint8_t enabled;
 } Triangle;
@@ -65,8 +65,7 @@ typedef struct {
 
 typedef struct APU{
     struct Emulator* emulator;
-    uint16_t buff[AUDIO_BUFF_SIZE];
-    Divider frame;
+    int16_t buff[AUDIO_BUFF_SIZE];
     Pulse pulse1;
     Pulse pulse2;
     Triangle triangle;
@@ -76,12 +75,15 @@ typedef struct APU{
     uint8_t counter_ctrl;
     uint8_t frame_interrupt;
     size_t cycles;
+    size_t sequencer;
+    uint8_t reset_sequencer;
     Divider sampling;
     size_t samples;
 } APU;
 
 
 void init_APU(struct Emulator* emulator);
+void exit_APU();
 void execute_apu(APU* apu);
 void set_status(APU* apu, uint8_t value);
 float get_sample(APU* apu);

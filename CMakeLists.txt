@@ -50,7 +50,7 @@ set (SRC
 )
 
 IF(WIN32 OR ANDROID)
-  include_directories(src src/mappers vendor/include)
+  include_directories(src src/mappers vendor/include ${SDL2_DIR})
 ELSE()
   include_directories(src src/mappers ${SDL2_INCLUDE_DIRS})
 ENDIF()

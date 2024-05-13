@@ -81,12 +81,13 @@ void get_graphics_context(GraphicsContext* ctx){
     SDL_AudioSpec want;
     SDL_zero(want);
     /* Set the audio format */
-    want.freq = 43680;
+    want.freq = 48000;
     want.format = AUDIO_S16SYS;
     want.channels = 1;    /* 1 = mono, 2 = stereo */
     // want.samples = 1024;  /* Good low-latency value for callback */
     want.callback = NULL;
     want.userdata = NULL;
+    want.silence = 32767;
 
     ctx->audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
     if (ctx->audio_device == 0) {

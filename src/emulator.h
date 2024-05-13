@@ -10,14 +10,15 @@
 
 
 // frame rate in Hz
-#define NTSC_FRAME_RATE 60
-#define PAL_FRAME_RATE 50
+// I've slightly sped these up to minimize audio drop-outs
+#define NTSC_FRAME_RATE 63
+#define PAL_FRAME_RATE 53
 
 // turbo keys toggle rate (Hz)
 // value should be a factor of FRAME_RATE
 // and should never exceed FRAME_RATE for best result
-#define NTSC_TURBO_RATE 30
-#define PAL_TURBO_RATE 25
+#define NTSC_TURBO_RATE 31.5f
+#define PAL_TURBO_RATE 26.5f
 
 // sleep time when emulator is paused in milliseconds
 #define IDLE_SLEEP 1000
