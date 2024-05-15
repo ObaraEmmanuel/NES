@@ -69,11 +69,15 @@ static float pulse_LUT[PULSE_LUT_SIZE];
 
 static void compute_mixer_LUT();
 
+static void init_audio_device(const APU* apu);
+
 static void init_pulse(Pulse *pulse, uint8_t id);
 
 static void init_triangle(Triangle *triangle);
 
 static void init_noise(Noise *noise);
+
+static void init_sampler(APU* apu, int frequency);
 
 static void length_sweep_pulse(Pulse *pulse);
 
@@ -83,7 +87,11 @@ static uint8_t clock_triangle(Triangle *triangle);
 
 static uint8_t clock_divider_inverse(Divider *divider);
 
-long long freeze = 0;
+static void quarter_frame(APU *apu);
+
+static void half_frame(APU *apu);
+
+static void sample(APU* apu);
 
 FILE *out_wav;
 
@@ -95,32 +103,47 @@ void init_APU(struct Emulator *emulator) {
     apu->cycles = 0;
     apu->sequencer = 0;
     apu->reset_sequencer = 0;
+    apu->audio_start = 0;
 
-    apu->sampling.period = 37;
-    apu->sampling.counter = 0;
-    apu->sampling.from = 0;
-    apu->sampling.limit = AUDIO_BUFF_SIZE - 1;
-    apu->sampling.step = 0;
+    memset(apu->stat_window, 0, sizeof(apu->stat_window));
+    apu->stat = 0;
+    apu->stat_index = 0;
 
     init_pulse(&apu->pulse1, 1);
     init_pulse(&apu->pulse2, 2);
     init_triangle(&apu->triangle);
     init_noise(&apu->noise);
+    init_sampler(apu, SAMPLING_FREQUENCY);
+    init_audio_device(apu);
+    SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 1);
 #if AUDIO_TO_FILE
     out_wav = fopen("test-aud.raw", "wb");
 #endif
+}
 
-    freeze = 0;
+void init_audio_device(const APU* apu) {
+    SDL_AudioSpec want;
+    SDL_zero(want);
+    /* Set the audio format */
+    want.freq = SAMPLING_FREQUENCY;
+    want.format = AUDIO_S16SYS;
+    want.channels = 1;    /* 1 = mono, 2 = stereo */
+    // want.samples = 1024;  /* Good low-latency value for callback */
+    want.callback = NULL;
+    want.userdata = NULL;
+    want.silence = 0;
+
+    apu->emulator->g_ctx.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
+    if (apu->emulator->g_ctx.audio_device == 0) {
+        LOG(ERROR , SDL_GetError());
+        exit(EXIT_FAILURE);
+    }
 }
 
 void exit_APU() {
     if (out_wav)
         fclose(out_wav);
 }
-
-void quarter_frame(APU *apu);
-
-void half_frame(APU *apu);
 
 void execute_apu(APU *apu) {
     // Perform necessary reset after $4017 write
@@ -265,14 +288,8 @@ post_sequencer:
     // triangle timer
     clock_triangle(&apu->triangle);
 
-    if (apu->cycles == freeze) {
-        freeze += 37;
-        apu->buff[apu->sampling.step++] = (int16_t) (32767 * get_sample(apu));
-        if (apu->sampling.step >= AUDIO_BUFF_SIZE) {
-            queue_audio(apu, &apu->emulator->g_ctx);
-            apu->sampling.step = 0;
-        }
-    }
+    // sample
+    sample(apu);
 
     apu->cycles++;
 }
@@ -307,23 +324,84 @@ void half_frame(APU *apu) {
         noise->l--;
 }
 
+void init_sampler(APU* apu, int frequency) {
+    float cycles_per_frame = apu->emulator->type == PAL? 33247.5: 29780.5;
+    Sampler* sampler = &apu->sampler;
+
+    sampler->max_period = cycles_per_frame * 60.0f / frequency;
+    sampler->min_period = sampler->max_period - 1;
+    // Start up at a high sample rate to build up buffer
+    sampler->period = sampler->min_period;
+    sampler->index = 0;
+    sampler->max_index = AUDIO_BUFF_SIZE;
+    sampler->samples = 0;
+    sampler->counter = 0;
+    sampler->factor_index = 0;
+    sampler->max_factor = 100;
+    sampler->rise = 0;
+    sampler->target_factor = 48;
+}
+
+
+void sample(APU* apu) {
+#if AVERAGE_DOWNSAMPLING
+    static float avg = -1;
+    // average samples in a bin
+    if(avg < 0)
+        avg = get_sample(apu);
+    else
+        avg = (avg + get_sample(apu))/2;
+#endif
+
+    Sampler* sampler = &apu->sampler;
+    sampler->counter++;
+    if(sampler->counter >= sampler->period) {
+#if AVERAGE_DOWNSAMPLING
+        apu->buff[sampler->index++] = (int16_t) (32767 * avg);
+        // begin fresh average for the next bin
+        avg = -1;
+#else
+        apu->buff[sampler->index++] = (int16_t) (32767 * get_sample(apu));
+#endif
+        if(sampler->index >= sampler->max_index) {
+            sampler->index = 0;
+        }
+        sampler->samples++;
+        sampler->counter = 0;
+        if(apu->sampler.factor_index <= apu->sampler.target_factor) {
+            sampler->period = sampler->max_period;
+        }else {
+            sampler->period = sampler->min_period;
+        }
+        sampler->factor_index++;
+        if(sampler->factor_index > sampler->max_factor) {
+            sampler->factor_index = 0;
+        }
+    }
+}
+
 
 void queue_audio(APU *apu, struct GraphicsContext *ctx) {
-    static int prev_cyc = 0;
-    // printf("%llu\n", apu->cycles - prev_cyc);
-    // printf("%d\n", apu->sampling.step);
-    prev_cyc = apu->cycles;
-    // printf("queue size %d\n", SDL_GetQueuedAudioSize(ctx->audio_device));
-    SDL_QueueAudio(ctx->audio_device, apu->buff, apu->sampling.step * 2);
+    uint32_t queue_size = SDL_GetQueuedAudioSize(ctx->audio_device);
+
+    apu->stat = apu->stat - apu->stat_window[apu->stat_index] + queue_size;
+    apu->stat_window[apu->stat_index++] = queue_size;
+    if(apu->stat_index >= STATS_WIN_SIZE)
+        apu->stat_index = 0;
+    // size_t avg = apu->stat / STATS_WIN_SIZE;
+    // printf("queue size %d, avg: %llu \n", queue_size, avg);
+    SDL_QueueAudio(ctx->audio_device, apu->buff, apu->sampler.index * 2);
+    if(!apu->audio_start && queue_size >= 8192) {
+        SDL_PauseAudioDevice(apu->emulator->g_ctx.audio_device, 0);
+        apu->audio_start = 1;
+    }
 #if AUDIO_TO_FILE
     if(out_wav)
         fwrite(apu->buff, 2, AUDIO_BUFF_SIZE, out_wav);
 #endif
-    apu->samples += apu->sampling.step + 1;
-    // reset sampler and buffer
-    // apu->sampling.step = 37;
-    // apu->sampling.counter = AUDIO_BUFF_SIZE;
-    memset(apu->buff, 0, AUDIO_BUFF_SIZE * 2);
+    memset(apu->buff, 0, apu->sampler.index * 2);
+    // reset sampler
+    apu->sampler.index = 0;
 }
 
 

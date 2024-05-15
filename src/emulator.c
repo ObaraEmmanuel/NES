@@ -31,12 +31,6 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
         TURBO_SKIP = PAL_FRAME_RATE / PAL_TURBO_RATE;
     }
 
-    init_mem(emulator);
-    init_ppu(emulator);
-    init_cpu(emulator);
-    init_APU(emulator);
-    init_timer(&emulator->timer, PERIOD);
-
     GraphicsContext* g_ctx = &emulator->g_ctx;
 
 #ifdef __ANDROID__
@@ -57,6 +51,11 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     g_ctx->scale = 2;
     get_graphics_context(g_ctx);
 
+    init_mem(emulator);
+    init_ppu(emulator);
+    init_cpu(emulator);
+    init_APU(emulator);
+    init_timer(&emulator->timer, PERIOD);
     ANDROID_INIT_TOUCH_PAD(g_ctx);
     init_pads();
 
@@ -73,7 +72,6 @@ void run_emulator(struct Emulator* emulator){
     struct APU* apu = &emulator->apu;
     struct GraphicsContext* g_ctx = &emulator->g_ctx;
     struct Timer* timer = &emulator->timer;
-    SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 0);
     SDL_Event e;
     Timer frame_timer;
     init_timer(&frame_timer, PERIOD);
@@ -110,8 +108,8 @@ void run_emulator(struct Emulator* emulator){
                     emulator->exit = 1;
                     break;
                 default:
-                    if((e.key.keysym.sym == SDLK_AC_BACK
-                        || e.key.keysym.scancode == SDL_SCANCODE_AC_BACK) && !emulator->exit) {
+                    if(e.key.keysym.sym == SDLK_AC_BACK
+                        || e.key.keysym.scancode == SDL_SCANCODE_AC_BACK) {
                         emulator->exit = 1;
                         LOG(DEBUG, "Exiting emulator session");
                     }
@@ -154,7 +152,7 @@ void run_emulator(struct Emulator* emulator){
             }
             render_graphics(g_ctx, ppu->screen);
             ppu->render = 0;
-            // queue_audio(apu, g_ctx);
+            queue_audio(apu, g_ctx);
             mark_end(timer);
             adjusted_wait(timer);
         }else{

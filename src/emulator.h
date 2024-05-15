@@ -16,8 +16,8 @@
 // turbo keys toggle rate (Hz)
 // value should be a factor of FRAME_RATE
 // and should never exceed FRAME_RATE for best result
-#define NTSC_TURBO_RATE 31.5f
-#define PAL_TURBO_RATE 26.5f
+#define NTSC_TURBO_RATE 30
+#define PAL_TURBO_RATE 25
 
 // sleep time when emulator is paused in milliseconds
 #define IDLE_SLEEP 1000

@@ -3,7 +3,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#define AUDIO_BUFF_SIZE 800
+#define SAMPLING_FREQUENCY 48000
+#define AUDIO_BUFF_SIZE 1024
+#define STATS_WIN_SIZE 20
+#define AVERAGE_DOWNSAMPLING 0
 
 struct Emulator;
 struct GraphicsContext;
@@ -62,23 +65,40 @@ typedef struct {
     uint8_t enabled;
 } Noise;
 
+typedef struct {
+    uint16_t factor_index;
+    uint16_t target_factor;
+    uint16_t max_factor;
+    uint16_t rise;
+    size_t samples;
+    size_t max_period;
+    size_t min_period;
+    size_t period;
+    size_t counter;
+    size_t index;
+    size_t max_index;
+} Sampler;
+
 
 typedef struct APU{
     struct Emulator* emulator;
     int16_t buff[AUDIO_BUFF_SIZE];
+    size_t stat_window[STATS_WIN_SIZE];
     Pulse pulse1;
     Pulse pulse2;
     Triangle triangle;
     Noise noise;
+    Sampler sampler;
     uint8_t frame_mode;
     uint8_t status;
     uint8_t counter_ctrl;
     uint8_t frame_interrupt;
+    uint8_t audio_start;
+    uint8_t reset_sequencer;
     size_t cycles;
     size_t sequencer;
-    uint8_t reset_sequencer;
-    Divider sampling;
-    size_t samples;
+    float stat;
+    size_t stat_index;
 } APU;
 
 
@@ -101,5 +121,5 @@ void set_tri_timer_low(Triangle* triangle, uint8_t value);
 void set_tri_length(Triangle* triangle, uint8_t value);
 
 void set_noise_ctrl(Noise* noise, uint8_t value);
-void set_noise_period(Noise* noise, uint8_t value);
+void set_noise_period(APU* apu, uint8_t value);
 void set_noise_length(Noise* noise, uint8_t value);
