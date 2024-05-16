@@ -26,9 +26,9 @@ over time. Any help is welcome.
     - [x] PAL
     - [ ] Dendy
 * APU (Audio Processing Unit)
-    - [ ] Pulse channel
-    - [ ] Triangle channel
-    - [ ] Noise channel
+    - [x] Pulse channel
+    - [x] Triangle channel
+    - [x] Noise channel
     - [ ] Delta Modulation Channel
 * Gaming input
     - [x] Keyboard input
