@@ -18,7 +18,7 @@ void init_ppu(struct Emulator* emulator){
     ppu->scanlines_per_frame = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;
 
     memset(ppu->palette, 0, 0x20);
-    memset(ppu->OAM_cache, 0, 64);
+    memset(ppu->OAM_cache, 0, sizeof(ppu->OAM_cache)); //TODO: add sizeof in all memory operations
     memset(ppu->V_RAM, 0, 0x800);
     memset(ppu->OAM, 0, 256);
     ppu->oam_address = 0;
