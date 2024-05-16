@@ -105,6 +105,7 @@ void init_APU(struct Emulator *emulator) {
     apu->reset_sequencer = 0;
     apu->audio_start = 0;
 
+    // For keeping track of queue_size statistics for use by the adaptive sampler
     memset(apu->stat_window, 0, sizeof(apu->stat_window));
     apu->stat = 0;
     apu->stat_index = 0;
@@ -330,16 +331,18 @@ void init_sampler(APU* apu, int frequency) {
 
     sampler->max_period = cycles_per_frame * 60.0f / frequency;
     sampler->min_period = sampler->max_period - 1;
-    // Start up at a high sample rate to build up buffer
     sampler->period = sampler->min_period;
     sampler->index = 0;
     sampler->max_index = AUDIO_BUFF_SIZE;
     sampler->samples = 0;
     sampler->counter = 0;
     sampler->factor_index = 0;
+    // basically the precision with which we vary the sampling rate
+    // 100 ->2 d.p, 1000->3 d.p, etc.
     sampler->max_factor = 100;
-    sampler->rise = 0;
-    sampler->target_factor = 48;
+    // this may need to be calibrated to suit the current sampling frequency
+    // the current equilibrium is for 48000 hz
+    sampler->target_factor = sampler->equilibrium_factor = 48;
 }
 
 
@@ -383,15 +386,33 @@ void sample(APU* apu) {
 
 void queue_audio(APU *apu, struct GraphicsContext *ctx) {
     uint32_t queue_size = SDL_GetQueuedAudioSize(ctx->audio_device);
-
     apu->stat = apu->stat - apu->stat_window[apu->stat_index] + queue_size;
     apu->stat_window[apu->stat_index++] = queue_size;
     if(apu->stat_index >= STATS_WIN_SIZE)
         apu->stat_index = 0;
-    // size_t avg = apu->stat / STATS_WIN_SIZE;
+
+    size_t avg = apu->stat / STATS_WIN_SIZE;
     // printf("queue size %d, avg: %llu \n", queue_size, avg);
-    SDL_QueueAudio(ctx->audio_device, apu->buff, apu->sampler.index * 2);
-    if(!apu->audio_start && queue_size >= 8192) {
+
+    // From here we tweak the sampling rate ever so slightly to prevent underruns and runaway latency
+    // by minimising deviation from the nominal queue size with a bit of control engineering
+    float delta_f, error = (float)avg - NOMINAL_QUEUE_SIZE;
+    Sampler* s = &apu->sampler;
+    if(error >= 0) {
+        delta_f = (s->max_factor - s->equilibrium_factor) * error / NOMINAL_QUEUE_SIZE;
+    }else {
+        delta_f = (s->equilibrium_factor * error / NOMINAL_QUEUE_SIZE);
+    }
+    // printf("delta %f, error %f \n", delta_f, error);
+    s->target_factor = s->equilibrium_factor + delta_f;
+    if(s->target_factor > s->max_factor) {
+        s->target_factor = s->max_factor;
+    }
+    // printf("target_f %d \n", s->target_factor);
+
+    SDL_QueueAudio(ctx->audio_device, apu->buff, s->index * 2);
+    // wait till queue is filled to prevent early onset underruns
+    if(!apu->audio_start && queue_size >= NOMINAL_QUEUE_SIZE) {
         SDL_PauseAudioDevice(apu->emulator->g_ctx.audio_device, 0);
         apu->audio_start = 1;
     }
@@ -399,9 +420,9 @@ void queue_audio(APU *apu, struct GraphicsContext *ctx) {
     if(out_wav)
         fwrite(apu->buff, 2, AUDIO_BUFF_SIZE, out_wav);
 #endif
-    memset(apu->buff, 0, apu->sampler.index * 2);
+    memset(apu->buff, 0, s->index * 2);
     // reset sampler
-    apu->sampler.index = 0;
+    s->index = 0;
 }
 
 
@@ -612,7 +633,7 @@ static uint8_t clock_divider_inverse(Divider *divider) {
     return 1;
 }
 
-static inline void length_sweep_pulse(Pulse *pulse) {
+static void length_sweep_pulse(Pulse *pulse) {
     // continuously compute target period
     long long target_period = pulse->t.period >> pulse->shift;
     target_period = pulse->neg ? -target_period : target_period;
