@@ -36,6 +36,7 @@ over time. Any help is welcome.
     - [ ] Original NES controller
     - [x] Gamepad controller (Multiplayer)
     - [x] Turbo keys
+    - [x] Custom Touch controller (Android)
 * Mappers
     - [x] \#0   NROM
     - [x] \#1   MMC1

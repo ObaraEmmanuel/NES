@@ -1,7 +1,7 @@
 roms/
 Makefile
 dist/
-cmake-build-debug/
+cmake-build-*/
 build/
 vendor/
 CMakeFiles/
