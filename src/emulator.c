@@ -23,6 +23,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
 
     load_file(argv[1], genie, &emulator->mapper);
     emulator->type = emulator->mapper.type;
+    emulator->mapper.emulator = emulator;
     if(emulator->type == NTSC) {
         PERIOD = 1000000000 / NTSC_FRAME_RATE;
         TURBO_SKIP = NTSC_FRAME_RATE / NTSC_TURBO_RATE;

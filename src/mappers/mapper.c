@@ -49,6 +49,8 @@ static void select_mapper(Mapper* mapper){
             load_AOROM(mapper);
             break;
         case MMC3:
+            load_MMC3(mapper);
+            break;
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
             exit(EXIT_FAILURE);
@@ -81,6 +83,10 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
             break;
         case ONE_SCREEN_UPPER:
             set_mapping(mapper, 0x400, 0x400, 0x400, 0x400);
+            LOG(DEBUG, "Using mirroring: Single screen upper");
+            break;
+        case FOUR_SCREEN:
+            set_mapping(mapper, 0, 0x400, 0xB00, 0xC00);
             LOG(DEBUG, "Using mirroring: Single screen upper");
             break;
         default:

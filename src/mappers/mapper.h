@@ -32,6 +32,7 @@ typedef enum MapperID {
 } MapperID;
 
 struct Genie;
+struct Emulator;
 
 typedef struct Mapper{
     uint8_t* CHR_RAM;
@@ -58,6 +59,7 @@ typedef struct Mapper{
     void* extension;
     // pointer to game genie if any
     struct Genie* genie;
+    struct Emulator* emulator;
 } Mapper;
 
 void load_file(char* file_name, char* game_genie, Mapper* mapper);
@@ -71,3 +73,4 @@ void load_MMC1(Mapper* mapper);
 void load_CNROM(Mapper* mapper);
 void load_GNROM(Mapper* mapper);
 void load_AOROM(Mapper* mapper);
+void load_MMC3(Mapper* mapper);

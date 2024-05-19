@@ -46,6 +46,7 @@ set (SRC
         src/mappers/mapper.c
         src/mappers/mmc1.c
         src/mappers/uxrom.c
+        src/mappers/mmc3.c
 
 )
 
