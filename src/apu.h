@@ -77,6 +77,7 @@ typedef struct {
     uint16_t sample_length;
     uint16_t sample_addr;
     uint8_t interrupt;
+    uint8_t irq_set;
     uint16_t rate;
     uint16_t rate_index;
     // output unit

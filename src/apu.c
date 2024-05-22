@@ -598,6 +598,9 @@ void set_noise_length(Noise *noise, uint8_t value) {
 void set_dmc_ctrl(APU* apu, uint8_t value) {
     apu->dmc.loop = (value & BIT_6) > 0;
     apu->dmc.IRQ_enable = (value & BIT_7) > 0;
+    if(!apu->dmc.IRQ_enable) {
+        apu->dmc.interrupt = 0;
+    }
     if(apu->emulator->type == NTSC)
         apu->dmc.rate = dmc_rate_index_NTSC[value & 0xf];
     else
@@ -629,13 +632,15 @@ void clock_dmc(APU* apu) {
                 dmc->current_addr = 0x8000;
             else
                 dmc->current_addr++;
+            dmc->irq_set = 0;
         }
         if(dmc->bytes_remaining == 0) {
             if(dmc->loop) {
                 dmc->current_addr = dmc->sample_addr;
                 dmc->bytes_remaining = dmc->sample_length;
-            }else if(dmc->IRQ_enable && !dmc->interrupt) {
+            }else if(dmc->IRQ_enable && !dmc->irq_set) {
                 dmc->interrupt = 1;
+                dmc->irq_set = 1;
                 interrupt(&apu->emulator->cpu, IRQ);
             }
         }
