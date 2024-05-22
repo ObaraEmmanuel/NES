@@ -36,6 +36,22 @@ static uint16_t noise_period_lookup_PAL[16] = {
 };
 
 /*
+Rate   $0   $1   $2   $3   $4   $5   $6   $7   $8   $9   $A   $B   $C   $D   $E   $F
+      ------------------------------------------------------------------------------
+NTSC  428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
+PAL   398, 354, 316, 298, 276, 236, 210, 198, 176, 148, 132, 118,  98,  78,  66,  50
+*/
+
+static uint16_t dmc_rate_index_NTSC[16] = {
+    428, 380, 340, 320, 286, 254, 226, 214, 190, 160, 142, 128, 106,  84,  72,  54
+};
+
+static uint16_t dmc_rate_index_PAL[16] = {
+    398, 354, 316, 298, 276, 236, 210, 198, 176, 148, 132, 118,  98,  78,  66,  50
+};
+
+
+/*
 Mode 0: 4-step sequence
 
 Action      Envelopes &     Length Counter& Interrupt   Delay to next
@@ -77,6 +93,8 @@ static void init_triangle(Triangle *triangle);
 
 static void init_noise(Noise *noise);
 
+static void init_dmc(DMC* dmc);
+
 static void init_sampler(APU* apu, int frequency);
 
 static void length_sweep_pulse(Pulse *pulse);
@@ -86,6 +104,8 @@ static uint8_t clock_divider(Divider *divider);
 static uint8_t clock_triangle(Triangle *triangle);
 
 static uint8_t clock_divider_inverse(Divider *divider);
+
+static void clock_dmc(APU* apu);
 
 static void quarter_frame(APU *apu);
 
@@ -114,9 +134,11 @@ void init_APU(struct Emulator *emulator) {
     init_pulse(&apu->pulse2, 2);
     init_triangle(&apu->triangle);
     init_noise(&apu->noise);
+    init_dmc(&apu->dmc);
     init_sampler(apu, SAMPLING_FREQUENCY);
     init_audio_device(apu);
     SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 1);
+    set_status(apu, 0);
 #if AUDIO_TO_FILE
     out_wav = fopen("test-aud.raw", "wb");
 #endif
@@ -286,6 +308,9 @@ post_sequencer:
         }
     }
 
+    // DMC
+    clock_dmc(apu);
+
     // triangle timer
     clock_triangle(&apu->triangle);
 
@@ -418,7 +443,7 @@ void queue_audio(APU *apu, struct GraphicsContext *ctx) {
     }
 #if AUDIO_TO_FILE
     if(out_wav)
-        fwrite(apu->buff, 2, AUDIO_BUFF_SIZE, out_wav);
+        fwrite(apu->buff, 2, s->index, out_wav);
 #endif
     memset(apu->buff, 0, s->index * 2);
     // reset sampler
@@ -444,6 +469,8 @@ float get_sample(APU *apu) {
         tnd_out += 2 * ((apu->noise.const_volume ? apu->noise.envelope.period : apu->noise.envelope.step) * (
                             apu->noise.shift & BIT_0) * (apu->noise.l > 0));
 
+    tnd_out += apu->dmc.counter;
+
     float amp = pulse_LUT[pulse_out] + tnd_LUT[tnd_out];
 
     // clamp to within 1 just in case
@@ -456,6 +483,17 @@ void set_status(APU *apu, uint8_t value) {
     apu->pulse2.enabled = (value & BIT_1) > 0;
     apu->triangle.enabled = (value & BIT_2) > 0;
     apu->noise.enabled = (value & BIT_3) > 0;
+    apu->dmc.enabled = (value & BIT_4) > 0;
+
+    if(apu->dmc.enabled && apu->dmc.bytes_remaining == 0) {
+        // restart it
+        apu->dmc.bytes_remaining = apu->dmc.sample_length;
+        apu->dmc.current_addr = apu->dmc.sample_addr;
+    }else if(!apu->dmc.enabled) {
+        apu->dmc.bytes_remaining = 0;
+    }
+    apu->dmc.interrupt = 0;
+
 
     // reset length counters if disabled
     apu->pulse1.l = apu->pulse1.enabled ? apu->pulse1.l : 0;
@@ -471,6 +509,8 @@ uint8_t read_apu_status(APU *apu) {
     status |= (apu->triangle.length_counter > 0 ? BIT_2 : 0);
     status |= (apu->noise.l > 0 ? BIT_3 : 0);
     status |= (apu->frame_interrupt ? BIT_6 : 0);
+    status |= (apu->dmc.interrupt ? BIT_7 : 0);
+    status |= (apu->dmc.bytes_remaining? BIT_4: 0);
     // clear frame interrupt
     apu->frame_interrupt = 0;
     return status;
@@ -555,6 +595,83 @@ void set_noise_length(Noise *noise, uint8_t value) {
         noise->l = length_counter_lookup[value >> 3];
 }
 
+void set_dmc_ctrl(APU* apu, uint8_t value) {
+    apu->dmc.loop = (value & BIT_6) > 0;
+    apu->dmc.IRQ_enable = (value & BIT_7) > 0;
+    if(apu->emulator->type == NTSC)
+        apu->dmc.rate = dmc_rate_index_NTSC[value & 0xf];
+    else
+        apu->dmc.rate = dmc_rate_index_PAL[value & 0xf];
+}
+
+void set_dmc_da(DMC* dmc, uint8_t value) {
+    dmc->counter = value & 0x7F;
+}
+
+void set_dmc_addr(DMC* dmc, uint8_t value) {
+    dmc->sample_addr = 0xC000 + (uint16_t)value * 64;
+}
+
+void set_dmc_length(DMC* dmc, uint8_t value) {
+    dmc->sample_length = (uint16_t)value * 16 + 1;
+}
+
+void clock_dmc(APU* apu) {
+    DMC* dmc = &apu->dmc;
+
+    if(dmc->enabled && dmc->empty) {
+        if(dmc->bytes_remaining > 0) {
+            apu->emulator->cpu.dma_cycles += 3;
+            dmc->sample = read_mem(&apu->emulator->mem, dmc->current_addr);
+            dmc->empty = 0;
+            dmc->bytes_remaining--;
+            if(dmc->current_addr == 0xffff)
+                dmc->current_addr = 0x8000;
+            else
+                dmc->current_addr++;
+        }
+        if(dmc->bytes_remaining == 0) {
+            if(dmc->loop) {
+                dmc->current_addr = dmc->sample_addr;
+                dmc->bytes_remaining = dmc->sample_length;
+            }else if(dmc->IRQ_enable && !dmc->interrupt) {
+                dmc->interrupt = 1;
+                interrupt(&apu->emulator->cpu, IRQ);
+            }
+        }
+    }
+
+    if(dmc->rate_index > 0) {
+        dmc->rate_index--;
+        return;
+    }
+    dmc->rate_index = dmc->rate;
+
+    if(dmc->bits_remaining > 0) {
+        // clamped counter update
+        if(!dmc->silence) {
+            if(dmc->bits & 1) {
+                dmc->counter+=2;
+                dmc->counter = dmc->counter > 127 ? 127 : dmc->counter;
+            }
+            else if(dmc->counter > 1)
+                dmc->counter-=2;
+            dmc->bits >>= 1;
+        }
+        dmc->bits_remaining--;
+    }
+    if(dmc->bits_remaining == 0) {
+        if(dmc->empty)
+            dmc->silence = 1;
+        else {
+            dmc->bits = dmc->sample;
+            dmc->empty = 1;
+            dmc->silence = 0;
+        }
+        dmc->bits_remaining = 8;
+    }
+}
+
 static void compute_mixer_LUT() {
     pulse_LUT[0] = 0;
     for (int i = 1; i < PULSE_LUT_SIZE; i++)
@@ -587,6 +704,11 @@ static void init_noise(Noise *noise) {
     noise->enabled = 0;
     noise->timer.limit = 0;
     noise->shift = 1;
+}
+
+static void init_dmc(DMC* dmc) {
+    dmc->empty = 1;
+    dmc->silence = 1;
 }
 
 static uint8_t clock_divider(Divider *divider) {

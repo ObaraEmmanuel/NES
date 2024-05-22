@@ -70,6 +70,27 @@ typedef struct {
 } Noise;
 
 typedef struct {
+    uint8_t enabled;
+    uint8_t IRQ_enable;
+    uint8_t loop;
+    uint8_t counter;
+    uint16_t sample_length;
+    uint16_t sample_addr;
+    uint8_t interrupt;
+    uint16_t rate;
+    uint16_t rate_index;
+    // output unit
+    uint8_t bits_remaining;
+    uint8_t silence;
+    uint8_t bits;
+    // memory reader
+    uint8_t sample;
+    uint8_t empty;
+    uint16_t bytes_remaining;
+    uint16_t current_addr;
+} DMC;
+
+typedef struct {
     uint16_t factor_index;
     uint16_t target_factor;
     uint16_t equilibrium_factor;
@@ -92,6 +113,7 @@ typedef struct APU{
     Pulse pulse2;
     Triangle triangle;
     Noise noise;
+    DMC dmc;
     Sampler sampler;
     uint8_t frame_mode;
     uint8_t status;
@@ -127,3 +149,8 @@ void set_tri_length(Triangle* triangle, uint8_t value);
 void set_noise_ctrl(Noise* noise, uint8_t value);
 void set_noise_period(APU* apu, uint8_t value);
 void set_noise_length(Noise* noise, uint8_t value);
+
+void set_dmc_ctrl(APU* apu, uint8_t value);
+void set_dmc_da(DMC* dmc, uint8_t value);
+void set_dmc_addr(DMC* dmc, uint8_t value);
+void set_dmc_length(DMC* dmc, uint8_t value);

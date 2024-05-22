@@ -110,11 +110,17 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
             case APU_NOISE_FREQ2:
                 set_noise_length(&apu->noise, value);
                 break;
-            case APU_MOD_ADDR:
-            case APU_MOD_CTRL:
-            case APU_MOD_DA:
-            case APU_MOD_LEN:
-                // LOG(ERROR, "DMC write attempted");
+            case APU_DMC_ADDR:
+                set_dmc_addr(&apu->dmc, value);
+                break;
+            case APU_DMC_CTRL:
+                set_dmc_ctrl(apu, value);
+                break;
+            case APU_DMC_DA:
+                set_dmc_da(&apu->dmc, value);
+                break;
+            case APU_DMC_LEN:
+                set_dmc_length(&apu->dmc, value);
                 break;
             case FRAME_COUNTER:
                 set_frame_counter_ctrl(apu, value);

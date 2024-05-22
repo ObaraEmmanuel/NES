@@ -29,7 +29,7 @@ over time. Any help is welcome.
     - [x] Pulse channel
     - [x] Triangle channel
     - [x] Noise channel
-    - [ ] Delta Modulation Channel
+    - [x] Delta Modulation Channel
 * Gaming input
     - [x] Keyboard input
     - [ ] Keyboard (multiplayer)

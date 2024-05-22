@@ -42,10 +42,10 @@ typedef enum{
     APU_NOISE_FREQ1 = 0x400E,
     APU_NOISE_FREQ2,
 
-    APU_MOD_CTRL,
-    APU_MOD_DA,
-    APU_MOD_ADDR,
-    APU_MOD_LEN,
+    APU_DMC_CTRL,
+    APU_DMC_DA,
+    APU_DMC_ADDR,
+    APU_DMC_LEN,
 
     OAM_DMA,
 
