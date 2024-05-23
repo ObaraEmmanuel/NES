@@ -103,11 +103,20 @@ void write_ppu(PPU* ppu, uint8_t value){
 void dma(PPU* ppu, uint8_t address){
     Memory* memory = &ppu->emulator->mem;
     uint8_t* ptr = get_ptr(memory, address * 0x100);
-    // copy from OAM address to the end (256 bytes)
-    memcpy(ppu->OAM + ppu->oam_address, ptr, 256 - ppu->oam_address);
-    if(ppu->oam_address)
-        // wrap around and copy from start to OAM address if OAM is not 0x00
-        memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
+    if(ptr == NULL) {
+        // Probably in PRG ROM so it is not possible to resolve a pointer
+        // due to bank switching, so we do it the slow hard way
+        for(int i = 0; i < 256; i++) {
+            ppu->OAM[(ppu->oam_address + i) & 0xff] = read_mem(memory, address * 0x100 + i);
+        }
+    }else {
+        // copy from OAM address to the end (256 bytes)
+        memcpy(ppu->OAM + ppu->oam_address, ptr, 256 - ppu->oam_address);
+        if(ppu->oam_address) {
+            // wrap around and copy from start to OAM address if OAM is not 0x00
+            memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
+        }
+    }
     ppu->emulator->cpu.dma_cycles += 513;
     // skip extra cycle on odd cycle
     ppu->emulator->cpu.dma_cycles += ppu->emulator->cpu.odd_cycle;
