@@ -68,14 +68,31 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             switch (event->type) {
                 case SDL_JOYBUTTONDOWN:
                 case SDL_JOYBUTTONUP:
-                    if (event->jbutton.button >= 0 && event->jbutton.button < 10) {
+                    if (event->jbutton.button < 10) {
                         key = key_map[event->jbutton.button];
                     }
 
-                    if(event->type == SDL_JOYBUTTONDOWN)
+                    if(event->type == SDL_JOYBUTTONDOWN) {
                         joyPad->status |= key;
-                    else if(event->type == SDL_JOYBUTTONUP)
+                        if(key == TURBO_A) {
+                            // set button A
+                            joyPad->status |= BUTTON_A;
+                        }
+                        if(key == TURBO_B) {
+                            // set button B
+                            joyPad->status |= BUTTON_B;
+                        }
+                    } else if(event->type == SDL_JOYBUTTONUP) {
                         joyPad->status &= ~key;
+                        if(key == TURBO_A) {
+                            // clear button A
+                            joyPad->status &= ~BUTTON_A;
+                        }
+                        if(key == TURBO_B) {
+                            // clear button B
+                            joyPad->status &= ~BUTTON_B;
+                        }
+                    }
                     break;
                 case SDL_JOYHATMOTION:
                     if (event->jhat.value & SDL_HAT_LEFT)
