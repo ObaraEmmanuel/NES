@@ -118,7 +118,7 @@ typedef struct APU{
     Sampler sampler;
     uint8_t frame_mode;
     uint8_t status;
-    uint8_t counter_ctrl;
+    uint8_t IRQ_inhibit;
     uint8_t frame_interrupt;
     uint8_t audio_start;
     uint8_t reset_sequencer;

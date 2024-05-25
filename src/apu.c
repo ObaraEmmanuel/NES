@@ -124,6 +124,7 @@ void init_APU(struct Emulator *emulator) {
     apu->sequencer = 0;
     apu->reset_sequencer = 0;
     apu->audio_start = 0;
+    apu->IRQ_inhibit = 0;
 
     // For keeping track of queue_size statistics for use by the adaptive sampler
     memset(apu->stat_window, 0, sizeof(apu->stat_window));
@@ -170,8 +171,7 @@ void exit_APU() {
 
 void execute_apu(APU *apu) {
     // Perform necessary reset after $4017 write
-    // Doing this in even sequence allows the required 3 or 4 cycle delay
-    if (apu->reset_sequencer && !apu->sequencer & 1) {
+    if (apu->reset_sequencer) {
         apu->reset_sequencer = 0;
         if (apu->frame_mode == 1) {
             quarter_frame(apu);
@@ -186,10 +186,6 @@ void execute_apu(APU *apu) {
     default:
         switch (apu->sequencer) {
             case 0:
-                if (apu->frame_mode == 1 && !apu->counter_ctrl & BIT_6) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
-                }
                 apu->sequencer++;
                 break;
             case 7457:
@@ -206,10 +202,6 @@ void execute_apu(APU *apu) {
                 apu->sequencer++;
                 break;
             case 29828:
-                if (apu->frame_mode == 1 && !apu->counter_ctrl & BIT_6) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
-                }
                 apu->sequencer++;
                 break;
             case 29829:
@@ -221,7 +213,7 @@ void execute_apu(APU *apu) {
                 quarter_frame(apu);
                 half_frame(apu);
 
-                if (!apu->counter_ctrl & BIT_6) {
+                if (!apu->IRQ_inhibit) {
                     apu->frame_interrupt = 1;
                     interrupt(&apu->emulator->cpu, IRQ);
                 }
@@ -240,10 +232,6 @@ void execute_apu(APU *apu) {
         // code looks repetitive but if you can do it better while still being fast be my guest
         switch (apu->sequencer) {
             case 0:
-                if (apu->frame_mode == 1 && !apu->counter_ctrl & BIT_6) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
-                }
                 apu->sequencer++;
                 break;
             case 8313:
@@ -260,10 +248,6 @@ void execute_apu(APU *apu) {
                 apu->sequencer++;
                 break;
             case 33252:
-                if (apu->frame_mode == 1 && !apu->counter_ctrl & BIT_6) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
-                }
                 apu->sequencer++;
                 break;
             case 33253:
@@ -275,7 +259,7 @@ void execute_apu(APU *apu) {
                 quarter_frame(apu);
                 half_frame(apu);
 
-                if (!apu->counter_ctrl & BIT_6) {
+                if (!apu->IRQ_inhibit) {
                     apu->frame_interrupt = 1;
                     interrupt(&apu->emulator->cpu, IRQ);
                 }
@@ -518,12 +502,13 @@ uint8_t read_apu_status(APU *apu) {
 
 
 void set_frame_counter_ctrl(APU *apu, uint8_t value) {
-    apu->counter_ctrl = value;
+    // $4017
+    apu->IRQ_inhibit = (value & BIT_6) > 0;
     apu->frame_mode = (value & BIT_7) > 0;
     // clear interrupt if IRQ disable set
     if (value & BIT_6)
         apu->frame_interrupt = 0;
-    apu->sequencer = 0;
+    apu->reset_sequencer = 1;
 }
 
 void set_pulse_ctrl(Pulse *pulse, uint8_t value) {
@@ -602,9 +587,9 @@ void set_dmc_ctrl(APU* apu, uint8_t value) {
         apu->dmc.interrupt = 0;
     }
     if(apu->emulator->type == NTSC)
-        apu->dmc.rate = dmc_rate_index_NTSC[value & 0xf];
+        apu->dmc.rate = dmc_rate_index_NTSC[value & 0xf] - 1;
     else
-        apu->dmc.rate = dmc_rate_index_PAL[value & 0xf];
+        apu->dmc.rate = dmc_rate_index_PAL[value & 0xf] - 1;
 }
 
 void set_dmc_da(DMC* dmc, uint8_t value) {
