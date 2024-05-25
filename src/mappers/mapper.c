@@ -140,8 +140,22 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         exit(EXIT_FAILURE);
     }
 
-    if((header[7]&0x0C)==0x08){
+    uint8_t mapnum = header[7] & 0x0C;
+    if(mapnum == 0x08){
+        mapper->format = NES2;
         LOG(ERROR, "NES2.0 format not supported");
+        exit(EXIT_FAILURE);
+    }
+
+    if(mapnum == 0x00 && strncmp((char*)(header+12), "\0\0\0\0", 4) == 0) {
+        mapper->format = INES;
+        LOG(INFO, "Using iNES format");
+    } else if(mapnum == 0x04) {
+        mapper->format = ARCHAIC_INES;
+        LOG(INFO, "Using iNES (archaic) format");
+    } else {
+        mapper->format = ARCHAIC_INES;
+        LOG(INFO, "Possibly using iNES (archaic) format");
     }
 
     mapper->PRG_banks = header[4];
@@ -149,6 +163,15 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
     LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
     LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
+
+    mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
+    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
+
+    if(mapper->CHR_banks) {
+        mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
+        SDL_RWread(file, mapper->CHR_RAM, 0x2000 * mapper->CHR_banks, 1);
+    }else
+        mapper->CHR_RAM = NULL;
 
     if(header[6] & BIT_1){
         mapper->save_RAM = malloc(0x2000);
@@ -169,50 +192,28 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     else {
         mapper->mirroring = HORIZONTAL;
     }
+    mapper->mapper_num = (header[6] & 0xF0) >> 4;
+    mapper->type = NTSC;
 
-    mapper->mapper_num = ((header[6] & 0xF0) >> 4) | (header[7] & 0xF0);
+    if(mapper->format == INES) {
+        mapper->mapper_num |= header[7] & 0xF0;
+        mapper->RAM_banks = header[8];
 
-    LOG(INFO, "Using mapper #%d", mapper->mapper_num);
+        if(mapper->RAM_banks == 0)
+            LOG(INFO, "SRAM Banks (8kb): Not specified");
+        else
+            LOG(INFO, "SRAM Banks (8kb): %u (Not used by emulator)", mapper->RAM_banks);
 
-    mapper->RAM_banks = header[8];
-
-    if(mapper->RAM_banks == 0)
-        LOG(INFO, "SRAM Banks (8kb): Not specified");
-    else
-        LOG(INFO, "SRAM Banks (8kb): %u (Not used by emulator)", mapper->RAM_banks);
-
-    switch (header[10] & 0x3) {
-        case 0:
-            if(header[9] & 1){
-                mapper->type = PAL;
-                LOG(INFO, "ROM type: PAL");
-            }else {
-                mapper->type = NTSC;
-                LOG(INFO, "ROM type: NTSC");
-            }
-            break;
-        case 2:
+        if(header[9] & 1){
             mapper->type = PAL;
             LOG(INFO, "ROM type: PAL");
-            break;
-        case 1:
-        case 3:
+        }else {
             mapper->type = NTSC;
-            LOG(INFO, "ROM type: Dual compatible, using NTSC");
-            break;
+            LOG(INFO, "ROM type: NTSC");
+        }
     }
 
-    mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
-
-    if(mapper->CHR_banks) {
-        mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
-        SDL_RWread(file, mapper->CHR_RAM, 0x2000 * mapper->CHR_banks, 1);
-    }else
-        mapper->CHR_RAM = NULL;
-
-    SDL_RWclose(file);
-
+    LOG(INFO, "Using mapper #%d", mapper->mapper_num);
     select_mapper(mapper);
     set_mirroring(mapper, mapper->mirroring);
 

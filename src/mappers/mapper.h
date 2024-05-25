@@ -31,6 +31,12 @@ typedef enum MapperID {
     GNROM = 66
 } MapperID;
 
+typedef enum MapperFormat {
+    ARCHAIC_INES,
+    INES,
+    NES2,
+} MapperFormat;
+
 struct Genie;
 struct Emulator;
 
@@ -45,6 +51,7 @@ typedef struct Mapper{
     uint8_t RAM_banks;
     Mirroring mirroring;
     TVSystem type;
+    MapperFormat format;
     uint16_t name_table_map[4];
     uint32_t clamp;
     uint8_t mapper_num;
