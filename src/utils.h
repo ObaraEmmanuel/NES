@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 #include <stdint.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
 #define MIN(x, y) (((x) < (y)) ? (x) : (y))

@@ -1,6 +1,6 @@
 #pragma once
 
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #define MAX_PADS 2
 #define CONTROLLER_KEY_COUNT 10

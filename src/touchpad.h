@@ -3,7 +3,7 @@
 #ifdef __ANDROID__
 
 #include <stdint.h>
-#include <SDL2/SDL.h>
+#include <SDL.h>
 
 #include "gfx.h"
 #include "controller.h"

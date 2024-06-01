@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include <SDL2/SDL_rwops.h>
+#include <SDL_rwops.h>
 
 #include "mapper.h"
 #include "genie.h"

@@ -1,6 +1,6 @@
 #ifdef __ANDROID__
 #include <stdlib.h>
-#include <SDL2/SDL_ttf.h>
+#include <SDL_ttf.h>
 
 #include "utils.h"
 #include "touchpad.h"

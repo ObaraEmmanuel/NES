@@ -1,11 +1,7 @@
 #pragma once
 
-#include <SDL2/SDL.h>
-#include <SDL2/SDL_ttf.h>
-
-#ifdef __ANDROID__
-#include <SDL2/SDL_ttf.h>
-#endif // __ANDROID__
+#include <SDL.h>
+#include <SDL_ttf.h>
 
 typedef struct GraphicsContext{
     SDL_Window* window;
