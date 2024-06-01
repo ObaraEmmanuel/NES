@@ -2,10 +2,12 @@
 #include "emulator.h"
 #include "gfx.h"
 #include "utils.h"
+#include "biquad.h"
 
 #define TND_LUT_SIZE 203
 #define PULSE_LUT_SIZE 31
 #define AUDIO_TO_FILE 0
+
 
 static const uint8_t length_counter_lookup[32] = {
     // HI/LO 0   1   2   3   4   5   6   7    8   9   A   B   C   D   E   F
@@ -336,9 +338,11 @@ void half_frame(APU *apu) {
 
 void init_sampler(APU* apu, int frequency) {
     float cycles_per_frame = apu->emulator->type == PAL? 33247.5: 29780.5;
+    float rate = apu->emulator->type == PAL? 50.0f : 60.0f;
     Sampler* sampler = &apu->sampler;
+    biquad_init(&apu->filter, HPF, 1, 20, frequency, 2);
 
-    sampler->max_period = cycles_per_frame * 60.0f / frequency;
+    sampler->max_period = cycles_per_frame * rate / frequency;
     sampler->min_period = sampler->max_period - 1;
     sampler->period = sampler->min_period;
     sampler->index = 0;
@@ -369,11 +373,12 @@ void sample(APU* apu) {
     sampler->counter++;
     if(sampler->counter >= sampler->period) {
 #if AVERAGE_DOWNSAMPLING
-        apu->buff[sampler->index++] = (int16_t) (32767 * avg);
+        apu->buff[sampler->index++] = 32767 * biquad(avg, &apu->filter);
         // begin fresh average for the next bin
         avg = -1;
 #else
-        apu->buff[sampler->index++] = (int16_t) (32767 * get_sample(apu));
+
+        apu->buff[sampler->index++] = 32767 * biquad(get_sample(apu), &apu->filter);
 #endif
         if(sampler->index >= sampler->max_index) {
             sampler->index = 0;
@@ -429,7 +434,7 @@ void queue_audio(APU *apu, struct GraphicsContext *ctx) {
     if(out_wav)
         fwrite(apu->buff, 2, s->index, out_wav);
 #endif
-    memset(apu->buff, 0, s->index * 2);
+    memset(apu->buff, 0, AUDIO_BUFF_SIZE * 2);
     // reset sampler
     s->index = 0;
 }

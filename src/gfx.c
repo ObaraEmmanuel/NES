@@ -10,8 +10,8 @@
 void get_graphics_context(GraphicsContext* ctx){
 
     SDL_Init(SDL_INIT_EVERYTHING);
-#ifdef __ANDROID__
     TTF_Init();
+#ifdef __ANDROID__
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
@@ -49,21 +49,15 @@ void get_graphics_context(GraphicsContext* ctx){
         exit(EXIT_FAILURE);
     }
 
-#ifdef __ANDROID__
     ctx->dest.h = ctx->screen_height;
     ctx->dest.w = (ctx->width * ctx->dest.h) / ctx->height;
     ctx->dest.x = (ctx->screen_width - ctx->dest.w) / 2;
     ctx->dest.y = 0;
 
-    ctx->font = TTF_OpenFont("asap.ttf", (int)(ctx->screen_height * 0.05));
-    if(!ctx->font){
-        LOG(ERROR, SDL_GetError());
-    }
-#else
     SDL_RenderSetLogicalSize(ctx->renderer, ctx->width, ctx->height);
     SDL_RenderSetIntegerScale(ctx->renderer, 1);
     SDL_RenderSetScale(ctx->renderer, ctx->scale, ctx->scale);
-#endif
+
 
     ctx->texture = SDL_CreateTexture(
         ctx->renderer,
@@ -99,10 +93,8 @@ void render_graphics(GraphicsContext* g_ctx, const uint32_t* buffer){
 }
 
 void free_graphics(GraphicsContext* ctx){
-#ifdef __ANDROID__
     TTF_CloseFont(ctx->font);
     TTF_Quit();
-#endif
     SDL_DestroyTexture(ctx->texture);
     SDL_DestroyRenderer(ctx->renderer);
     SDL_DestroyWindow(ctx->window);

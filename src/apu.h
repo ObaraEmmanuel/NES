@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include "biquad.h"
 
 #define SAMPLING_FREQUENCY 48000
 // should be able to store samples produced in 1/60th of a second
@@ -126,6 +127,7 @@ typedef struct APU{
     size_t sequencer;
     float stat;
     size_t stat_index;
+    Biquad filter;
 } APU;
 
 

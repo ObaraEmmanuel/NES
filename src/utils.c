@@ -1,6 +1,13 @@
 #include "utils.h"
 #include <stdarg.h>
+#include <assert.h>
+#include <math.h>
+#include <stdio.h>
 #include <SDL2/SDL.h>
+
+#ifndef PI
+# define PI	3.14159265358979323846264338327950288
+#endif
 
 
 size_t file_size(FILE* file){
@@ -26,6 +33,9 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...){
             case ERROR:
                 priority = ANDROID_LOG_ERROR;
                 break;
+            case WARN:
+                priority = ANDROID_LOG_WARN;
+                break;
             default:
                 priority = ANDROID_LOG_UNKNOWN;
         }
@@ -44,6 +54,9 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...){
             case ERROR:
                 printf("ERROR > ");
                 break;
+            case WARN:
+                printf("WARN  > ");
+                break;
             default:
                 printf("LOG   > ");
         }
@@ -52,6 +65,7 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...){
         vprintf(fmt, ap);
         va_end(ap);
         printf("\n");
+        fflush(stdout);
 #endif
     }
 }
@@ -156,5 +170,31 @@ void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t
                 LOG(DEBUG, "Unsupported format");
                 exit(EXIT_FAILURE);
         }
+    }
+}
+
+void fft(complx *v, int n, complx *tmp) {
+    if(n <= 1)
+        return;
+    /* otherwise, do nothing and return */
+    int k, m;
+    complx z, w, *vo, *ve;
+    ve = tmp;
+    vo = tmp + n / 2;
+    for (k = 0; k < n / 2; k++) {
+        ve[k] = v[2 * k];
+        vo[k] = v[2 * k + 1];
+    }
+    fft(ve, n / 2, v); /* FFT on even-indexed elements of v[] */
+    fft(vo, n / 2, v); /* FFT on odd-indexed elements of v[] */
+    for (m = 0; m < n / 2; m++) {
+        w.Re = cos(2 * PI * m / (double) n);
+        w.Im = -sin(2 * PI * m / (double) n);
+        z.Re = w.Re * vo[m].Re - w.Im * vo[m].Im; /* Re(w*vo[m]) */
+        z.Im = w.Re * vo[m].Im + w.Im * vo[m].Re; /* Im(w*vo[m]) */
+        v[m].Re = ve[m].Re + z.Re;
+        v[m].Im = ve[m].Im + z.Im;
+        v[m + n / 2].Re = ve[m].Re - z.Re;
+        v[m + n / 2].Im = ve[m].Im - z.Im;
     }
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 #ifdef __ANDROID__
 #include <SDL2/SDL_ttf.h>
@@ -11,9 +12,7 @@ typedef struct GraphicsContext{
     SDL_Renderer* renderer;
     SDL_Texture* texture;
     SDL_AudioDeviceID audio_device;
-#ifdef __ANDROID__
     TTF_Font* font;
-#endif // __ANDROID__
     SDL_Rect dest;
     int width;
     int height;

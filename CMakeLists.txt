@@ -7,7 +7,7 @@ set(BUILD_DIR build)
 IF (WIN32 OR ANDROID)
   set(VENDOR_DIR ${CMAKE_SOURCE_DIR}/vendor)
   set(SDL2_DIR ${CMAKE_SOURCE_DIR}/vendor/SDL2)
-  set(SDL2_TTF_DIR ${CMAKE_SOURCE_DIR}/vendor/SDL2_ttf)
+  set(SDL2_ttf_DIR ${CMAKE_SOURCE_DIR}/vendor/SDL2_ttf/cmake)
 ENDIF()
 
 
@@ -15,10 +15,11 @@ IF(ANDROID)
   option(BUILD_SHARED_LIBS "Build shared libraries" ON)
   option(TTF_WITH_HARFBUZZ "use harfbuzz to improve text shaping" ON)
   add_subdirectory(${SDL2_DIR})
-  add_subdirectory(${SDL2_TTF_DIR})
+  add_subdirectory(${SDL2_ttf_DIR})
   # This is the built in NDK logging library
   find_library(log-lib log)
 ELSE()
+  find_package(SDL2_ttf REQUIRED)
   find_package(SDL2 REQUIRED)
 ENDIF()
 
@@ -47,11 +48,14 @@ set (SRC
         src/mappers/mmc1.c
         src/mappers/uxrom.c
         src/mappers/mmc3.c
-
+        src/nsf.c
+        src/biquad.c
+        src/biquad.h
+        src/font.h
 )
 
 IF(WIN32 OR ANDROID)
-  include_directories(src src/mappers vendor/include ${SDL2_DIR})
+  include_directories(src src/mappers vendor/include ${SDL2_DIR} ${SDL2_ttf_DIR})
 ELSE()
   include_directories(src src/mappers ${SDL2_INCLUDE_DIRS})
 ENDIF()
@@ -72,7 +76,7 @@ IF(ANDROID)
   )
 ELSE()
   add_executable(nes ${SRC})
-  target_link_libraries(nes ${SDL2_LIBRARIES})
+  target_link_libraries(nes ${SDL2_LIBRARIES} SDL2_ttf::SDL2_ttf)
 ENDIF()
 
 IF (NOT WIN32)
@@ -82,11 +86,12 @@ ELSE()
 ENDIF()
 
 if(WIN32)
+  get_target_property(SDL2_ttf_DLL SDL2_ttf::SDL2_ttf IMPORTED_LOCATION)
   get_filename_component(SDL2_DLL_NAME "${SDL2_DLL}" NAME)
+  get_filename_component(SDL2_ttf_DLL_NAME "${SDL2_ttf_DLL}" NAME)
   add_custom_command(TARGET nes POST_BUILD
-          MAIN_DEPENDENCY "${SDL2_DLL}"
-          BYPRODUCTS "${SDL2_DLL_NAME}"
           COMMENT "Copying SDL2 DLL"
-          COMMAND "${CMAKE_COMMAND}" -E copy "${SDL2_DLL}" "$<TARGET_FILE_DIR:nes>/${SDL2_DLL_NAME}"
-          )
+          COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SDL2_DLL}" "$<TARGET_FILE_DIR:nes>/${SDL2_DLL_NAME}"
+          COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${SDL2_ttf_DLL}" "$<TARGET_FILE_DIR:nes>/${SDL2_ttf_DLL_NAME}"
+  )
 endif()

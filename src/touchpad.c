@@ -22,6 +22,11 @@ static void update_joy_pos();
 void init_touch_pad(GraphicsContext* ctx){
     touch_pad.g_ctx = ctx;
 
+    ctx->font = TTF_OpenFont("asap.ttf", (int)(ctx->screen_height * 0.05));
+    if(ctx->font == NULL){
+        LOG(ERROR, SDL_GetError());
+    }
+
     int offset = (int)(0.2 * ctx->screen_height);
     int anchor_y = ctx->screen_height - offset;
     int anchor_x = ctx->screen_width - offset;

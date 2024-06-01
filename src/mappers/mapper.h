@@ -39,6 +39,7 @@ typedef enum MapperFormat {
 
 struct Genie;
 struct Emulator;
+struct NSF;
 
 typedef struct Mapper{
     uint8_t* CHR_RAM;
@@ -55,6 +56,9 @@ typedef struct Mapper{
     uint16_t name_table_map[4];
     uint32_t clamp;
     uint8_t mapper_num;
+    uint8_t is_nsf;
+    uint8_t (*read_ROM)(struct Mapper*, uint16_t);
+    void (*write_ROM)(struct Mapper*, uint16_t, uint8_t);
     uint8_t (*read_PRG)(struct Mapper*, uint16_t);
     void (*write_PRG)(struct Mapper*, uint16_t, uint8_t);
     uint8_t (*read_CHR)(struct Mapper*, uint16_t);
@@ -66,6 +70,7 @@ typedef struct Mapper{
     void* extension;
     // pointer to game genie if any
     struct Genie* genie;
+    struct NSF* NSF;
     struct Emulator* emulator;
 } Mapper;
 

@@ -4,6 +4,12 @@
 #include <stdint.h>
 #include <SDL2/SDL.h>
 
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+
+typedef float real;
+typedef struct{real Re; real Im;} complx;
+
 #if defined(_WIN32) || defined(_WIN64)
 #define _WIN 1
 #endif
@@ -43,6 +49,7 @@ enum {
 enum LogLevel{
     DEBUG = 0,
     ERROR,
+    WARN,
     INFO,
 };
 
@@ -54,3 +61,4 @@ void TRACE(const char* fmt, ...);
 int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius);
 int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius);
 void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format);
+void fft(complx *v, int n, complx *tmp);

@@ -3,7 +3,7 @@
 #include "emulator.h"
 #include "utils.h"
 
-void init_mem(struct Emulator* emulator){
+void init_mem(Emulator* emulator){
     Memory* mem = &emulator->mem;
     mem->emulator = emulator;
     mem->mapper = &emulator->mapper;
@@ -133,22 +133,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
         return;
     }
 
-    if(address < 0x6000){
-        LOG(DEBUG, "Attempted to write to unavailable expansion ROM");
-        return;
-    }
-
-    if(address < 0x8000){
-        // extended ram
-        if(mem->mapper->save_RAM != NULL)
-            mem->mapper->save_RAM[address - 0x6000] = value;
-        else {
-            LOG(DEBUG, "Attempted to write to non existent save RAM");
-        }
-    }else{
-        // PRG
-        mem->mapper->write_PRG(mem->mapper, address, value);
-    }
+    mem->mapper->write_ROM(mem->mapper, address, value);
 }
 uint8_t read_mem(Memory* mem, uint16_t address){
     if(address < RAM_END)
@@ -180,22 +165,5 @@ uint8_t read_mem(Memory* mem, uint16_t address){
         }
     }
 
-    if(address < 0x6000){
-        LOG(DEBUG, "Attempted to read from unavailable expansion ROM");
-        return 0;
-    }
-
-    if(address < 0x8000){
-        // save RAM
-        if(mem->mapper->save_RAM != NULL)
-            return mem->mapper->save_RAM[address - 0x6000];
-        else {
-            LOG(DEBUG, "Attempted to read from non existent save RAM");
-            return 0;
-        }
-
-    }else{
-        // PRG
-        return mem->mapper->read_PRG(mem->mapper, address);
-    }
+    return mem->mapper->read_ROM(mem->mapper, address);
 }

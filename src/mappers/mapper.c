@@ -5,6 +5,7 @@
 #include "mapper.h"
 #include "genie.h"
 #include "utils.h"
+#include "nsf.h"
 
 static void select_mapper(Mapper*  mapper);
 static void set_mapping(Mapper* mapper, uint16_t tr, uint16_t tl, uint16_t br, uint16_t bl);
@@ -14,7 +15,8 @@ static uint8_t read_PRG(Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
 static uint8_t read_CHR(Mapper*, uint16_t);
 static void write_CHR(Mapper*, uint16_t, uint8_t);
-
+static uint8_t read_ROM(Mapper*, uint16_t);
+static void write_ROM(Mapper*, uint16_t, uint8_t);
 
 static void select_mapper(Mapper* mapper){
     // load generic implementations
@@ -22,6 +24,8 @@ static void select_mapper(Mapper* mapper){
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
+    mapper->read_ROM = read_ROM;
+    mapper->write_ROM = write_ROM;
     mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
 
     if(!mapper->CHR_banks) {
@@ -95,6 +99,46 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
     }
 }
 
+static uint8_t read_ROM(Mapper* mapper, uint16_t address){
+    if(address < 0x6000) {
+        // expansion rom
+        LOG(DEBUG, "Attempted to write to unavailable expansion ROM");
+        return 0;
+    }
+    if(address < 0x6000) {
+        // PRG ram
+        if(mapper->save_RAM != NULL)
+            return mapper->save_RAM[address - 0x6000];
+
+        LOG(DEBUG, "Attempted to read from non existent PRG RAM");
+        return 0;
+    }
+
+    // PRG
+    return mapper->read_PRG(mapper, address);
+}
+
+
+static void write_ROM(Mapper* mapper, uint16_t address, uint8_t value){
+    if(address < 0x6000){
+        LOG(DEBUG, "Attempted to write to unavailable expansion ROM");
+        return;
+    }
+
+    if(address < 0x8000){
+        // extended ram
+        if(mapper->save_RAM != NULL)
+            mapper->save_RAM[address - 0x6000] = value;
+        else {
+            LOG(DEBUG, "Attempted to write to non existent save RAM");
+        }
+        return;
+    }
+
+    // PRG
+    mapper->write_PRG(mapper, address, value);
+}
+
 
 static uint8_t read_PRG(Mapper* mapper, uint16_t address){
     return mapper->PRG_ROM[(address - 0x8000) & mapper->clamp];
@@ -135,7 +179,14 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     uint8_t header[INES_HEADER_SIZE];
     SDL_RWread(file, header, INES_HEADER_SIZE, 1);
 
-    if(strncmp((char *)header, "NES\x1A", 4) != 0){
+    if(strncmp(header, "NESM\x1A", 5) == 0){
+        LOG(INFO, "Using NSF format");
+        load_nsf(file, mapper);
+        SDL_RWclose(file);
+        return;
+    }
+
+    if(strncmp(header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
         exit(EXIT_FAILURE);
     }
@@ -221,6 +272,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         LOG(INFO, "-------- Game Genie Cartridge info ---------");
         load_genie(game_genie, mapper);
     }
+    SDL_RWclose(file);
 }
 
 void free_mapper(Mapper* mapper){
@@ -232,5 +284,10 @@ void free_mapper(Mapper* mapper){
         free(mapper->extension);
     if(mapper->genie != NULL)
         free(mapper->genie);
+    if(mapper->NSF != NULL) {
+        SDL_DestroyTexture(mapper->NSF->song_num_tx);
+        SDL_DestroyTexture(mapper->NSF->song_info_tx);
+        free(mapper->NSF);
+    }
     LOG(DEBUG, "Mapper cleanup complete");
 }
