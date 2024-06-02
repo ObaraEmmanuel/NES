@@ -4,14 +4,8 @@ project(nes)
 set(CMAKE_C_STANDARD 11)
 set(BUILD_DIR build)
 
-IF (WIN32 OR ANDROID)
-#  set(VENDOR_DIR ${CMAKE_SOURCE_DIR}/vendor)
-  set(SDL_DIR ${CMAKE_SOURCE_DIR}/external/SDL)
-  set(SDL_ttf_DIR ${CMAKE_SOURCE_DIR}/external/SDL_ttf)
-ENDIF()
-
-option(BUILD_STATIC_LIBS "Build shared libraries" ON)
-option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
+set(SDL_DIR ${CMAKE_SOURCE_DIR}/external/SDL)
+set(SDL_ttf_DIR ${CMAKE_SOURCE_DIR}/external/SDL_ttf)
 option(TTF_WITH_HARFBUZZ "use harfbuzz to improve text shaping" ON)
 add_subdirectory(${SDL_DIR})
 add_subdirectory(${SDL_ttf_DIR})
@@ -19,6 +13,11 @@ add_subdirectory(${SDL_ttf_DIR})
 IF(ANDROID)
   # This is the built in NDK logging library
   find_library(log-lib log)
+  option(BUILD_STATIC_LIBS "Build shared libraries" OFF)
+  option(BUILD_SHARED_LIBS "Build shared libraries" ON)
+ELSE()
+  option(BUILD_STATIC_LIBS "Build shared libraries" ON)
+  option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 ENDIF()
 
 set (SRC
@@ -62,17 +61,17 @@ IF(ANDROID)
   )
   target_link_libraries(
           nes
-          SDL2_ttf
           SDL2
+          SDL2_ttf
           ${log-lib}
   )
 ELSE()
   add_executable(nes ${SRC})
-  target_link_libraries(nes PRIVATE SDL2::SDL2main SDL2::SDL2-static SDL2_ttf::SDL2_ttf-static)
+  target_link_libraries(nes SDL2::SDL2main SDL2::SDL2-static SDL2_ttf::SDL2_ttf-static)
 ENDIF()
 
 IF (NOT WIN32)
-  target_link_libraries(nes PRIVATE m)
+  target_link_libraries(nes m)
 ELSE()
-  target_link_libraries(nes PRIVATE winmm.lib)
+  target_link_libraries(nes winmm.lib)
 ENDIF()

@@ -86,9 +86,12 @@ void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
 }
 
 void update_joypad(struct JoyPad* joyPad, SDL_Event* event){
+#ifdef __ANDROID__
     ANDROID_TOUCHPAD_MAPPER(joyPad, event);
+#else
     keyboard_mapper(joyPad, event);
     gamepad_mapper(joyPad, event);
+#endif
 }
 
 void turbo_trigger(struct JoyPad* joyPad){

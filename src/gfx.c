@@ -2,6 +2,7 @@
 
 #include "gfx.h"
 #include "utils.h"
+#include "font.h"
 
 #ifdef __ANDROID__
 #include "touchpad.h"
@@ -12,6 +13,10 @@ void get_graphics_context(GraphicsContext* ctx){
     SDL_Init(SDL_INIT_EVERYTHING);
     TTF_Init();
 #ifdef __ANDROID__
+    ctx->font = TTF_OpenFont("asap.ttf", (int)(ctx->screen_height * 0.05));
+    if(ctx->font == NULL){
+        LOG(ERROR, SDL_GetError());
+    }
     SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
@@ -24,6 +29,11 @@ void get_graphics_context(GraphicsContext* ctx){
         | SDL_WINDOW_ALLOW_HIGHDPI
     );
 #else
+    SDL_RWops* rw = SDL_RWFromMem(font_data, sizeof(font_data));
+    ctx->font = TTF_OpenFontRW(rw, 1, 11);
+    if(ctx->font == NULL){
+        LOG(ERROR, SDL_GetError());
+    }
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
         SDL_WINDOWPOS_CENTERED,
@@ -49,15 +59,16 @@ void get_graphics_context(GraphicsContext* ctx){
         exit(EXIT_FAILURE);
     }
 
+#ifdef __ANDROID__
     ctx->dest.h = ctx->screen_height;
     ctx->dest.w = (ctx->width * ctx->dest.h) / ctx->height;
     ctx->dest.x = (ctx->screen_width - ctx->dest.w) / 2;
     ctx->dest.y = 0;
-
+#else
     SDL_RenderSetLogicalSize(ctx->renderer, ctx->width, ctx->height);
     SDL_RenderSetIntegerScale(ctx->renderer, 1);
     SDL_RenderSetScale(ctx->renderer, ctx->scale, ctx->scale);
-
+#endif
 
     ctx->texture = SDL_CreateTexture(
         ctx->renderer,

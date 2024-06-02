@@ -1,7 +1,10 @@
 #include "nsf.h"
 #include "utils.h"
 #include "emulator.h"
-#include "font.h"
+
+#ifdef __ANDROID__
+#include "touchpad.h"
+#endif
 
 #include <float.h>
 #include <stdlib.h>
@@ -216,17 +219,16 @@ void nsf_jsr(Emulator* emulator, uint16_t address) {
 static double bin_boundaries[BAR_COUNT + 1] = {0};
 
 void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
+#ifdef __ANDROID__
+    int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
+#else
+    int offset_x = 0, offset_y = 0, width = g_ctx->width, height = g_ctx->height;
+#endif
     // pre-compute logarithmic binning boundaries
     for(size_t i = 0; i < BAR_COUNT; i++) {
         bin_boundaries[i] = exp((log(24000) - log(20))*i/(double)BAR_COUNT) * 20;
     }
     bin_boundaries[BAR_COUNT] = 24000;
-
-    SDL_RWops* rw = SDL_RWFromMem(font_data, sizeof(font_data));
-    g_ctx->font = TTF_OpenFontRW(rw, 1, 11);
-    if(g_ctx->font == NULL){
-        LOG(ERROR, SDL_GetError());
-    }
     char buf[144] = {0};
     snprintf(buf, 144, "song: %s \nartist: %s \ncopyright: %s", nsf->song_name, nsf->artist, nsf->copyright);
     SDL_Color color = {192, 0x30, 0x0, 0xff};
@@ -234,7 +236,8 @@ void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
     nsf->song_info_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
     nsf->song_info_rect.w = text_surf->w;
     nsf->song_info_rect.h = text_surf->h;
-    nsf->song_info_rect.x = nsf->song_info_rect.y = 10;
+    nsf->song_info_rect.x = 10 + offset_x;
+    nsf->song_info_rect.y = 10 + offset_y;
 
     SDL_FreeSurface(text_surf);
 }
@@ -244,8 +247,13 @@ static int amps[BAR_COUNT] = {0};
 
 void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
     static int song_num = -1;
-
     GraphicsContext* g_ctx = &emulator->g_ctx;
+#ifdef __ANDROID__
+    int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
+#else
+    int offset_x = 0, offset_y = 0, width = g_ctx->width, height = g_ctx->height;
+#endif
+
     APU* apu = &emulator->apu;
     complx* v = nsf->samples;
     // convert audio buffer to complex values for FFT
@@ -284,26 +292,26 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
     // compute normalization factor for spectrum values for better visualization
     float min_v = FLT_MAX, max_v = FLT_MIN;
     for(size_t i = 0; i < BAR_COUNT; i++) {
-        min_v = min(min_v, bins[i]);
-        max_v = max(max_v, bins[i]);
+        min_v = MIN(min_v, bins[i]);
+        max_v = MAX(max_v, bins[i]);
     }
     float factor = 1.0f / (max_v - min_v);
 
     SDL_RenderClear(g_ctx->renderer);
     SDL_Rect dest;
-    int amp;
+    int amp, max_bar_h = 0.4f * height, min_bar_h = 0.02f * height, bar_step = min_bar_h / 2;
     for(int i = 0; i < BAR_COUNT; i++) {
-        amp = factor * bins[i] * 100;
+        amp = factor * bins[i] * max_bar_h;
         // animate the visualization bars
         if(amp > amps[i]) {
-            amps[i] += 2;
+            amps[i] += bar_step;
         }else {
-            amps[i] -= 2;
+            amps[i] -= bar_step;
         }
-        amps[i] = amps[i] < 4 ? 4 : amps[i] > 100 ? 100 : amps[i];
-        dest.y = (g_ctx->height - amps[i]) / 2;
-        dest.x = i * g_ctx->width/BAR_COUNT;
-        dest.w = g_ctx->width/BAR_COUNT - 1;
+        amps[i] = amps[i] < min_bar_h ? min_bar_h : amps[i] > max_bar_h ? max_bar_h : amps[i];
+        dest.y = (height - amps[i]) / 2 + offset_y;
+        dest.x = i * width/BAR_COUNT + offset_x;
+        dest.w = width/BAR_COUNT - 1;
         dest.h = amps[i];
         SDL_SetRenderDrawColor(
             g_ctx->renderer, i*(g_ctx->width/BAR_COUNT), 0x0,
@@ -321,14 +329,17 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         nsf->song_num_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
         nsf->song_num_rect.h = text_surf->h;
         nsf->song_num_rect.w = text_surf->w;
-        nsf->song_num_rect.x = (g_ctx->width - text_surf->w) / 2;
-        nsf->song_num_rect.y = g_ctx->height - 10 - text_surf->h;
+        nsf->song_num_rect.x = (width - text_surf->w) / 2 + offset_x;
+        nsf->song_num_rect.y = height - 10 - text_surf->h + offset_y;
         SDL_FreeSurface(text_surf);
         song_num = nsf->current_song;
     }
 
     SDL_RenderCopy(g_ctx->renderer, nsf->song_info_tx, NULL, &nsf->song_info_rect);
     SDL_RenderCopy(g_ctx->renderer, nsf->song_num_tx, NULL, &nsf->song_num_rect);
+#ifdef __ANDROID__
+    ANDROID_RENDER_TOUCH_CONTROLS(g_ctx);
+#endif
     SDL_SetRenderDrawColor(g_ctx->renderer, 0, 0, 0, 255);
     SDL_RenderPresent(g_ctx->renderer);
 }

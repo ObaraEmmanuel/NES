@@ -172,6 +172,14 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
                     // type as button release
                     key &= ~button->id;
                     LOG(DEBUG, "Released button finger id: %d", event->tfinger.fingerId);
+                    if(button->id == TURBO_A) {
+                        // clear button A
+                        key &= ~BUTTON_A;
+                    }
+                    if(button->id == TURBO_B) {
+                        // clear button B
+                        key &= ~BUTTON_B;
+                    }
                 }
             }
 
@@ -207,6 +215,14 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
                     // type as button press
                     LOG(DEBUG, "Button pressed");
                     key |= button->id;
+                    if(button->id == TURBO_A) {
+                        // set button A
+                        key |= BUTTON_A;
+                    }
+                    if(key == TURBO_B) {
+                        // set button B
+                        key |= BUTTON_B;
+                    }
                 }
             }
 
