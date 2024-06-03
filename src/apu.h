@@ -45,6 +45,7 @@ typedef struct {
     uint8_t envelope_loop;
     uint8_t enabled;
     uint8_t mute;
+    uint16_t target_period;
 } Pulse;
 
 

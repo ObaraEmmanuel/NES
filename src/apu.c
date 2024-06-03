@@ -18,8 +18,8 @@ static const uint8_t length_counter_lookup[32] = {
 
 static uint8_t duty[4][8] =
 {
-    {0, 1, 0, 0, 0, 0, 0, 1}, // 12.5 %
-    {0, 1, 1, 0, 0, 0, 1, 1}, // 25 %
+    {0, 1, 0, 0, 0, 0, 0, 0}, // 12.5 %
+    {0, 1, 1, 0, 0, 0, 0, 0}, // 25 %
     {0, 1, 1, 1, 1, 0, 0, 0}, // 50 %
     {1, 0, 0, 1, 1, 1, 1, 1} // 25 % negated
 };
@@ -106,6 +106,8 @@ static uint8_t clock_divider(Divider *divider);
 static uint8_t clock_triangle(Triangle *triangle);
 
 static uint8_t clock_divider_inverse(Divider *divider);
+
+static void update_target_period(Pulse* pulse);
 
 static void clock_dmc(APU* apu);
 
@@ -451,12 +453,11 @@ float get_sample(APU *apu) {
         pulse_out += (apu->pulse2.const_volume ? apu->pulse2.envelope.period : apu->pulse2.envelope.step) * (duty[apu->
             pulse2.duty][apu->pulse2.t.step]);
 
-    if (apu->triangle.enabled)
+    if (apu->triangle.enabled && apu->triangle.sequencer.period > 1)
         tnd_out += tri_sequence[apu->triangle.sequencer.step] * 3;
 
-    if (apu->noise.enabled)
-        tnd_out += 2 * ((apu->noise.const_volume ? apu->noise.envelope.period : apu->noise.envelope.step) * (
-                            apu->noise.shift & BIT_0) * (apu->noise.l > 0));
+    if (apu->noise.enabled && !(apu->noise.shift & BIT_0) && apu->noise.l > 0)
+        tnd_out += 2 * (apu->noise.const_volume ? apu->noise.envelope.period : apu->noise.envelope.step);
 
     tnd_out += apu->dmc.counter;
 
@@ -522,12 +523,14 @@ void set_pulse_ctrl(Pulse *pulse, uint8_t value) {
     pulse->envelope.period = value & 0xF;
     pulse->envelope.counter = pulse->envelope.period;
     // reload divider step counter
+    // this should be set on next envelope clock but this will do for now
     pulse->envelope.step = 15;
     pulse->duty = value >> 6;
 }
 
 void set_pulse_timer(Pulse *pulse, uint8_t value) {
     pulse->t.period = pulse->t.period & ~0xff | value;
+    update_target_period(pulse);
 }
 
 void set_pulse_sweep(Pulse *pulse, uint8_t value) {
@@ -536,13 +539,14 @@ void set_pulse_sweep(Pulse *pulse, uint8_t value) {
     pulse->sweep.counter = pulse->sweep.period;
     pulse->shift = value & PULSE_SHIFT;
     pulse->neg = value & BIT_3;
+    update_target_period(pulse);
 }
 
 void set_pulse_length_counter(Pulse *pulse, uint8_t value) {
     pulse->t.period = pulse->t.period & 0xff | (value & 0x7) << 8;
     if (pulse->enabled)
         pulse->l = length_counter_lookup[value >> 3];
-    pulse->t.step = 0;
+    update_target_period(pulse);
     pulse->envelope.step = 15;
 }
 
@@ -566,8 +570,6 @@ void set_noise_ctrl(Noise *noise, uint8_t value) {
     noise->const_volume = (value & BIT_4) > 0;
     noise->envelope.loop = (value & BIT_5) > 0;
     noise->envelope.period = value & 0xF;
-    noise->envelope.counter = noise->envelope.period;
-    noise->envelope.step = 15;
 }
 
 void set_noise_period(APU* apu, uint8_t value) {
@@ -576,13 +578,13 @@ void set_noise_period(APU* apu, uint8_t value) {
         noise->timer.period = noise_period_lookup_PAL[value & 0xF];
     else
         noise->timer.period = noise_period_lookup_NTSC[value & 0xF];
-    noise->timer.step = noise->timer.period;
     noise->mode = (value & BIT_7) > 0;
 }
 
 void set_noise_length(Noise *noise, uint8_t value) {
     if (noise->enabled)
         noise->l = length_counter_lookup[value >> 3];
+    noise->envelope.step = 15;
 }
 
 void set_dmc_ctrl(APU* apu, uint8_t value) {
@@ -750,20 +752,25 @@ static uint8_t clock_divider_inverse(Divider *divider) {
     return 1;
 }
 
-static void length_sweep_pulse(Pulse *pulse) {
-    // continuously compute target period
-    long long target_period = pulse->t.period >> pulse->shift;
-    target_period = pulse->neg ? -target_period : target_period;
+static void update_target_period(Pulse* pulse) {
+    int change = pulse->t.period >> pulse->shift;
+    change = pulse->neg ? pulse->id == 1 ? - change - 1 : -change : change;
     // add 1 (2's complement) for pulse 2
-    target_period += (pulse->id == 2 ? 1 : 0) + pulse->t.period;
-    // clock divider
-    uint8_t clock_sweep = clock_divider(&pulse->sweep);
-    pulse->mute = 0;
-    if (pulse->t.period < 8 || target_period > 0x7ff) {
-        // mute the channel
+    change = pulse->t.period + change;
+    pulse->target_period = change < 0 ? 0 : change;
+    if(pulse->t.period < 8 || pulse->target_period > 0x7ff) {
         pulse->mute = 1;
-    } else if (pulse->enable_sweep && clock_sweep && pulse->shift > 0) {
-        pulse->t.period = target_period;
+    }else {
+        pulse->mute = 0;
+    }
+}
+
+static void length_sweep_pulse(Pulse *pulse) {
+    if(clock_divider(&pulse->sweep)) {
+        if(pulse->enable_sweep && pulse->shift > 0 && !pulse->mute) {
+            pulse->t.period = pulse->target_period;
+            update_target_period(pulse);
+        }
     }
 
     // length counter
