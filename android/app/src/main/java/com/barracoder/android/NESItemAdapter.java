@@ -23,6 +23,11 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         this.list = list;
     }
 
+    public void filterList(ArrayList<NESItemModel> filteredList){
+        list = filteredList;
+        notifyDataSetChanged();
+    }
+
     @NonNull
     @Override
     public NESItemHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -36,7 +41,9 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         holder.gameName.setText(item.getName());
         if(item.getImage() != null)
             Glide.with(context).load(item.getImage()).into(holder.gameImage);
-        else
+        else if (item.getRom().endsWith(".nsf")) {
+            holder.gameImage.setImageResource(R.drawable.music);
+        } else
             holder.gameImage.setImageResource(R.drawable.controller);
 
         holder.playButton.setOnClickListener(view -> {

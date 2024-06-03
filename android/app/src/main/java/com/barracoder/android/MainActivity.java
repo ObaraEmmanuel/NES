@@ -3,8 +3,12 @@ package com.barracoder.android;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.SearchView;
 import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -19,12 +23,28 @@ public class MainActivity extends AppCompatActivity {
 
     ArrayList<NESItemModel> list;
     RecyclerView recyclerView;
+    NESItemAdapter adapter;
     private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        SearchView searchView = findViewById(R.id.searchView);
+
+        searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
+            @Override
+            public boolean onQueryTextSubmit(String query) {
+                return false;
+            }
+
+            @Override
+            public boolean onQueryTextChange(String newText) {
+                filter(newText);
+                return false;
+            }
+        });
 
         recyclerView = findViewById(R.id.NESRecyclerView);
         list = new ArrayList<>();
@@ -45,7 +65,7 @@ public class MainActivity extends AppCompatActivity {
             list.add(item);
         }
 
-        NESItemAdapter adapter = new NESItemAdapter(MainActivity.this, list);
+        adapter = new NESItemAdapter(MainActivity.this, list);
         recyclerView.setAdapter(adapter);
     }
 
@@ -72,5 +92,15 @@ public class MainActivity extends AppCompatActivity {
             return fileName.substring(0, fileName.lastIndexOf("."));
         }
         return fileName;
+    }
+
+    private void filter(String text) {
+        ArrayList<NESItemModel> filteredList = new ArrayList<>();
+        for (NESItemModel item : list) {
+            if (item.getName().toLowerCase().contains(text.toLowerCase())) {
+                filteredList.add(item);
+            }
+        }
+        adapter.filterList(filteredList);
     }
 }

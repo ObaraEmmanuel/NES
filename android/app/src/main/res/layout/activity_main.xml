@@ -31,6 +31,20 @@
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/app_name"
         app:titleMarginStart="20dp"
-        app:titleTextColor="@color/primary" />
+        app:titleTextColor="@color/primary" >
+
+        <androidx.appcompat.widget.SearchView
+            android:id="@+id/searchView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true"
+            android:layout_gravity="end"
+            android:iconifiedByDefault="false"
+            android:queryHint="Search"
+            app:closeIcon="@drawable/ic_close"
+            app:searchIcon="@drawable/ic_search"
+            tools:layout_editor_absoluteX="116dp"
+            tools:layout_editor_absoluteY="4dp" />
+    </androidx.appcompat.widget.Toolbar>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
