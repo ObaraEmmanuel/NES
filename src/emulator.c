@@ -52,6 +52,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     g_ctx->height = 240;
     g_ctx->scale = 2;
     get_graphics_context(g_ctx);
+    SDL_SetWindowTitle(g_ctx->window, get_file_name(argv[1]));
 
     init_mem(emulator);
     init_ppu(emulator);

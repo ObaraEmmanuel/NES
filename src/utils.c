@@ -4,6 +4,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <SDL.h>
+#include <string.h>
 
 #ifndef PI
 # define PI	3.14159265358979323846264338327950288
@@ -197,4 +198,15 @@ void fft(complx *v, int n, complx *tmp) {
         v[m + n / 2].Re = ve[m].Re - z.Re;
         v[m + n / 2].Im = ve[m].Im - z.Im;
     }
+}
+
+char *get_file_name(char *path) {
+    char *pfile = path + strlen(path);
+    for (; pfile > path; pfile--){
+        if ((*pfile == '\\') || (*pfile == '/')){
+            pfile++;
+            break;
+        }
+    }
+    return pfile;
 }
