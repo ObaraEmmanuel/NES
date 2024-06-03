@@ -37,6 +37,14 @@ over time. Any help is welcome.
     - [x] Gamepad controller (Multiplayer)
     - [x] Turbo keys
     - [x] Custom Touch controller (Android)
+* Formats
+    - [x] iNES
+    - [ ] NES2.0
+    - [x] NSF
+    - [ ] NSF2
+    - [ ] UNIF
+    - [ ] FDS
+    - [ ] IPS
 * Mappers
     - [x] \#0   NROM
     - [x] \#1   MMC1
