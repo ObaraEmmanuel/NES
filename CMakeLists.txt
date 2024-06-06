@@ -7,8 +7,6 @@ set(BUILD_DIR build)
 set(SDL_DIR ${CMAKE_SOURCE_DIR}/external/SDL)
 set(SDL_ttf_DIR ${CMAKE_SOURCE_DIR}/external/SDL_ttf)
 option(TTF_WITH_HARFBUZZ "use harfbuzz to improve text shaping" ON)
-add_subdirectory(${SDL_DIR})
-add_subdirectory(${SDL_ttf_DIR})
 
 IF(ANDROID)
   # This is the built in NDK logging library
@@ -19,6 +17,9 @@ ELSE()
   option(BUILD_STATIC_LIBS "Build shared libraries" ON)
   option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 ENDIF()
+
+add_subdirectory(${SDL_DIR})
+add_subdirectory(${SDL_ttf_DIR})
 
 set (SRC
         src/apu.c
