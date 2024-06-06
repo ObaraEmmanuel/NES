@@ -226,9 +226,9 @@ void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
 #endif
     // pre-compute logarithmic binning boundaries
     for(size_t i = 0; i < BAR_COUNT; i++) {
-        bin_boundaries[i] = exp((log(24000) - log(20))*i/(double)BAR_COUNT) * 20;
+        bin_boundaries[i] = exp((log(20000) - log(20))*i/(double)BAR_COUNT) * 20;
     }
-    bin_boundaries[BAR_COUNT] = 24000;
+    bin_boundaries[BAR_COUNT] = 20000;
     char buf[144] = {0};
     snprintf(buf, 144, "song: %s \nartist: %s \ncopyright: %s", nsf->song_name, nsf->artist, nsf->copyright);
     SDL_Color color = {192, 0x30, 0x0, 0xff};
@@ -265,8 +265,8 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
     fft(nsf->samples, AUDIO_BUFF_SIZE, nsf->temp);
 
     // Place frequencies into their respective frequency bins
-    double end = bin_boundaries[0], step = 24000.0f / AUDIO_BUFF_SIZE / 2, index = 0;
-    size_t j = 0;
+    double end = bin_boundaries[0], step = 20000.0f / AUDIO_BUFF_SIZE / 2, index = 0;
+    size_t j = step/20;
     for(size_t i = 0; i < BAR_COUNT; i++) {
         double total = 0;
         size_t bin_count = 0;

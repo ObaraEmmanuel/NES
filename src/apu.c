@@ -342,7 +342,8 @@ void init_sampler(APU* apu, int frequency) {
     float cycles_per_frame = apu->emulator->type == PAL? 33247.5: 29780.5;
     float rate = apu->emulator->type == PAL? 50.0f : 60.0f;
     Sampler* sampler = &apu->sampler;
-    biquad_init(&apu->filter, HPF, 1, 20, frequency, 2);
+    // Q = 0.707 => BW = 1.414 (1 octave)
+    biquad_init(&apu->filter, HPF, 0, 20, frequency, 1);
 
     sampler->max_period = cycles_per_frame * rate / frequency;
     sampler->min_period = sampler->max_period - 1;
@@ -380,7 +381,7 @@ void sample(APU* apu) {
         avg = -1;
 #else
 
-        apu->buff[sampler->index++] = 32767 * biquad(get_sample(apu), &apu->filter);
+        apu->buff[sampler->index++] = 32000 * biquad(get_sample(apu), &apu->filter);
 #endif
         if(sampler->index >= sampler->max_index) {
             sampler->index = 0;

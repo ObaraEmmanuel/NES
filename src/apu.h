@@ -11,7 +11,7 @@
 #define AUDIO_BUFF_SIZE 1024
 #define STATS_WIN_SIZE 20
 #define AVERAGE_DOWNSAMPLING 0
-#define NOMINAL_QUEUE_SIZE 8192
+#define NOMINAL_QUEUE_SIZE 6000
 
 struct Emulator;
 struct GraphicsContext;
