@@ -206,10 +206,10 @@ void run_NSF_player(struct Emulator* emulator) {
             update_joypad(joy1, &e);
             update_joypad(joy2, &e);
             if((status1 & RIGHT && !(joy1->status & RIGHT)) || (status2 & RIGHT && !(joy2->status & RIGHT))) {
-                nsf->current_song = nsf->current_song == nsf->total_songs ? 0 : nsf->current_song + 1;
+                nsf->current_song = nsf->current_song >= nsf->total_songs ? 1 : nsf->current_song + 1;
                 init_song(emulator, nsf->current_song);
             } else if((status1 & LEFT && !(joy1->status & LEFT)) || (status2 & LEFT && !(joy2->status & LEFT))) {
-                nsf->current_song = nsf->current_song == 1 ? nsf->total_songs : nsf->current_song - 1;
+                nsf->current_song = nsf->current_song <= 1 ? nsf->total_songs : nsf->current_song - 1;
                 init_song(emulator, nsf->current_song);
             }
             status1 = joy1->status;
