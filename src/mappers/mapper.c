@@ -198,7 +198,15 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         exit(EXIT_FAILURE);
     }
 
-    if(mapnum == 0x00 && strncmp((char*)(header+12), "\0\0\0\0", 4) == 0) {
+    uint8_t last_4_zeros = 1;
+    for(size_t i = 12; i < INES_HEADER_SIZE; i++) {
+        if(header[i] != 0) {
+            last_4_zeros = 0;
+            break;
+        }
+    }
+
+    if(mapnum == 0x00 && last_4_zeros) {
         mapper->format = INES;
         LOG(INFO, "Using iNES format");
     } else if(mapnum == 0x04) {
