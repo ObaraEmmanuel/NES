@@ -14,6 +14,8 @@ typedef struct TouchAxis{
     int r;
     int inner_x;
     int inner_y;
+    int origin_x;
+    int origin_y;
     uint8_t state;
     uint8_t active;
     uint8_t h_latch;
@@ -32,6 +34,7 @@ typedef struct  TouchButton{
     KeyPad id;
     int x;
     int y;
+    int r;
     uint8_t active;
     uint8_t auto_render;
     SDL_FingerID finger;
@@ -50,6 +53,7 @@ typedef struct TouchPad{
     TouchButton* buttons[TOUCH_BUTTON_COUNT];
     TouchAxis axis;
     GraphicsContext* g_ctx;
+    TTF_Font * font;
 } TouchPad;
 
 // forward declaration

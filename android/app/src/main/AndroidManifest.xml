@@ -24,6 +24,8 @@
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <!--  Allow access to the vibrator  -->
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
     <!--  if you want to capture audio, uncomment this.  -->
     <!--  <uses-permission android:name="android.permission.RECORD_AUDIO" />  -->
 

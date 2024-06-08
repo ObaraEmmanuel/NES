@@ -6,13 +6,28 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/openROMBtn"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="20dp"
+        android:layout_marginBottom="30dp"
+        android:clickable="true"
+        android:src="@drawable/add_ic"
+        app:backgroundTint="#F44336"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/NESRecyclerView"
         android:layout_width="0dp"
         android:layout_height="0dp"
-        android:paddingStart="0dp"
-        android:paddingEnd="20dp"
-        android:paddingBottom="20dp"
+
+        android:layout_marginTop="10dp"
+        android:layout_marginBottom="10dp"
+        android:clipToPadding="false"
+        android:paddingBottom="110dp"
+        android:scrollbarStyle="outsideOverlay"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
@@ -20,18 +35,20 @@
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar2"
-        android:layout_width="409dp"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:background="@drawable/box_gradient"
         android:elevation="15dp"
         android:minHeight="?attr/actionBarSize"
+        android:paddingEnd="10dp"
+        android:paddingStart="10dp"
         android:theme="?attr/actionBarTheme"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/app_name"
         app:titleMarginStart="20dp"
-        app:titleTextColor="@color/primary" >
+        app:titleTextColor="@color/primary">
 
         <androidx.appcompat.widget.SearchView
             android:id="@+id/searchView"
@@ -44,7 +61,9 @@
             app:closeIcon="@drawable/ic_close"
             app:searchIcon="@drawable/ic_search"
             tools:layout_editor_absoluteX="116dp"
-            tools:layout_editor_absoluteY="4dp" />
+            tools:layout_editor_absoluteY="4dp" >
+        </androidx.appcompat.widget.SearchView>
+
     </androidx.appcompat.widget.Toolbar>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

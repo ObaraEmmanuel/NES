@@ -1,16 +1,14 @@
 package com.barracoder.android;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.SearchView;
 import androidx.recyclerview.widget.DefaultItemAnimator;
-import androidx.recyclerview.widget.GridLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.io.File;
@@ -49,7 +47,7 @@ public class MainActivity extends AppCompatActivity {
         recyclerView = findViewById(R.id.NESRecyclerView);
         list = new ArrayList<>();
 
-        recyclerView.setLayoutManager(new GridLayoutManager(getApplicationContext(), 2));
+        recyclerView.setLayoutManager(new GridAutoFitLayoutManager(getApplicationContext(), recyclerView, 180));
         recyclerView.setItemAnimator(new DefaultItemAnimator());
 
         String[] roms = get_rom_files();
@@ -67,6 +65,22 @@ public class MainActivity extends AppCompatActivity {
 
         adapter = new NESItemAdapter(MainActivity.this, list);
         recyclerView.setAdapter(adapter);
+
+        findViewById(R.id.openROMBtn).setOnClickListener(view -> {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            startActivityForResult(intent, 42);
+        });
+    }
+
+    @Override
+    public void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == 42 && resultCode == RESULT_OK) {
+            // launch ROM
+            Toast.makeText(this, "Not implemented", Toast.LENGTH_SHORT).show();
+        }
     }
 
     protected String[] get_rom_images(){
