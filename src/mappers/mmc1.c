@@ -1,3 +1,4 @@
+#include <emulator.h>
 #include <stdlib.h>
 
 #include "mapper.h"
@@ -14,6 +15,7 @@ typedef struct{
     uint8_t CHR_mode;
     uint8_t PRG_mode;
     uint8_t reg;
+    size_t cpu_cycle;
 } MMC1_t;
 
 enum {
@@ -27,7 +29,6 @@ enum {
 static uint8_t read_PRG(Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
 static uint8_t read_CHR(Mapper*, uint16_t);
-static void write_CHR(Mapper*, uint16_t, uint8_t);
 static void set_PRG_banks(MMC1_t* mmc1, Mapper* mapper);
 static void set_CHR_banks(MMC1_t* mmc1, Mapper* mapper);
 
@@ -39,9 +40,12 @@ void load_MMC1(Mapper* mapper){
     mapper->extension = mmc1;
     mmc1->reg = REG_INIT;
     mmc1->PRG_mode = 3;
+    mmc1->cpu_cycle = -1;
 
-    if(mapper->CHR_banks)
-        mmc1->CHR_bank1 = mmc1->CHR_bank2 = mapper->CHR_RAM;
+    if(mapper->CHR_banks) {
+        mmc1->CHR_bank1 = mapper->CHR_RAM;
+        mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
+    }
 
     mmc1->PRG_bank1 = mapper->PRG_ROM;
     mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
@@ -51,19 +55,23 @@ void load_MMC1(Mapper* mapper){
 static uint8_t read_PRG(Mapper* mapper, uint16_t address){
     if(address < 0xC000)
         return *(((MMC1_t*)mapper->extension)->PRG_bank1 + (address & 0x3fff));
-    else
-        return *(((MMC1_t*)mapper->extension)->PRG_bank2 + (address & 0x3fff));
+    return *(((MMC1_t*)mapper->extension)->PRG_bank2 + (address & 0x3fff));
 }
 
 
 static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
-    MMC1_t* mmc1 = (MMC1_t*)mapper->extension;
+    MMC1_t* mmc1 = mapper->extension;
+    uint8_t same_cycle = mapper->emulator->cpu.t_cycles == mmc1->cpu_cycle;
+    mmc1->cpu_cycle = mapper->emulator->cpu.t_cycles;
     if(value & REG_RESET){
         // reset
         mmc1->reg = REG_INIT;
         mmc1->PRG_mode = 3;
         set_PRG_banks(mmc1, mapper);
     }else{
+        // ignore consequtive writes
+        if(same_cycle)
+            return;
         mmc1->reg = (mmc1->reg >> 1) | ((value & BIT_0) << 5);
 
         if(!(mmc1->reg & BIT_0))
@@ -72,38 +80,35 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
 
         // remove register size check bit
         mmc1->reg >>= 1;
-        if(address < 0xA000){
-            // mirroring
-            switch (mmc1->reg & MIRROR_BITS) {
-                case 0:set_mirroring(mapper, ONE_SCREEN_LOWER); break;
-                case 1:set_mirroring(mapper, ONE_SCREEN_UPPER); break;
-                case 2:set_mirroring(mapper, VERTICAL); break;
-                case 3:set_mirroring(mapper, HORIZONTAL); break;
-            }
+        switch ((address & 0x6000) | 0x8000) {
+            case 0x8000:
+                // mirroring
+                switch (mmc1->reg & MIRROR_BITS) {
+                    case 0:set_mirroring(mapper, ONE_SCREEN_LOWER); break;
+                    case 1:set_mirroring(mapper, ONE_SCREEN_UPPER); break;
+                    case 2:set_mirroring(mapper, VERTICAL); break;
+                    case 3:set_mirroring(mapper, HORIZONTAL); break;
+                }
 
-            mmc1->CHR_mode = (mmc1->reg & CHR_MODE) >> 4;
-            mmc1->PRG_mode = (mmc1->reg & PRG_MODE) >> 2;
+                mmc1->CHR_mode = (mmc1->reg & CHR_MODE) >> 4;
+                mmc1->PRG_mode = (mmc1->reg & PRG_MODE) >> 2;
 
-            set_PRG_banks(mmc1, mapper);
-            set_CHR_banks(mmc1, mapper);
-
+                set_PRG_banks(mmc1, mapper);
+                set_CHR_banks(mmc1, mapper);
+                break;
+            case 0xa000:
+                mmc1->CHR1_reg = mmc1->reg;
+                set_CHR_banks(mmc1, mapper);
+                break;
+            case 0xc000:
+                mmc1->CHR2_reg = mmc1->reg;
+                set_CHR_banks(mmc1, mapper);
+                break;
+            case 0xe000:
+                mmc1->PRG_reg = mmc1->reg & 0xF;
+                set_PRG_banks(mmc1, mapper);
+                break;
         }
-        else if(address < 0xC000){
-            mmc1->CHR1_reg = mmc1->reg;
-            mmc1->CHR_bank1 = mapper->CHR_RAM + 0x1000 * (mmc1->reg | (1 - mmc1->CHR_mode));
-            if(!mmc1->CHR_mode)
-                mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
-        }
-        else if(address < 0xE000){
-            mmc1->CHR2_reg = mmc1->reg;
-            if(mmc1->CHR_mode)
-                mmc1->CHR_bank2 = mapper->CHR_RAM + 0x1000 * mmc1->reg;
-        }
-        else{
-            mmc1->PRG_reg = mmc1->reg & 0xF;
-            set_PRG_banks(mmc1, mapper);
-        }
-
         mmc1->reg = REG_INIT;
     }
 }
@@ -114,7 +119,7 @@ static void set_PRG_banks(MMC1_t* mmc1, Mapper* mapper){
         case 0:
         case 1:
             mmc1->PRG_bank1 = mapper->PRG_ROM + (0x4000 * (mmc1->PRG_reg & ~1));
-            mmc1->PRG_bank2 = mmc1->PRG_bank2 + 0x4000;
+            mmc1->PRG_bank2 = mmc1->PRG_bank1 + 0x4000;
             break;
         case 2:
             // fix first bank switch second bank
@@ -135,7 +140,7 @@ static void set_CHR_banks(MMC1_t* mmc1, Mapper* mapper){
         mmc1->CHR_bank1 = mapper->CHR_RAM + (0x1000 * mmc1->CHR1_reg);
         mmc1->CHR_bank2 = mapper->CHR_RAM + (0x1000 * mmc1->CHR2_reg);
     }else{
-        mmc1->CHR_bank1 = mapper->CHR_RAM + (0x1000 * (mmc1->CHR1_reg | 1));
+        mmc1->CHR_bank1 = mapper->CHR_RAM + (0x1000 * (mmc1->CHR1_reg & ~1));
         mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
     }
 }
@@ -143,8 +148,7 @@ static void set_CHR_banks(MMC1_t* mmc1, Mapper* mapper){
 static uint8_t read_CHR(Mapper* mapper, uint16_t address){
     if(!mapper->CHR_banks)
         return mapper->CHR_RAM[address];
-    else if(address < 0x1000)
+    if(address < 0x1000)
         return *(((MMC1_t*)mapper->extension)->CHR_bank1 + address);
-    else
-        return *(((MMC1_t*)mapper->extension)->CHR_bank2 + (address & 0xfff));
+    return *(((MMC1_t*)mapper->extension)->CHR_bank2 + (address & 0xfff));
 }
