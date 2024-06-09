@@ -87,7 +87,7 @@ void run_emulator(struct Emulator* emulator){
 
     while (!emulator->exit) {
 #if PROFILE
-        if(ppu->frames >= PROFILE_STOP_FRAME)
+        if(PROFILE_STOP_FRAME && ppu->frames >= PROFILE_STOP_FRAME)
             break;
 #endif
         mark_start(timer);
