@@ -62,11 +62,11 @@ static void select_mapper(Mapper* mapper){
 }
 
 
-static void set_mapping(Mapper* mapper, uint16_t tr, uint16_t tl, uint16_t br, uint16_t bl){
-    mapper->name_table_map[0] = tr;
-    mapper->name_table_map[1] = tl;
-    mapper->name_table_map[2] = br;
-    mapper->name_table_map[3] = bl;
+static void set_mapping(Mapper* mapper, uint16_t tl, uint16_t tr, uint16_t bl, uint16_t br){
+    mapper->name_table_map[0] = tl;
+    mapper->name_table_map[1] = tr;
+    mapper->name_table_map[2] = bl;
+    mapper->name_table_map[3] = br;
 }
 
 
@@ -233,8 +233,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         mapper->CHR_RAM = NULL;
 
     if(header[6] & BIT_1){
-        mapper->save_RAM = malloc(0x2000);
-        LOG(INFO, "Battery backed save RAM 8KB : Available");
+        LOG(INFO, "Uses Battery backed save RAM 8KB");
     }
 
     if(header[6] & BIT_2) {
@@ -259,9 +258,11 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         mapper->RAM_banks = header[8];
 
         if(mapper->RAM_banks == 0)
-            LOG(INFO, "SRAM Banks (8kb): Not specified");
-        else
-            LOG(INFO, "SRAM Banks (8kb): %u (Not used by emulator)", mapper->RAM_banks);
+            LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
+        else {
+            mapper->save_RAM = malloc(0x2000 * mapper->RAM_banks);
+            LOG(INFO, "SRAM Banks (8kb): %u", mapper->RAM_banks);
+        }
 
         if(header[9] & 1){
             mapper->type = PAL;
