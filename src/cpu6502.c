@@ -315,7 +315,9 @@ void execute(c6502* ctx){
         // Increments and decrements opcodes
 
         case DEC:{
-            uint8_t m = read_mem(ctx->memory, address) - 1;
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m--);
             write_mem(ctx->memory, address, m);
             set_ZN(ctx, m);
             break;
@@ -329,7 +331,9 @@ void execute(c6502* ctx){
             set_ZN(ctx, ctx->y);
             break;
         case INC:{
-            uint8_t m = read_mem(ctx->memory, address) + 1;
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m++);
             write_mem(ctx->memory, address, m);
             set_ZN(ctx, m);
             break;
@@ -349,28 +353,40 @@ void execute(c6502* ctx){
             if(ctx->instruction->mode == ACC) {
                 ctx->ac = shift_l(ctx, ctx->ac);
             }else{
-                write_mem(ctx->memory, address, shift_l(ctx, read_mem(ctx->memory, address)));
+                uint8_t m = read_mem(ctx->memory, address);
+                // dummy write
+                write_mem(ctx->memory, address, m);
+                write_mem(ctx->memory, address, shift_l(ctx, m));
             }
             break;
         case LSR:
             if(ctx->instruction->mode == ACC) {
                 ctx->ac = shift_r(ctx, ctx->ac);
             }else{
-                write_mem(ctx->memory, address, shift_r(ctx, read_mem(ctx->memory, address)));
+                uint8_t m = read_mem(ctx->memory, address);
+                // dummy write
+                write_mem(ctx->memory, address, m);
+                write_mem(ctx->memory, address, shift_r(ctx, m));
             }
             break;
         case ROL:
             if(ctx->instruction->mode == ACC){
                 ctx->ac = rot_l(ctx, ctx->ac);
             }else{
-                write_mem(ctx->memory, address, rot_l(ctx, read_mem(ctx->memory, address)));
+                uint8_t m = read_mem(ctx->memory, address);
+                // dummy write
+                write_mem(ctx->memory, address, m);
+                write_mem(ctx->memory, address, rot_l(ctx, m));
             }
             break;
         case ROR:
             if(ctx->instruction->mode == ACC){
                 ctx->ac = rot_r(ctx, ctx->ac);
             }else{
-                write_mem(ctx->memory, address, rot_r(ctx, read_mem(ctx->memory, address)));
+                uint8_t m = read_mem(ctx->memory, address);
+                // dummy write
+                write_mem(ctx->memory, address, m);
+                write_mem(ctx->memory, address, rot_r(ctx, m));
             }
             break;
 
@@ -483,13 +499,17 @@ void execute(c6502* ctx){
             break;
         }
         case DCP: {
-            uint8_t m = read_mem(ctx->memory, address) - 1;
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m--);
             write_mem(ctx->memory, address, m);
             set_ZN(ctx, ctx->ac - m);
             break;
         }
         case ISB: {
-            uint8_t m = read_mem(ctx->memory, address) + 1;
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m++);
             write_mem(ctx->memory, address, m);
             uint16_t diff = ctx->ac - m - ((ctx->sr & CARRY) == 0);
             ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
@@ -500,14 +520,20 @@ void execute(c6502* ctx){
             break;
         }
         case RLA: {
-            uint8_t m = rot_l(ctx, read_mem(ctx->memory, address));
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m);
+            m = rot_l(ctx, m);
             write_mem(ctx->memory, address, m);
             ctx->ac &= m;
             set_ZN(ctx, ctx->ac);
             break;
         }
         case RRA: {
-            uint8_t m = rot_r(ctx, read_mem(ctx->memory, address));
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m);
+            m = rot_r(ctx, m);
             write_mem(ctx->memory, address, m);
             uint16_t sum = ctx->ac + m + ((ctx->sr & CARRY) != 0);
             ctx->sr &= ~(CARRY | OVERFLW | NEGATIVE | ZERO);
@@ -518,14 +544,20 @@ void execute(c6502* ctx){
             break;
         }
         case SLO: {
-            uint8_t m = shift_l(ctx, read_mem(ctx->memory, address));
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m);
+            m = shift_l(ctx, m);
             write_mem(ctx->memory, address, m);
             ctx->ac |= m;
             set_ZN(ctx, ctx->ac);
             break;
         }
         case SRE: {
-            uint8_t m = shift_r(ctx, read_mem(ctx->memory, address));
+            uint8_t m = read_mem(ctx->memory, address);
+            // dummy write
+            write_mem(ctx->memory, address, m);
+            m = shift_r(ctx, m);
             write_mem(ctx->memory, address, m);
             ctx->ac ^= m;
             set_ZN(ctx, ctx->ac);
