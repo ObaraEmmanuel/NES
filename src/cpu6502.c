@@ -608,7 +608,7 @@ static uint16_t get_address(c6502* ctx){
                     // these don't take into account absolute x page breaks
                     case STA:case ASL:case DEC:case INC:case LSR:case ROL:case ROR:
                     // unofficial
-                    case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
+                    case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case SHY:
                         break;
                     default:
                         ctx->cycles++;
@@ -620,7 +620,7 @@ static uint16_t get_address(c6502* ctx){
             ctx->pc += 2;
             if(has_page_break(addr, addr + ctx->y)) {
                 switch (ctx->instruction->opcode) {
-                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
+                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
                         break;
                     default:
                         ctx->cycles++;
@@ -647,7 +647,7 @@ static uint16_t get_address(c6502* ctx){
             addr = (hi << 8) | lo;
             if(has_page_break(addr, addr + ctx->y)) {
                 switch (ctx->instruction->opcode) {
-                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB:
+                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
                         break;
                     default:
                         ctx->cycles++;
