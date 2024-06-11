@@ -63,6 +63,7 @@ typedef struct Mapper{
     void (*write_PRG)(struct Mapper*, uint16_t, uint8_t);
     uint8_t (*read_CHR)(struct Mapper*, uint16_t);
     void (*write_CHR)(struct Mapper*, uint16_t , uint8_t);
+    void (*reset)(struct Mapper*);
 
     // mapper extension structs would be attached here
     // memory should be allocated dynamically and should

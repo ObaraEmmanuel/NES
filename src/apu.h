@@ -133,6 +133,7 @@ typedef struct APU{
 
 
 void init_APU(struct Emulator* emulator);
+void reset_APU(APU *apu);
 void exit_APU();
 void execute_apu(APU* apu);
 void set_status(APU* apu, uint8_t value);

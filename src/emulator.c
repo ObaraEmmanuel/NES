@@ -94,6 +94,9 @@ void run_emulator(struct Emulator* emulator){
         while (SDL_PollEvent(&e)) {
             update_joypad(joy1, &e);
             update_joypad(joy2, &e);
+            if((joy1->status & 0xc) == 0xc || (joy2->status & 0xc) == 0xc) {
+                reset_emulator(emulator);
+            }
             switch (e.type) {
                 case SDL_KEYDOWN:
                     switch (e.key.keysym.sym) {
@@ -105,8 +108,7 @@ void run_emulator(struct Emulator* emulator){
                             TOGGLE_TIMER_RESOLUTION();
                             break;
                         case SDLK_F5:
-                            reset_cpu(cpu);
-                            LOG(INFO, "Resetting emulator");
+                            reset_emulator(emulator);
                             break;
                         default:
                             break;
@@ -173,6 +175,16 @@ void run_emulator(struct Emulator* emulator){
     release_timer(&frame_timer);
 }
 
+void reset_emulator(Emulator* emulator) {
+    LOG(INFO, "Resetting emulator");
+    reset_cpu(&emulator->cpu);
+    reset_APU(&emulator->apu);
+    reset_ppu(&emulator->ppu);
+    if(emulator->mapper.reset != NULL) {
+        emulator->mapper.reset(&emulator->mapper);
+    }
+}
+
 void run_NSF_player(struct Emulator* emulator) {
     LOG(INFO, "Starting NSF player...");
     JoyPad* joy1 = &emulator->mem.joy1;
@@ -214,6 +226,11 @@ void run_NSF_player(struct Emulator* emulator) {
             }
             status1 = joy1->status;
             status2 = joy2->status;
+            if((joy1->status & 0xc) == 0xc || (joy2->status & 0xc) == 0xc) {
+                reset_emulator(emulator);
+                nsf->current_song = 1;
+                init_song(emulator, nsf->current_song);
+            }
 
             switch (e.type) {
                 case SDL_KEYDOWN:
@@ -226,8 +243,9 @@ void run_NSF_player(struct Emulator* emulator) {
                             TOGGLE_TIMER_RESOLUTION();
                             break;
                         case SDLK_F5:
-                            reset_cpu(cpu);
-                            LOG(INFO, "Resetting emulator");
+                            reset_emulator(emulator);
+                            nsf->current_song = 1;
+                            init_song(emulator, nsf->current_song);
                             break;
                         default:
                             break;

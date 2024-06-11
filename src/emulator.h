@@ -24,13 +24,13 @@
 
 
 typedef struct Emulator{
-    struct c6502 cpu;
-    struct PPU ppu;
-    struct APU apu;
-    struct Memory mem;
-    struct Mapper mapper;
-    struct GraphicsContext g_ctx;
-    struct Timer timer;
+    c6502 cpu;
+    PPU ppu;
+    APU apu;
+    Memory mem;
+    Mapper mapper;
+    GraphicsContext g_ctx;
+    Timer timer;
 
     TVSystem type;
 
@@ -41,7 +41,8 @@ typedef struct Emulator{
 } Emulator;
 
 
-void init_emulator(struct Emulator* emulator, int argc, char *argv[]);
-void run_emulator(struct Emulator* emulator);
-void run_NSF_player(struct Emulator* emulator);
-void free_emulator(struct Emulator* emulator);
+void init_emulator(Emulator* emulator, int argc, char *argv[]);
+void reset_emulator(Emulator* emulator);
+void run_emulator(Emulator* emulator);
+void run_NSF_player(Emulator* emulator);
+void free_emulator(Emulator* emulator);

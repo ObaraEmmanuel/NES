@@ -42,6 +42,8 @@ void reset_cpu(c6502* cpu){
     cpu->sr |= INTERRUPT;
     cpu->sp -= 3;
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
+    cpu->cycles = 0;
+    cpu->dma_cycles = 0;
 }
 
 static void interrupt_(c6502* ctx){

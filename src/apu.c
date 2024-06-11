@@ -144,9 +144,17 @@ void init_APU(struct Emulator *emulator) {
     init_audio_device(apu);
     SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 1);
     set_status(apu, 0);
+    set_frame_counter_ctrl(apu, 0);
 #if AUDIO_TO_FILE
     out_wav = fopen("test-aud.raw", "wb");
 #endif
+}
+
+void reset_APU(APU *apu) {
+    set_status(apu, 0);
+    apu->triangle.sequencer.step = 0;
+    apu->dmc.counter &= 1;
+    apu->frame_interrupt = 0;
 }
 
 void init_audio_device(const APU* apu) {
