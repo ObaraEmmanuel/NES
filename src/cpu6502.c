@@ -465,7 +465,7 @@ void execute(c6502* ctx){
         case ANC:
             ctx->ac = ctx->ac & read_mem(ctx->memory, address);
             ctx->sr &= ~(CARRY | ZERO | NEGATIVE);
-            ctx->sr = (ctx->ac & NEGATIVE) ? (CARRY | NEGATIVE): 0;
+            ctx->sr |= (ctx->ac & NEGATIVE) ? (CARRY | NEGATIVE): 0;
             ctx->sr |= ((!ctx->ac)? ZERO: 0);
             break;
         case ARR: {
@@ -474,7 +474,7 @@ void execute(c6502* ctx){
             rotated |= (ctx->sr & CARRY) << 7;
             ctx->sr &= ~(CARRY | ZERO | NEGATIVE | OVERFLW);
             ctx->sr |= (rotated & BIT_6) ? CARRY: 0;
-            ctx->sr |= ((rotated & BIT_6) ^ (rotated & BIT_5)) ? OVERFLW: 0;
+            ctx->sr |= (((rotated & BIT_6) >> 1) ^ (rotated & BIT_5)) ? OVERFLW: 0;
             fast_set_ZN(ctx, rotated);
             ctx->ac = rotated;
             break;
@@ -503,7 +503,10 @@ void execute(c6502* ctx){
             // dummy write
             write_mem(ctx->memory, address, m--);
             write_mem(ctx->memory, address, m);
-            set_ZN(ctx, ctx->ac - m);
+            uint16_t diff = ctx->ac - read_mem(ctx->memory, address);
+            ctx->sr &= ~(CARRY | NEGATIVE | ZERO);
+            ctx->sr |= !(diff & 0xFF00) ? CARRY: 0;
+            fast_set_ZN(ctx, diff);
             break;
         }
         case ISB: {
@@ -561,6 +564,16 @@ void execute(c6502* ctx){
             write_mem(ctx->memory, address, m);
             ctx->ac ^= m;
             set_ZN(ctx, ctx->ac);
+            break;
+        }
+        case SHY: {
+            uint8_t H = address >> 8, L = address & 0xff;
+            write_mem(ctx->memory, ((ctx->y & (H + 1)) << 8) | L, ctx->y & (H + 1));
+            break;
+        }
+        case SHX: {
+            uint8_t H = address >> 8, L = address & 0xff;
+            write_mem(ctx->memory, ((ctx->x & (H + 1)) << 8) | L, ctx->x & (H + 1));
             break;
         }
         default:
