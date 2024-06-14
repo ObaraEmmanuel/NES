@@ -105,7 +105,7 @@ static uint8_t read_ROM(Mapper* mapper, uint16_t address){
         LOG(DEBUG, "Attempted to write to unavailable expansion ROM");
         return 0;
     }
-    if(address < 0x6000) {
+    if(address < 0x8000) {
         // PRG ram
         if(mapper->save_RAM != NULL)
             return mapper->save_RAM[address - 0x6000];
@@ -257,9 +257,10 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         mapper->mapper_num |= header[7] & 0xF0;
         mapper->RAM_banks = header[8];
 
-        if(mapper->RAM_banks == 0)
+        if(mapper->RAM_banks == 0) {
             LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
-        else {
+            mapper->save_RAM = malloc(0x2000);
+        }else {
             mapper->save_RAM = malloc(0x2000 * mapper->RAM_banks);
             LOG(INFO, "SRAM Banks (8kb): %u", mapper->RAM_banks);
         }

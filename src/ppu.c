@@ -131,7 +131,7 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
         return ppu->mapper->read_CHR(ppu->mapper, address);
 
     if(address < 0x3F00){
-        address = (address - 0x2000) % 0xfff;
+        address = (address - 0x2000) & 0xfff;
         return ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
     }
 
