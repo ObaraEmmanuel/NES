@@ -12,13 +12,13 @@ typedef enum TVSystem{
 } TVSystem;
 
 typedef enum{
+    NO_MIRRORING,
     VERTICAL,
     HORIZONTAL,
     ONE_SCREEN,
     ONE_SCREEN_LOWER,
     ONE_SCREEN_UPPER,
     FOUR_SCREEN,
-
 } Mirroring;
 
 typedef enum MapperID {
@@ -42,20 +42,23 @@ struct Emulator;
 struct NSF;
 
 typedef struct Mapper{
-    uint8_t* CHR_RAM;
+    uint8_t* CHR_ROM;
     uint8_t* PRG_ROM;
-    uint8_t* save_RAM;
+    uint8_t* PRG_RAM;
     uint8_t* PRG_ptr;
     uint8_t* CHR_ptr;
-    uint8_t PRG_banks;
-    uint8_t CHR_banks;
+    uint16_t PRG_banks;
+    uint16_t CHR_banks;
+    size_t CHR_RAM_size;
     uint8_t RAM_banks;
+    size_t RAM_size;
     Mirroring mirroring;
     TVSystem type;
     MapperFormat format;
     uint16_t name_table_map[4];
     uint32_t clamp;
-    uint8_t mapper_num;
+    uint16_t mapper_num;
+    uint8_t submapper;
     uint8_t is_nsf;
     uint8_t (*read_ROM)(struct Mapper*, uint16_t);
     void (*write_ROM)(struct Mapper*, uint16_t, uint8_t);

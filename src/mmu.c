@@ -16,8 +16,8 @@ void init_mem(Emulator* emulator){
 uint8_t* get_ptr(Memory* mem, uint16_t address){
     if(address < 0x2000)
         return mem->RAM + (address % 0x800);
-    if(address > 0x6000 && address < 0x8000 && mem->mapper->save_RAM != NULL)
-        return mem->mapper->save_RAM + (address - 0x6000);
+    if(address > 0x6000 && address < 0x8000 && mem->mapper->PRG_RAM != NULL)
+        return mem->mapper->PRG_RAM + (address - 0x6000);
     return NULL;
 }
 

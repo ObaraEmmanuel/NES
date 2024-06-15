@@ -101,8 +101,8 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
     LOG(INFO, "Bank switching: %s", nsf->bank_switch ? "ON": "OFF");
 
     // PRG RAM
-    mapper->save_RAM = malloc(PRG_RAM_SIZE);
-    memset(mapper->save_RAM, 0, PRG_RAM_SIZE);
+    mapper->PRG_RAM = malloc(PRG_RAM_SIZE);
+    memset(mapper->PRG_RAM, 0, PRG_RAM_SIZE);
 
     // mapper R/W redirects
     mapper->read_PRG = read_PRG;
@@ -145,7 +145,7 @@ static uint8_t read_ROM(Mapper* mapper, uint16_t addr) {
         return 0;
 
     if(addr < 0x8000)
-        return mapper->save_RAM[addr - 0x6000];
+        return mapper->PRG_RAM[addr - 0x6000];
 
     return mapper->read_PRG(mapper, addr);
 }
@@ -156,7 +156,7 @@ static void write_ROM(Mapper* mapper, uint16_t addr, uint8_t val) {
             mapper->NSF->bank_ptrs[addr - 0x5ff8] = mapper->PRG_ROM + val * 0x1000;
         }
     } else if(addr < 0x8000) {
-        mapper->save_RAM[addr - 0x6000] = val;
+        mapper->PRG_RAM[addr - 0x6000] = val;
     }
 }
 

@@ -51,8 +51,8 @@ void load_MMC3(Mapper *mapper) {
     mmc3->PRG_bank1 = mmc3->PRG_bank2 = mapper->PRG_ROM;
 
     // point to first bank
-    mmc3->CHR_bank_1k_1 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mapper->CHR_RAM;
-    mmc3->CHR_bank_2k_1 = mmc3->CHR_bank_2k_2 = mapper->CHR_RAM;
+    mmc3->CHR_bank_1k_1 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mapper->CHR_ROM;
+    mmc3->CHR_bank_2k_1 = mmc3->CHR_bank_2k_2 = mapper->CHR_ROM;
 }
 
 uint8_t read_PRG(Mapper *mapper, uint16_t addr) {
@@ -130,28 +130,28 @@ void write_bank_data(Mapper *mapper, uint8_t val) {
         case 0:
             // R0
             val = val & 0xFE;
-            mmc3->CHR_bank_2k_1 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_2k_1 = mapper->CHR_ROM + val * 0x400;
             break;
         case 1:
             // R1
             val = val & 0xFE;
-            mmc3->CHR_bank_2k_2 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_2k_2 = mapper->CHR_ROM + val * 0x400;
             break;
         case 2:
             // R2
-            mmc3->CHR_bank_1k_1 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_1k_1 = mapper->CHR_ROM + val * 0x400;
             break;
         case 3:
             // R3
-            mmc3->CHR_bank_1k_2 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_1k_2 = mapper->CHR_ROM + val * 0x400;
             break;
         case 4:
             // R4
-            mmc3->CHR_bank_1k_3 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_1k_3 = mapper->CHR_ROM + val * 0x400;
             break;
         case 5:
             // R5
-            mmc3->CHR_bank_1k_4 = mapper->CHR_RAM + val * 0x400;
+            mmc3->CHR_bank_1k_4 = mapper->CHR_ROM + val * 0x400;
             break;
         case 6:
             // R6

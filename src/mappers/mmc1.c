@@ -43,7 +43,7 @@ void load_MMC1(Mapper* mapper){
     mmc1->cpu_cycle = -1;
 
     if(mapper->CHR_banks) {
-        mmc1->CHR_bank1 = mapper->CHR_RAM;
+        mmc1->CHR_bank1 = mapper->CHR_ROM;
         mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
     }
 
@@ -88,6 +88,7 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
                     case 1:set_mirroring(mapper, ONE_SCREEN_UPPER); break;
                     case 2:set_mirroring(mapper, VERTICAL); break;
                     case 3:set_mirroring(mapper, HORIZONTAL); break;
+                    default:break;
                 }
 
                 mmc1->CHR_mode = (mmc1->reg & CHR_MODE) >> 4;
@@ -107,6 +108,8 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
             case 0xe000:
                 mmc1->PRG_reg = mmc1->reg & 0xF;
                 set_PRG_banks(mmc1, mapper);
+                break;
+            default:
                 break;
         }
         mmc1->reg = REG_INIT;
@@ -131,23 +134,25 @@ static void set_PRG_banks(MMC1_t* mmc1, Mapper* mapper){
             mmc1->PRG_bank1 = mapper->PRG_ROM + 0x4000 * mmc1->PRG_reg;
             mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
             break;
+        default:
+            break;
     }
 }
 
 static void set_CHR_banks(MMC1_t* mmc1, Mapper* mapper){
     if(mmc1->CHR_mode){
         // 2 4KB banks
-        mmc1->CHR_bank1 = mapper->CHR_RAM + (0x1000 * mmc1->CHR1_reg);
-        mmc1->CHR_bank2 = mapper->CHR_RAM + (0x1000 * mmc1->CHR2_reg);
+        mmc1->CHR_bank1 = mapper->CHR_ROM + (0x1000 * mmc1->CHR1_reg);
+        mmc1->CHR_bank2 = mapper->CHR_ROM + (0x1000 * mmc1->CHR2_reg);
     }else{
-        mmc1->CHR_bank1 = mapper->CHR_RAM + (0x1000 * (mmc1->CHR1_reg & ~1));
+        mmc1->CHR_bank1 = mapper->CHR_ROM + (0x1000 * (mmc1->CHR1_reg & ~1));
         mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
     }
 }
 
 static uint8_t read_CHR(Mapper* mapper, uint16_t address){
-    if(!mapper->CHR_banks)
-        return mapper->CHR_RAM[address];
+    if(mapper->CHR_RAM_size)
+        return mapper->CHR_ROM[address];
     if(address < 0x1000)
         return *(((MMC1_t*)mapper->extension)->CHR_bank1 + address);
     return *(((MMC1_t*)mapper->extension)->CHR_bank2 + (address & 0xfff));

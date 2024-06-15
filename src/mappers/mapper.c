@@ -28,11 +28,6 @@ static void select_mapper(Mapper* mapper){
     mapper->write_ROM = write_ROM;
     mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
 
-    if(!mapper->CHR_banks) {
-        mapper->CHR_RAM = malloc(0x2000);
-        memset(mapper->CHR_RAM, 0, 0x2000);
-    }
-
     switch (mapper->mapper_num) {
         case NROM:
             // generic implementation will suffice
@@ -71,6 +66,8 @@ static void set_mapping(Mapper* mapper, uint16_t tl, uint16_t tr, uint16_t bl, u
 
 
 void set_mirroring(Mapper* mapper, Mirroring mirroring){
+    if(mirroring == mapper->mirroring)
+        return;
     switch (mirroring) {
         case HORIZONTAL:
             set_mapping(mapper, 0, 0, 0x400, 0x400);
@@ -97,6 +94,7 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
             set_mapping(mapper,0, 0, 0, 0);
             LOG(ERROR, "Unknown mirroring %u", mirroring);
     }
+    mapper->mirroring = mirroring;
 }
 
 static uint8_t read_ROM(Mapper* mapper, uint16_t address){
@@ -107,8 +105,8 @@ static uint8_t read_ROM(Mapper* mapper, uint16_t address){
     }
     if(address < 0x8000) {
         // PRG ram
-        if(mapper->save_RAM != NULL)
-            return mapper->save_RAM[address - 0x6000];
+        if(mapper->PRG_RAM != NULL)
+            return mapper->PRG_RAM[address - 0x6000];
 
         LOG(DEBUG, "Attempted to read from non existent PRG RAM");
         return 0;
@@ -127,8 +125,8 @@ static void write_ROM(Mapper* mapper, uint16_t address, uint8_t value){
 
     if(address < 0x8000){
         // extended ram
-        if(mapper->save_RAM != NULL)
-            mapper->save_RAM[address - 0x6000] = value;
+        if(mapper->PRG_RAM != NULL)
+            mapper->PRG_RAM[address - 0x6000] = value;
         else {
             LOG(DEBUG, "Attempted to write to non existent save RAM");
         }
@@ -151,16 +149,16 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
 
 
 static uint8_t read_CHR(Mapper* mapper, uint16_t address){
-    return mapper->CHR_RAM[address];
+    return mapper->CHR_ROM[address];
 }
 
 
 static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
-    if(mapper->CHR_banks){
+    if(!mapper->CHR_RAM_size){
         LOG(DEBUG, "Attempted to write to CHR-ROM");
         return;
     }
-    mapper->CHR_RAM[address] = value;
+    mapper->CHR_ROM[address] = value;
 }
 
 
@@ -194,8 +192,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     uint8_t mapnum = header[7] & 0x0C;
     if(mapnum == 0x08){
         mapper->format = NES2;
-        LOG(ERROR, "NES2.0 format not supported");
-        exit(EXIT_FAILURE);
+        LOG(INFO, "Using NES2.0 format");
     }
 
     uint8_t last_4_zeros = 1;
@@ -212,25 +209,13 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     } else if(mapnum == 0x04) {
         mapper->format = ARCHAIC_INES;
         LOG(INFO, "Using iNES (archaic) format");
-    } else {
+    } else if(mapnum !=0x08) {
         mapper->format = ARCHAIC_INES;
         LOG(INFO, "Possibly using iNES (archaic) format");
     }
 
     mapper->PRG_banks = header[4];
     mapper->CHR_banks = header[5];
-
-    LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
-    LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
-
-    mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
-
-    if(mapper->CHR_banks) {
-        mapper->CHR_RAM = malloc(0x2000 * mapper->CHR_banks);
-        SDL_RWread(file, mapper->CHR_RAM, 0x2000 * mapper->CHR_banks, 1);
-    }else
-        mapper->CHR_RAM = NULL;
 
     if(header[6] & BIT_1){
         LOG(INFO, "Uses Battery backed save RAM 8KB");
@@ -241,14 +226,16 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         exit(EXIT_FAILURE);
     }
 
+    Mirroring mirroring;
+
     if(header[6] & BIT_3){
-        mapper->mirroring = FOUR_SCREEN;
+        mirroring = FOUR_SCREEN;
     }
     else if(header[6] & BIT_0) {
-        mapper->mirroring = VERTICAL;
+        mirroring = VERTICAL;
     }
     else {
-        mapper->mirroring = HORIZONTAL;
+        mirroring = HORIZONTAL;
     }
     mapper->mapper_num = (header[6] & 0xF0) >> 4;
     mapper->type = NTSC;
@@ -259,9 +246,9 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
         if(mapper->RAM_banks == 0) {
             LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
-            mapper->save_RAM = malloc(0x2000);
+            mapper->RAM_size = 0x2000;
         }else {
-            mapper->save_RAM = malloc(0x2000 * mapper->RAM_banks);
+            mapper->RAM_size = 0x2000 * mapper->RAM_banks;
             LOG(INFO, "SRAM Banks (8kb): %u", mapper->RAM_banks);
         }
 
@@ -272,11 +259,84 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
             mapper->type = NTSC;
             LOG(INFO, "ROM type: NTSC");
         }
+    } else if(mapper->format == NES2) {
+        mapper->mapper_num |= header[7] & 0xF0;
+        mapper->mapper_num |= ((header[8] & 0xf) << 8);
+        mapper->submapper = header[8] >> 4;
+
+        mapper->PRG_banks |= ((header[9] & 0x0f) << 8);
+        mapper->CHR_banks |= ((header[9] & 0xf0) << 4);
+
+        if(header[10] & 0xf)
+            mapper->RAM_size = (64 << (header[10] & 0xf));
+        if(header[10] & 0xf0)
+            mapper->RAM_size += (64 << ((header[10] & 0xf0) >> 4));
+        if(mapper->RAM_size)
+            LOG(INFO, "PRG-RAM size: %u", mapper->RAM_size);
+
+        if(header[11] & 0xf)
+            mapper->CHR_RAM_size = (64 << (header[11] & 0xf));
+        if(header[11] & 0xf0)
+            mapper->CHR_RAM_size += (64 << ((header[11] & 0xf0) >> 4));
+        if(mapper->CHR_RAM_size)
+            LOG(INFO, "CHR-RAM size: %u", mapper->CHR_RAM_size);
+
+        switch (header[12] & 0x3) {
+            case 0:
+                mapper->type = NTSC;
+                LOG(INFO, "ROM type: NTSC");
+                break;
+            case 1:
+                mapper->type = PAL;
+                LOG(INFO, "ROM type: PAL");
+                break;
+            case 2:
+                // multi-region
+                mapper->type = NTSC;
+                LOG(INFO, "ROM type: Multi-region, Using NTSC");
+                break;
+            case 3:
+                mapper->type = DENDY;
+                LOG(ERROR, "Dendy ROM not supported");
+                exit(EXIT_FAILURE);
+            default:
+                break;
+        }
+    }
+
+    if(mapper->RAM_size) {
+        mapper->PRG_RAM = malloc(mapper->RAM_size);
+        memset(mapper->PRG_RAM, 0, mapper->RAM_size);
+    }
+
+    if(!mapper->CHR_banks && mapper->format != NES2) {
+        mapper->CHR_RAM_size = 0x2000;
+        LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
+    }
+
+    LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
+    LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
+
+    mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
+    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
+
+    if(mapper->CHR_banks) {
+        mapper->CHR_ROM = malloc(0x2000 * mapper->CHR_banks);
+        SDL_RWread(file, mapper->CHR_ROM, 0x2000 * mapper->CHR_banks, 1);
+    }else if(mapper->CHR_RAM_size) {
+        mapper->CHR_ROM = malloc(mapper->CHR_RAM_size);
+        memset(mapper->CHR_ROM, 0, mapper->CHR_RAM_size);
+    }
+
+    if(mapper->CHR_ROM == NULL) {
+        // if both of them are unspecified emulator will definitely crash later on
+        LOG(ERROR, "Cannot proceed without CHR_RAM or CHR_ROM");
+        exit(EXIT_FAILURE);
     }
 
     LOG(INFO, "Using mapper #%d", mapper->mapper_num);
     select_mapper(mapper);
-    set_mirroring(mapper, mapper->mirroring);
+    set_mirroring(mapper, mirroring);
 
     if(game_genie != NULL){
         LOG(INFO, "-------- Game Genie Cartridge info ---------");
@@ -288,8 +348,10 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 void free_mapper(Mapper* mapper){
     if(mapper->PRG_ROM != NULL)
         free(mapper->PRG_ROM);
-    if(mapper->CHR_RAM != NULL)
-        free(mapper->CHR_RAM);
+    if(mapper->CHR_ROM != NULL)
+        free(mapper->CHR_ROM);
+    if(mapper->PRG_RAM != NULL)
+        free(mapper->PRG_RAM);
     if(mapper->extension != NULL)
         free(mapper->extension);
     if(mapper->genie != NULL)

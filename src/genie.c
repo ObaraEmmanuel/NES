@@ -107,14 +107,14 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
 
 
 static uint8_t read_CHR(Mapper* mapper, uint16_t address){
-    return mapper->genie->g_mapper.CHR_RAM[address];
+    return mapper->genie->g_mapper.CHR_ROM[address];
 }
 
 
 static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
-    if(mapper->CHR_banks){
+    if(mapper->CHR_RAM_size){
         LOG(DEBUG, "Attempted to write to CHR-ROM");
         return;
     }
-    mapper->genie->g_mapper.CHR_RAM[address] = value;
+    mapper->genie->g_mapper.CHR_ROM[address] = value;
 }
