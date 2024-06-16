@@ -116,6 +116,8 @@ void dma(PPU* ppu, uint8_t address){
             // wrap around and copy from start to OAM address if OAM is not 0x00
             memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
         }
+        // last value
+        memory->bus = ptr[255];
     }
     ppu->emulator->cpu.dma_cycles += 513;
     // skip extra cycle on odd cycle
@@ -126,13 +128,17 @@ void dma(PPU* ppu, uint8_t address){
 
 uint8_t read_vram(PPU* ppu, uint16_t address){
     address = address & 0x3fff;
+    ppu->bus = address;
 
-    if(address < 0x2000)
-        return ppu->mapper->read_CHR(ppu->mapper, address);
+    if(address < 0x2000) {
+        ppu->bus = ppu->mapper->read_CHR(ppu->mapper, address);
+        return ppu->bus;
+    }
 
     if(address < 0x3F00){
         address = (address - 0x2000) & 0xfff;
-        return ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
+        ppu->bus = ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
+        return ppu->bus;
     }
 
     if(address < 0x4000)
@@ -143,6 +149,7 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
 
 void write_vram(PPU* ppu, uint16_t address, uint8_t value){
     address = address & 0x3fff;
+    ppu->bus = value;
 
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);

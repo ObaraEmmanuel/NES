@@ -62,6 +62,7 @@ struct Emulator;
 
 typedef struct Memory {
     uint8_t RAM[RAM_SIZE];
+    uint8_t bus;
     JoyPad joy1;
     JoyPad joy2;
     Mapper* mapper;

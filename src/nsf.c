@@ -142,7 +142,8 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
 
 static uint8_t read_ROM(Mapper* mapper, uint16_t addr) {
     if(addr < 0x6000)
-        return 0;
+        // open bus
+        return mapper->emulator->mem.bus;
 
     if(addr < 0x8000)
         return mapper->PRG_RAM[addr - 0x6000];

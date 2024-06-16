@@ -88,7 +88,7 @@ void interrupt(c6502* ctx, Interrupt interrupt){
 }
 
 
-static void branch(c6502* ctx, uint8_t mask, uint8_t predicate){
+static void branch(c6502* ctx, uint8_t mask, uint8_t predicate) {
     if(((ctx->sr & mask) > 0) == predicate){
         // increment cycles if branching to a different page
         ctx->cycles += has_page_break(ctx->pc, ctx->address);
@@ -595,6 +595,8 @@ static uint16_t get_address(c6502* ctx){
     switch (ctx->instruction->mode) {
         case IMPL:
         case ACC:
+            // dummy read
+            read_mem(ctx->memory, ctx->pc);
         case NONE:
             return 0;
         case REL: {
@@ -618,28 +620,36 @@ static uint16_t get_address(c6502* ctx){
         case ABS_X:
             addr = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
-            if(has_page_break(addr, addr + ctx->x)) {
-                switch (ctx->instruction->opcode) {
-                    // these don't take into account absolute x page breaks
-                    case STA:case ASL:case DEC:case INC:case LSR:case ROL:case ROR:
-                    // unofficial
-                    case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case SHY:
-                        break;
-                    default:
+            switch (ctx->instruction->opcode) {
+                // these don't take into account absolute x page breaks
+                case STA:case ASL:case DEC:case INC:case LSR:case ROL:case ROR:
+                // unofficial
+                case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case SHY:
+                    // invalid read
+                    read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->x) & 0xff));
+                    break;
+                default:
+                    if(has_page_break(addr, addr + ctx->x)) {
+                        // invalid read
+                        read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->x) & 0xff));
                         ctx->cycles++;
-                }
+                    }
             }
             return addr + ctx->x;
         case ABS_Y:
             addr = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
-            if(has_page_break(addr, addr + ctx->y)) {
-                switch (ctx->instruction->opcode) {
-                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
-                        break;
-                    default:
+            switch (ctx->instruction->opcode) {
+                case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
+                    // invalid read
+                    read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
+                    break;
+                default:
+                    if(has_page_break(addr, addr + ctx->y)) {
+                        // invalid read
+                        read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
                         ctx->cycles++;
-                }
+                    }
             }
             return addr + ctx->y;
         case IND:
@@ -660,13 +670,17 @@ static uint16_t get_address(c6502* ctx){
             hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
             addr = (hi << 8) | lo;
-            if(has_page_break(addr, addr + ctx->y)) {
-                switch (ctx->instruction->opcode) {
-                    case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
-                        break;
-                    default:
+            switch (ctx->instruction->opcode) {
+                case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
+                    // invalid read
+                    read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
+                    break;
+                default:
+                    if(has_page_break(addr, addr + ctx->y)) {
+                        // invalid read
+                        read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
                         ctx->cycles++;
-                }
+                    }
             }
             return addr + ctx->y;
     }

@@ -3,6 +3,7 @@
 #include <SDL_rwops.h>
 
 #include "mapper.h"
+#include "emulator.h"
 #include "genie.h"
 #include "utils.h"
 #include "nsf.h"
@@ -100,8 +101,8 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
 static uint8_t read_ROM(Mapper* mapper, uint16_t address){
     if(address < 0x6000) {
         // expansion rom
-        LOG(DEBUG, "Attempted to write to unavailable expansion ROM");
-        return 0;
+        LOG(DEBUG, "Attempted to read from unavailable expansion ROM");
+        return mapper->emulator->mem.bus;
     }
     if(address < 0x8000) {
         // PRG ram
@@ -109,7 +110,7 @@ static uint8_t read_ROM(Mapper* mapper, uint16_t address){
             return mapper->PRG_RAM[address - 0x6000];
 
         LOG(DEBUG, "Attempted to read from non existent PRG RAM");
-        return 0;
+        return mapper->emulator->mem.bus;
     }
 
     // PRG

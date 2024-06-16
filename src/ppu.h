@@ -61,6 +61,7 @@ typedef struct PPU{
     uint8_t buffer;
 
     uint8_t render;
+    uint8_t bus;
 
     struct Emulator* emulator;
     Mapper* mapper;

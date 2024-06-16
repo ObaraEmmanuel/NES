@@ -22,6 +22,8 @@ uint8_t* get_ptr(Memory* mem, uint16_t address){
 }
 
 void write_mem(Memory* mem, uint16_t address, uint8_t value){
+    uint8_t old = mem->bus;
+    mem->bus = value;
 
     if(address < RAM_END) {
         mem->RAM[address % RAM_SIZE] = value;
@@ -39,32 +41,43 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
 
         switch (address) {
             case PPU_CTRL:
+                ppu->bus = value;
                 set_ctrl(ppu, value);
                 break;
             case PPU_MASK:
+                ppu->bus = value;
                 ppu->mask = value;
                 break;
             case PPU_SCROLL:
+                ppu->bus = value;
                 set_scroll(ppu, value);
                 break;
             case PPU_ADDR:
+                ppu->bus = value;
                 set_address(ppu, value);
                 break;
             case PPU_DATA:
+                ppu->bus = value;
                 write_ppu(ppu, value);
                 break;
             case OAM_ADDR:
+                ppu->bus = value;
                 set_oam_address(ppu, value);
                 break;
             case OAM_DMA:
                 dma(ppu, value);
                 break;
             case OAM_DATA:
+                ppu->bus = value;
                 write_oam(ppu, value);
+                break;
+            case PPU_STATUS:
+                ppu->bus = value;
                 break;
             case JOY1:
                 write_joypad(&mem->joy1, value);
                 write_joypad(&mem->joy2, value);
+                mem->bus = (old & 0xf0) | value & 0xf;
                 break;
             case APU_P1_CTRL:
                 set_pulse_ctrl(&apu->pulse1, value);
@@ -127,7 +140,6 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 set_status(apu, value);
                 break;
             default:
-                LOG(DEBUG, "Cannot write to register 0x%X", address);
                 break;
         }
         return;
@@ -136,8 +148,10 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
     mem->mapper->write_ROM(mem->mapper, address, value);
 }
 uint8_t read_mem(Memory* mem, uint16_t address){
-    if(address < RAM_END)
-        return mem->RAM[address % RAM_SIZE];
+    if(address < RAM_END) {
+        mem->bus = mem->RAM[address % RAM_SIZE];
+        return mem->bus;
+    }
     
     // resolve mirrored registers
     if(address < IO_REG_MIRRORED_END)
@@ -148,22 +162,41 @@ uint8_t read_mem(Memory* mem, uint16_t address){
         PPU* ppu = &mem->emulator->ppu;
         switch (address) {
             case PPU_STATUS:
-                return read_status(ppu);
+                ppu->bus &= 0x1f;
+                ppu->bus |= read_status(ppu) & 0xe0;
+                mem->bus = ppu->bus;
+                return mem->bus;
             case OAM_DATA:
-                return read_oam(ppu);
+                mem->bus = ppu->bus = read_oam(ppu);
+                return mem->bus;
             case PPU_DATA:
-                return read_ppu(ppu);
+                mem->bus = ppu->bus = read_ppu(ppu);
+                return mem->bus;
+            case PPU_CTRL:
+            case PPU_MASK:
+            case PPU_SCROLL:
+            case PPU_ADDR:
+            case OAM_ADDR:
+                // ppu open bus
+                mem->bus = ppu->bus;
+                return mem->bus;
             case JOY1:
-                return read_joypad(&mem->joy1);
+                mem->bus &= 0xe0;
+                mem->bus |= read_joypad(&mem->joy1) & 0x1f;
+                return mem->bus;
             case JOY2:
-                return read_joypad(&mem->joy2);
+                mem->bus &= 0xe0;
+                mem->bus |= read_joypad(&mem->joy2) & 0x1f;
+                return mem->bus;
             case APU_STATUS:
-                return read_apu_status(&mem->emulator->apu);
+                mem->bus = read_apu_status(&mem->emulator->apu);
+                return mem->bus;
             default:
-                LOG(DEBUG, "Cannot read from register 0x%X", address);
-                return 0;
+                // open bus
+                return mem->bus;
         }
     }
 
-    return mem->mapper->read_ROM(mem->mapper, address);
+    mem->bus = mem->mapper->read_ROM(mem->mapper, address);
+    return mem->bus;
 }
