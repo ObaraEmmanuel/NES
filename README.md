@@ -15,13 +15,13 @@ over time. Any help is welcome.
     - [x] Official opcodes
     - [x] Unofficial opcodes
     - [x] Cycle accuracy (official & unofficial)
+    - [x] Dummy reads/writes
     - [ ] BCD arithmetic (Not needed by NES anyway)
 * Memory
-    - [x] Extended RAM
-    - [ ] Expansion ROM
     - [ ] Battery backed (persistent) save RAM
-    - [ ] Open-bus behaviour
+    - [x] Open-bus
 * PPU (Picture Processing Unit)
+    - [x] Open-bus
     - [x] NTSC
     - [x] PAL
     - [ ] Dendy
@@ -39,8 +39,9 @@ over time. Any help is welcome.
     - [x] Custom Touch controller (Android)
 * Formats
     - [x] iNES
-    - [ ] NES2.0
+    - [x] NES2.0
     - [x] NSF
+    - [ ] NSFe
     - [ ] NSF2
     - [ ] UNIF
     - [ ] FDS
@@ -80,6 +81,14 @@ _1943: Battle of Midway_
 
 ![1943](resources/1943.png)
 
+_NSF Player: Ninja Gaiden_
+
+![Ninja Gaiden NSF](resources/ninja-gaiden-nsf.png)
+
+_Android: Ninja Gaiden_
+
+![Ninja Gaiden Android](resources/ninja-gaiden-android.png)
+
 ## Controller setup
 Xbox and Playstation controllers have not been tested on the emulator and are not guaranteed to work
 as shown here.
@@ -100,19 +109,19 @@ as shown here.
 ## Compiling
 
 Compiling the emulator requires:
-* a C11 (or higher) compiler e.g. gcc  
-* SDL2 library for graphics
+* a C11 (or higher) compiler e.g. gcc
 * cmake
-* make (linux)
+* make (linux), msvc nmake (windows)
 
 Assuming have the above requirements installed on your system,
 Acquire and build the source as follows:
 
 ```shell
-$ git clone https://github.com/obaraemmanuel/NES
+$ git clone --recurse-submodules https://github.com/obaraemmanuel/NES
 $ cd NES
-$ mkdir build && cd build
-$ cmake ..
+$ mkdir build
+$ cmake . -B build
+$ cd build
 $ make
 ```
 
