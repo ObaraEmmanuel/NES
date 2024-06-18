@@ -324,15 +324,13 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     if(mapper->CHR_banks) {
         mapper->CHR_ROM = malloc(0x2000 * mapper->CHR_banks);
         SDL_RWread(file, mapper->CHR_ROM, 0x2000 * mapper->CHR_banks, 1);
-    }else if(mapper->CHR_RAM_size) {
+    }else{
+        if(!mapper->CHR_RAM_size) {
+            LOG(INFO, "No CHR-RAM or CHR-ROM specified, Using 8kb CHR-RAM");
+            mapper->CHR_RAM_size = 0x2000;
+        }
         mapper->CHR_ROM = malloc(mapper->CHR_RAM_size);
         memset(mapper->CHR_ROM, 0, mapper->CHR_RAM_size);
-    }
-
-    if(mapper->CHR_ROM == NULL) {
-        // if both of them are unspecified emulator will definitely crash later on
-        LOG(ERROR, "Cannot proceed without CHR_RAM or CHR_ROM");
-        exit(EXIT_FAILURE);
     }
 
     LOG(INFO, "Using mapper #%d", mapper->mapper_num);
