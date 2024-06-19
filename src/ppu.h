@@ -40,7 +40,7 @@ struct Emulator;
 
 typedef struct PPU{
     size_t frames;
-    uint32_t screen[VISIBLE_DOTS * VISIBLE_SCANLINES];
+    uint32_t *screen;
     uint8_t V_RAM[0x800];
     uint8_t OAM[256];
     uint8_t OAM_cache[8];
@@ -80,11 +80,12 @@ static const uint32_t nes_palette_raw[64] = {
 };
 
 
-static uint32_t nes_palette[64];
+extern uint32_t nes_palette[64];
 
 
 void execute_ppu(PPU* ppu);
 void reset_ppu(PPU* ppu);
+void exit_ppu(PPU* ppu);
 void init_ppu(struct Emulator* emulator);
 uint8_t read_status(PPU* ppu);
 uint8_t read_ppu(PPU* ppu);

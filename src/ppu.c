@@ -8,11 +8,12 @@
 
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
-
+uint32_t nes_palette[64];
 
 void init_ppu(struct Emulator* emulator){
     to_pixel_format(nes_palette_raw, nes_palette, 64, SDL_PIXELFORMAT_ABGR8888);
-    struct PPU* ppu = &emulator->ppu;
+    PPU* ppu = &emulator->ppu;
+    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;
     ppu->scanlines_per_frame = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;
@@ -37,6 +38,12 @@ void reset_ppu(PPU* ppu){
     ppu->OAM_cache_len = 0;
     memset(ppu->OAM_cache, 0, 8);
     memset(ppu->screen, 0, sizeof(ppu->screen));
+}
+
+void exit_ppu(PPU* ppu) {
+    if(ppu->screen != NULL) {
+        free(ppu->screen);
+    }
 }
 
 void set_address(PPU* ppu, uint8_t address){
@@ -84,11 +91,10 @@ void set_scroll(PPU* ppu, uint8_t coord){
 
 uint8_t read_ppu(PPU* ppu){
     uint8_t prev_buff = ppu->buffer, data;
-    // $2000 - $2fff are mirrored at $3000 - $3fff
-    ppu->buffer = read_vram(ppu, 0x2000 + (ppu->v - 0x2000) % 0x1000);
+    ppu->buffer = read_vram(ppu, ppu->v);
 
     if(ppu->v >= 0x3F00)
-        data = read_vram(ppu, ppu->v);
+        data = ppu->buffer;
     else
         data = prev_buff;
     ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
@@ -136,7 +142,7 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
     }
 
     if(address < 0x3F00){
-        address = (address - 0x2000) & 0xfff;
+        address = (address & 0xefff) - 0x2000;
         ppu->bus = ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
         return ppu->bus;
     }
@@ -154,7 +160,7 @@ void write_vram(PPU* ppu, uint16_t address, uint8_t value){
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);
     else if(address < 0x3F00){
-        address = (address - 0x2000) & 0xfff;
+        address = (address & 0xefff) - 0x2000;
         ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)] = value;
     }
 
@@ -209,7 +215,7 @@ void execute_ppu(PPU* ppu){
             if((!palette_addr && palette_addr_sp) || (palette_addr && palette_addr_sp && !back_priority))
                 palette_addr = palette_addr_sp;
 
-            palette_addr = !palette_addr ? ppu->palette[0] : ppu->palette[palette_addr];
+            palette_addr = ppu->palette[palette_addr];
             ppu->screen[ppu->scanlines * VISIBLE_DOTS + ppu->dots - 1] = nes_palette[palette_addr];
         }
         if(ppu->dots == VISIBLE_DOTS + 1 && ppu->mask & SHOW_BG){

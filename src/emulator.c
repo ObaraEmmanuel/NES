@@ -299,6 +299,7 @@ void run_NSF_player(struct Emulator* emulator) {
 void free_emulator(struct Emulator* emulator){
     LOG(DEBUG, "Starting emulator clean up");
     exit_APU();
+    exit_ppu(&emulator->ppu);
     free_mapper(&emulator->mapper);
     ANDROID_FREE_TOUCH_PAD();
     free_graphics(&emulator->g_ctx);
