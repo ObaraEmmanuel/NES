@@ -13,12 +13,11 @@ void render_name_tables(struct PPU* ppu, uint32_t* screen) {
         for (int n = k * 0x400, i = 0; n < (k * 0x400) + 0x3C0; n++, i++) {
             size_t tile_x = i % 32;
             size_t tile_y = i / 32;
-            uint8_t *tile = ppu->mapper->CHR_ROM + bank + read_vram(ppu, 0x2000 + n) * 16;
             uint8_t *palette = get_palette(ppu, tile_x, tile_y);
 
             for (int y = 0; y < 8; y++) {
-                uint8_t lo = *(tile + y);
-                uint8_t hi = *(tile + y + 8);
+                uint8_t lo = read_vram(ppu, bank + read_vram(ppu, 0x2000 + n) * 16 + y);
+                uint8_t hi = read_vram(ppu, bank + read_vram(ppu, 0x2000 + n) * 16 + y + 8);;
 
                 for (int x = 7; x >= 0; x--) {
                     uint8_t value = ((hi & BIT_0) << 1) | lo & BIT_0;

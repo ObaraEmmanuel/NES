@@ -13,7 +13,11 @@ uint32_t nes_palette[64];
 void init_ppu(struct Emulator* emulator){
     to_pixel_format(nes_palette_raw, nes_palette, 64, SDL_PIXELFORMAT_ABGR8888);
     PPU* ppu = &emulator->ppu;
+#if NAMETABLE_MODE
+    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS * 4);
+#else
     ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+#endif
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;
     ppu->scanlines_per_frame = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;

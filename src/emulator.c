@@ -8,6 +8,7 @@
 #include "mapper.h"
 #include "nsf.h"
 #include "timers.h"
+#include "debugtools.h"
 
 static uint64_t PERIOD;
 static uint16_t TURBO_SKIP;
@@ -51,6 +52,17 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     g_ctx->width = 256;
     g_ctx->height = 240;
     g_ctx->scale = 2;
+
+#if NAMETABLE_MODE
+    g_ctx->width = 512;
+    g_ctx->height = 480;
+    g_ctx->scale = 1;
+    if(emulator->mapper.is_nsf) {
+        LOG(ERROR, "Can't run NSF Player in Nametable mode");
+        exit(EXIT_FAILURE);
+    }
+    LOG(DEBUG, "RENDERING IN NAMETABLE MODE");
+#endif
     get_graphics_context(g_ctx);
     SDL_SetWindowTitle(g_ctx->window, get_file_name(argv[1]));
 
@@ -160,6 +172,9 @@ void run_emulator(struct Emulator* emulator){
                     execute_apu(apu);
                 }
             }
+#if NAMETABLE_MODE
+            render_name_tables(ppu, ppu->screen);
+#endif
             render_graphics(g_ctx, ppu->screen);
             ppu->render = 0;
             queue_audio(apu, g_ctx);

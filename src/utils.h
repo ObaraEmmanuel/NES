@@ -34,6 +34,7 @@ typedef struct{real Re; real Im;} complx;
 #define TRACER 0
 #define PROFILE 0
 #define PROFILE_STOP_FRAME 1
+#define NAMETABLE_MODE 0
 
 enum {
     BIT_7 = 1<<7,
