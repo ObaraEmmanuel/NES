@@ -6,9 +6,10 @@
 #define INES_HEADER_SIZE 16
 
 typedef enum TVSystem{
-    NTSC,
+    NTSC = 0,
+    DUAL,
     PAL,
-    DENDY
+    DENDY,
 } TVSystem;
 
 typedef enum{

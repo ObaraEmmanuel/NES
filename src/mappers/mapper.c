@@ -255,10 +255,8 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
         if(header[9] & 1){
             mapper->type = PAL;
-            LOG(INFO, "ROM type: PAL");
         }else {
             mapper->type = NTSC;
-            LOG(INFO, "ROM type: NTSC");
         }
     } else if(mapper->format == NES2) {
         mapper->mapper_num |= header[7] & 0xF0;
@@ -285,16 +283,13 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         switch (header[12] & 0x3) {
             case 0:
                 mapper->type = NTSC;
-                LOG(INFO, "ROM type: NTSC");
                 break;
             case 1:
                 mapper->type = PAL;
-                LOG(INFO, "ROM type: PAL");
                 break;
             case 2:
                 // multi-region
-                mapper->type = NTSC;
-                LOG(INFO, "ROM type: Multi-region, Using NTSC");
+                mapper->type = DUAL;
                 break;
             case 3:
                 mapper->type = DENDY;
@@ -315,6 +310,19 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
     }
 
+    if(mapper->format != NES2) {
+
+        if(!mapper->CHR_banks) {
+            mapper->CHR_RAM_size = 0x2000;
+            LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
+        }
+
+        if(strstr(file_name, "(E)") != NULL && mapper->type == NTSC) {
+            // probably PAL ROM
+            mapper->type = PAL;
+        }
+    }
+
     LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
     LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
 
@@ -331,6 +339,21 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         }
         mapper->CHR_ROM = malloc(mapper->CHR_RAM_size);
         memset(mapper->CHR_ROM, 0, mapper->CHR_RAM_size);
+    }
+
+    switch (mapper->type) {
+        case NTSC:
+            LOG(INFO, "ROM type: NTSC");
+            break;
+        case DUAL:
+            LOG(INFO, "ROM type: DUAL (Using NTSC)");
+            mapper->type = NTSC;
+            break;
+        case PAL:
+            LOG(INFO, "ROM type: PAL");
+            break;
+        default:
+            LOG(INFO, "ROM type: Unknown");
     }
 
     LOG(INFO, "Using mapper #%d", mapper->mapper_num);
