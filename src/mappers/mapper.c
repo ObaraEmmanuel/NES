@@ -18,6 +18,7 @@ static uint8_t read_CHR(Mapper*, uint16_t);
 static void write_CHR(Mapper*, uint16_t, uint8_t);
 static uint8_t read_ROM(Mapper*, uint16_t);
 static void write_ROM(Mapper*, uint16_t, uint8_t);
+static void on_scanline(Mapper*);
 
 static void select_mapper(Mapper* mapper){
     // load generic implementations
@@ -27,6 +28,7 @@ static void select_mapper(Mapper* mapper){
     mapper->write_CHR = write_CHR;
     mapper->read_ROM = read_ROM;
     mapper->write_ROM = write_ROM;
+    mapper->on_scanline = on_scanline;
     mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
 
     switch (mapper->mapper_num) {
@@ -88,14 +90,18 @@ void set_mirroring(Mapper* mapper, Mirroring mirroring){
             LOG(DEBUG, "Using mirroring: Single screen upper");
             break;
         case FOUR_SCREEN:
-            set_mapping(mapper, 0, 0x400, 0xB00, 0xC00);
-            LOG(DEBUG, "Using mirroring: Single screen upper");
+            set_mapping(mapper, 0, 0x400, 0x800, 0xC00);
+            LOG(DEBUG, "Using mirroring: Four screen");
             break;
         default:
             set_mapping(mapper,0, 0, 0, 0);
             LOG(ERROR, "Unknown mirroring %u", mirroring);
     }
     mapper->mirroring = mirroring;
+}
+
+static void on_scanline(Mapper* mapper) {
+
 }
 
 static uint8_t read_ROM(Mapper* mapper, uint16_t address){

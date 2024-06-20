@@ -1,6 +1,9 @@
-#include <mapper.h>
+#include <emulator.h>
 #include <stdint.h>
-#include <utils.h>
+
+#include "mapper.h"
+#include "utils.h"
+#include "cpu6502.h"
 
 typedef struct {
     uint8_t *CHR_bank_2k_1;
@@ -29,16 +32,16 @@ static void write_PRG(Mapper *, uint16_t, uint8_t);
 
 static uint8_t read_CHR(Mapper *, uint16_t);
 
-static void write_CHR(Mapper *, uint16_t, uint8_t);
-
 static void write_bank_data(Mapper *mapper, uint8_t val);
+
+static void on_scanline(Mapper*);
 
 
 void load_MMC3(Mapper *mapper) {
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
-    mapper->write_CHR = write_CHR;
+    mapper->on_scanline = on_scanline;
     MMC3_t *mmc3 = calloc(1, sizeof(MMC3_t));
     mapper->extension = mmc3;
 
@@ -53,6 +56,21 @@ void load_MMC3(Mapper *mapper) {
     // point to first bank
     mmc3->CHR_bank_1k_1 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mmc3->CHR_bank_1k_2 = mapper->CHR_ROM;
     mmc3->CHR_bank_2k_1 = mmc3->CHR_bank_2k_2 = mapper->CHR_ROM;
+}
+
+static void on_scanline(Mapper* mapper) {
+    // TODO cycle-accurate A12 based IRQ
+    MMC3_t *mmc3 = mapper->extension;
+
+    if(mmc3->IRQ_cleared || !mmc3->IRQ_counter) {
+        mmc3->IRQ_counter = mmc3->IRQ_latch;
+        mmc3->IRQ_cleared = 0;
+    }else {
+        mmc3->IRQ_counter--;
+    }
+
+    if(!mmc3->IRQ_counter && mmc3->IRQ_enabled)
+        interrupt(&mapper->emulator->cpu, IRQ);
 }
 
 uint8_t read_PRG(Mapper *mapper, uint16_t addr) {
@@ -162,12 +180,15 @@ void write_bank_data(Mapper *mapper, uint8_t val) {
         default:
             // R7
             val = val & 0x3f;
-            mmc3->PRG_bank1 = mapper->PRG_ROM + val * 0x2000;
+            mmc3->PRG_bank2 = mapper->PRG_ROM + val * 0x2000;
             break;
     }
 }
 
 uint8_t read_CHR(Mapper *mapper, uint16_t addr) {
+    if(!mapper->CHR_banks) {
+        return mapper->CHR_ROM[addr];
+    }
     MMC3_t *mmc3 = mapper->extension;
     switch (addr & 0x1C00) {
         case 0x0:
@@ -205,78 +226,5 @@ uint8_t read_CHR(Mapper *mapper, uint16_t addr) {
             // out of bounds
             LOG(ERROR, "CHR Read (0x%04x) out of bounds", addr);
             return 0;
-    }
-}
-
-void write_CHR(Mapper *mapper, uint16_t addr, uint8_t val) {
-    MMC3_t *mmc3 = mapper->extension;
-    switch (addr & 0x1C00) {
-        case 0x0:
-            // R2 / R0
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_1k_1 + addr) = val;
-            else
-                *(mmc3->CHR_bank_2k_1 + addr) = val;
-            break;
-        case 0x400:
-            // R3 / R0
-            addr = addr - 0x400;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_1k_2 + 0x400 + addr) = val;
-            else
-                *(mmc3->CHR_bank_2k_1 + addr) = val;
-            break;
-        case 0x800:
-            // R4 / R1
-            addr = addr - 0x800;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_1k_3 + addr) = val;
-            else
-                *(mmc3->CHR_bank_2k_2 + addr) = val;
-            break;
-        case 0xC00:
-            // R5 / R1
-            addr = addr - 0xC00;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_1k_4 + addr) = val;
-            else
-                *(mmc3->CHR_bank_2k_2 + 0x400 + addr) = val;
-            break;
-        case 0x1000:
-            // R0 / R2
-            addr = addr - 0x1000;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_2k_1 + addr) = val;
-            else
-                *(mmc3->CHR_bank_1k_1 + addr) = val;
-            break;
-        case 0x1400:
-            // R0 / R3
-            addr = addr - 0x1400;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_2k_1 + 0x400 + addr) = val;
-            else
-                *(mmc3->CHR_bank_1k_2 + addr) = val;
-            break;
-        case 0x1800:
-            // R1 / R4
-            addr = addr - 0x1800;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_2k_2 + addr) = val;
-            else
-                *(mmc3->CHR_bank_1k_3 + addr) = val;
-            break;
-        case 0x1C00:
-            // R1 / R5
-            addr = addr - 0x1C00;
-            if (mmc3->CHR_inversion)
-                *(mmc3->CHR_bank_2k_2 + 0x400 + addr) = val;
-            else
-                *(mmc3->CHR_bank_1k_4 + addr) = val;
-            break;
-        default:
-            // out of bounds
-            LOG(ERROR, "CHR Write (0x%04x) out of bounds", addr);
-            break;
     }
 }

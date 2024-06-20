@@ -61,6 +61,7 @@ typedef struct Mapper{
     uint16_t mapper_num;
     uint8_t submapper;
     uint8_t is_nsf;
+    void (*on_scanline)(struct Mapper*);
     uint8_t (*read_ROM)(struct Mapper*, uint16_t);
     void (*write_ROM)(struct Mapper*, uint16_t, uint8_t);
     uint8_t (*read_PRG)(struct Mapper*, uint16_t);

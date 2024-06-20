@@ -41,7 +41,7 @@ struct Emulator;
 typedef struct PPU{
     size_t frames;
     uint32_t *screen;
-    uint8_t V_RAM[0x800];
+    uint8_t V_RAM[0x1000];
     uint8_t OAM[256];
     uint8_t OAM_cache[8];
     uint8_t palette[0x20];

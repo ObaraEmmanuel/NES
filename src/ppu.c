@@ -9,23 +9,25 @@
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 uint32_t nes_palette[64];
+static size_t screen_size;
 
 void init_ppu(struct Emulator* emulator){
     to_pixel_format(nes_palette_raw, nes_palette, 64, SDL_PIXELFORMAT_ABGR8888);
     PPU* ppu = &emulator->ppu;
 #if NAMETABLE_MODE
-    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS * 4);
+    screen_size = sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS * 4;
 #else
-    ppu->screen = malloc(sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS);
+    screen_size = sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS;
 #endif
+    ppu->screen = malloc(screen_size);
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;
     ppu->scanlines_per_frame = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;
 
-    memset(ppu->palette, 0, 0x20);
-    memset(ppu->OAM_cache, 0, sizeof(ppu->OAM_cache)); //TODO: add sizeof in all memory operations
-    memset(ppu->V_RAM, 0, 0x800);
-    memset(ppu->OAM, 0, 256);
+    memset(ppu->palette, 0, sizeof(ppu->palette));
+    memset(ppu->OAM_cache, 0, sizeof(ppu->OAM_cache));
+    memset(ppu->V_RAM, 0, sizeof(ppu->V_RAM));
+    memset(ppu->OAM, 0, sizeof(ppu->OAM));
     ppu->oam_address = 0;
     ppu->v = 0;
     reset_ppu(ppu);
@@ -41,7 +43,7 @@ void reset_ppu(PPU* ppu){
     ppu->frames = 0;
     ppu->OAM_cache_len = 0;
     memset(ppu->OAM_cache, 0, 8);
-    memset(ppu->screen, 0, sizeof(ppu->screen));
+    memset(ppu->screen, 0, screen_size);
 }
 
 void exit_ppu(PPU* ppu) {
@@ -250,7 +252,10 @@ void execute_ppu(PPU* ppu){
             ppu->v &= ~HORIZONTAL_BITS;
             ppu->v |= ppu->t & HORIZONTAL_BITS;
         }
-        else if(ppu->dots == END_DOT){
+        else if(ppu->dots == VISIBLE_DOTS + 5 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
+            ppu->mapper->on_scanline(ppu->mapper);
+        }
+        else if(ppu->dots == END_DOT && ppu->mask & RENDER_ENABLED){
             memset(ppu->OAM_cache, 0, 8);
             ppu->OAM_cache_len = 0;
             uint8_t range = ppu->ctrl & LONG_SPRITE ? 16: 8;
