@@ -9,6 +9,7 @@
 #include <float.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #define PRG_ROM_SIZE 0x8000
 #define PRG_RAM_SIZE 0x2000

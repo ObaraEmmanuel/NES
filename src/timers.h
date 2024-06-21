@@ -3,27 +3,8 @@
 #include <stdint.h>
 #include "utils.h"
 
-#ifdef _WIN
-#include <windows.h>
-// sleep resolution in milliseconds
-// should be a non-zero and non-negative value
-#define SLEEP_RESOLUTION_MS 1
-#else
-#include <unistd.h>
-#include "time.h"
-#endif
-
-
 typedef struct Timer{
-#ifdef _WIN
-    LARGE_INTEGER start, diff;
-    LARGE_INTEGER frequency;
-    uint64_t period_ms;
-#else
-    struct timespec start, diff;
-    uint64_t clock_res;
-    uint64_t period_ns;
-#endif
+    void* timer;
 } Timer;
 
 

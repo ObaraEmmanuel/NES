@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include "biquad.h"
 
 #define SAMPLING_FREQUENCY 48000
