@@ -24,7 +24,7 @@ void init_timer(Timer* timer, uint64_t sweep){
     t->period_ms = sweep / M;
     if(!QueryPerformanceFrequency(&t->frequency)){
         LOG(ERROR, "Could not acquire timer resolution ");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     } else {
         LOG(DEBUG, "Performance counter frequency %lu Hz", t->frequency.QuadPart);
     }

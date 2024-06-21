@@ -172,7 +172,7 @@ void init_audio_device(const APU* apu) {
     apu->emulator->g_ctx.audio_device = SDL_OpenAudioDevice(NULL, 0, &want, NULL, 0);
     if (apu->emulator->g_ctx.audio_device == 0) {
         LOG(ERROR , SDL_GetError());
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 }
 

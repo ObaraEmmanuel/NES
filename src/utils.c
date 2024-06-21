@@ -169,7 +169,7 @@ void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t
             }
             default:
                 LOG(DEBUG, "Unsupported format");
-                exit(EXIT_FAILURE);
+                quit(EXIT_FAILURE);
         }
     }
 }
@@ -209,4 +209,12 @@ char *get_file_name(char *path) {
         }
     }
     return pfile;
+}
+
+void quit(int code) {
+#if EXIT_PAUSE
+    printf("Press any key to exit . . .");
+    getchar();
+#endif
+    exit(code);
 }

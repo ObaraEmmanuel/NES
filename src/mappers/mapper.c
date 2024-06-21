@@ -55,7 +55,7 @@ static void select_mapper(Mapper* mapper){
             break;
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
-            exit(EXIT_FAILURE);
+            quit(EXIT_FAILURE);
     }
 }
 
@@ -175,7 +175,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
     if(file == NULL){
         LOG(ERROR, "file '%s' not found", file_name);
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     // clear mapper
@@ -193,7 +193,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
     if(strncmp(header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     uint8_t mapnum = header[7] & 0x0C;
@@ -230,7 +230,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
     if(header[6] & BIT_2) {
         LOG(ERROR, "Trainer not supported");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     Mirroring mirroring;
@@ -300,7 +300,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
             case 3:
                 mapper->type = DENDY;
                 LOG(ERROR, "Dendy ROM not supported");
-                exit(EXIT_FAILURE);
+                quit(EXIT_FAILURE);
             default:
                 break;
         }

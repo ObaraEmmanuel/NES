@@ -40,7 +40,7 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
     nsf->load_addr = (header[9] << 8) | header[8];
     if(nsf->load_addr < 0x8000) {
         LOG(INFO, "Load address ox%04x too low", nsf->load_addr);
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     nsf->init_addr = (header[0xb] << 8) | header[0xa];
@@ -76,7 +76,7 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
 
     if(header[0x7b]) {
         LOG(ERROR, "Extra Sound Chip support required");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     size_t data_len = (header[0x7f] << 16) | (header[0x7e] << 8) | header[0x7d];
@@ -84,7 +84,7 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
         long long size = SDL_RWseek(file, 0, RW_SEEK_END);
         if(size < 0) {
             LOG(ERROR, "Error reading ROM");
-            exit(EXIT_FAILURE);
+            quit(EXIT_FAILURE);
         }
         data_len = size - NSF_HEADER_SIZE;
         // reset file ptr

@@ -49,14 +49,14 @@ void get_graphics_context(GraphicsContext* ctx){
 
     if(ctx->window == NULL){
         LOG(ERROR, SDL_GetError());
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
     SDL_SetWindowMinimumSize(ctx->window, ctx->width, ctx->height);
 
     ctx->renderer = SDL_CreateRenderer(ctx->window, -1, SDL_RENDERER_ACCELERATED);
     if(ctx->renderer == NULL){
         LOG(ERROR, SDL_GetError());
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
 #ifdef __ANDROID__
@@ -80,7 +80,7 @@ void get_graphics_context(GraphicsContext* ctx){
 
     if(ctx->texture == NULL){
         LOG(ERROR, SDL_GetError());
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     SDL_SetRenderDrawColor(ctx->renderer, 0, 0, 0, 255);

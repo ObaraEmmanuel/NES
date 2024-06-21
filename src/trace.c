@@ -11,7 +11,7 @@ void print_cpu_trace(const c6502* ctx){
 #if TRACER == 1
     // for use with the golden log
     if(traces >= 8991 && !PROFILE)
-        exit(1);
+        quit(1);
 #endif
     char opcode_str[4], address_str[28], opcode_hex_str[9];
     uint16_t addr, pc = ctx->pc, hi, lo;

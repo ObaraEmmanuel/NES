@@ -35,6 +35,7 @@ typedef struct{real Re; real Im;} complx;
 #define PROFILE 0
 #define PROFILE_STOP_FRAME 1
 #define NAMETABLE_MODE 0
+#define EXIT_PAUSE 0
 
 enum {
     BIT_7 = 1<<7,
@@ -64,3 +65,4 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius);
 void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format);
 void fft(complx *v, int n, complx *tmp);
 char *get_file_name(char *path);
+void quit(int code);

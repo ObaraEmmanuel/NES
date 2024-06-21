@@ -9,6 +9,7 @@
 #include "nsf.h"
 #include "timers.h"
 #include "debugtools.h"
+#include "utils.h"
 
 static uint64_t PERIOD;
 static uint16_t TURBO_SKIP;
@@ -16,7 +17,7 @@ static uint16_t TURBO_SKIP;
 void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     if(argc < 2) {
         LOG(ERROR, "Input file not provided");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
 
     char* genie = NULL;
@@ -59,7 +60,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     g_ctx->scale = 1;
     if(emulator->mapper.is_nsf) {
         LOG(ERROR, "Can't run NSF Player in Nametable mode");
-        exit(EXIT_FAILURE);
+        quit(EXIT_FAILURE);
     }
     LOG(DEBUG, "RENDERING IN NAMETABLE MODE");
 #endif
