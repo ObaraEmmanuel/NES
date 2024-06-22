@@ -54,6 +54,7 @@ over time. Any help is welcome.
     - [x] \#4   MMC3
     - [ ] \#5   MMC5
     - [x] \#7   AxROM
+    - [x] \#11  Color Dreams
     - [x] \#66  GNROM
 * Game genie (for cheat codes)
     

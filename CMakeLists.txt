@@ -46,6 +46,7 @@ set (SRC
         src/mappers/mmc1.c
         src/mappers/uxrom.c
         src/mappers/mmc3.c
+        src/mappers/colordreams.c
         src/nsf.c
         src/biquad.c
         src/biquad.h

@@ -53,6 +53,9 @@ static void select_mapper(Mapper* mapper){
         case MMC3:
             load_MMC3(mapper);
             break;
+        case COLORDREAMS:
+            load_colordreams(mapper);
+            break;
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
             quit(EXIT_FAILURE);

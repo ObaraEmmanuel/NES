@@ -29,6 +29,7 @@ typedef enum MapperID {
     CNROM,
     MMC3,
     AOROM = 7,
+    COLORDREAMS = 11,
     GNROM = 66
 } MapperID;
 
@@ -92,3 +93,4 @@ void load_CNROM(Mapper* mapper);
 void load_GNROM(Mapper* mapper);
 void load_AOROM(Mapper* mapper);
 void load_MMC3(Mapper* mapper);
+void load_colordreams(Mapper* mapper);
