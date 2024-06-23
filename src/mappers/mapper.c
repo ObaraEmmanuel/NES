@@ -314,11 +314,6 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         memset(mapper->PRG_RAM, 0, mapper->RAM_size);
     }
 
-    if(!mapper->CHR_banks && mapper->format != NES2) {
-        mapper->CHR_RAM_size = 0x2000;
-        LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
-    }
-
     if(mapper->format != NES2) {
 
         if(!mapper->CHR_banks) {
