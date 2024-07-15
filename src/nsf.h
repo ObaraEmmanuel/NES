@@ -44,6 +44,8 @@ typedef struct NSF {
 } NSF;
 
 void load_nsf(SDL_RWops* file, Mapper* mapper);
+void next_song(struct Emulator* emulator, NSF* nsf);
+void prev_song(struct Emulator* emulator, NSF* nsf);
 void init_song(struct Emulator* emulator, size_t song_number);
 void nsf_jsr(struct Emulator* emulator, uint16_t address);
 void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf);

@@ -14,6 +14,7 @@
 #define PRG_ROM_SIZE 0x8000
 #define PRG_RAM_SIZE 0x2000
 #define BAR_COUNT 128
+#define MAX_SILENCE 150 // frames
 
 static uint8_t read_PRG(Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
@@ -218,6 +219,16 @@ void nsf_jsr(Emulator* emulator, uint16_t address) {
     emulator->cpu.pc = address;
 }
 
+void next_song(Emulator* emulator, NSF* nsf) {
+    nsf->current_song = nsf->current_song >= nsf->total_songs ? 1 : nsf->current_song + 1;
+    init_song(emulator, nsf->current_song);
+}
+
+void prev_song(Emulator* emulator, NSF* nsf) {
+    nsf->current_song = nsf->current_song <= 1 ? nsf->total_songs : nsf->current_song - 1;
+    init_song(emulator, nsf->current_song);
+}
+
 static double bin_boundaries[BAR_COUNT + 1] = {0};
 
 void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
@@ -248,7 +259,7 @@ static float bins[BAR_COUNT] = {0};
 static int amps[BAR_COUNT] = {0};
 
 void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
-    static int song_num = -1;
+    static int song_num = -1, silent_frames = 0;
     GraphicsContext* g_ctx = &emulator->g_ctx;
 #ifdef __ANDROID__
     int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
@@ -258,10 +269,23 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
 
     APU* apu = &emulator->apu;
     complx* v = nsf->samples;
+    int silent = 1;
     // convert audio buffer to complex values for FFT
     for(size_t i =0; i < AUDIO_BUFF_SIZE; i++) {
         v[i].Re = apu->buff[i];
         v[i].Im = 0;
+        if(silent && apu->buff[i] > 0)
+            silent = 0;
+    }
+    if(silent)
+        silent_frames++;
+    else
+        silent_frames = 0;
+
+    if(silent_frames > MAX_SILENCE) {
+        next_song(emulator, nsf);
+        silent_frames = 0;
+        return;
     }
     // FFT to extract frequency spectrum
     fft(nsf->samples, AUDIO_BUFF_SIZE, nsf->temp);

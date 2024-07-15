@@ -20,7 +20,7 @@
 #define PAL_TURBO_RATE 25
 
 // sleep time when emulator is paused in milliseconds
-#define IDLE_SLEEP 1000
+#define IDLE_SLEEP 50
 
 
 typedef struct Emulator{
