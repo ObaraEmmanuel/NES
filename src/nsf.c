@@ -274,7 +274,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
     for(size_t i =0; i < AUDIO_BUFF_SIZE; i++) {
         v[i].Re = apu->buff[i];
         v[i].Im = 0;
-        if(silent && apu->buff[i] > 0)
+        if(silent && apu->buff[i] != 0)
             silent = 0;
     }
     if(silent)

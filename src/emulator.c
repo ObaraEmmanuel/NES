@@ -116,6 +116,7 @@ void run_emulator(struct Emulator* emulator){
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
                             break;
+                        case SDLK_AUDIOPLAY:
                         case SDLK_SPACE:
                             emulator->pause ^= 1;
                             TOGGLE_TIMER_RESOLUTION();
@@ -254,9 +255,16 @@ void run_NSF_player(struct Emulator* emulator) {
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
                             break;
+                        case SDLK_AUDIOPLAY:
                         case SDLK_SPACE:
                             emulator->pause ^= 1;
                             TOGGLE_TIMER_RESOLUTION();
+                            break;
+                        case SDLK_AUDIONEXT:
+                            next_song(emulator, nsf);
+                            break;
+                        case SDLK_AUDIOPREV:
+                            prev_song(emulator, nsf);
                             break;
                         case SDLK_F5:
                             reset_emulator(emulator);
