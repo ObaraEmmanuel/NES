@@ -352,6 +352,8 @@ void init_sampler(APU* apu, int frequency) {
     Sampler* sampler = &apu->sampler;
     // Q = 0.707 => BW = 1.414 (1 octave)
     biquad_init(&apu->filter, HPF, 0, 20, frequency, 1);
+    // anti-aliasing filter.
+    biquad_init(&apu->aa_filter, LPF, 0, 20000, cycles_per_frame * rate, 1);
 
     sampler->max_period = cycles_per_frame * rate / frequency;
     sampler->min_period = sampler->max_period - 1;
@@ -371,13 +373,14 @@ void init_sampler(APU* apu, int frequency) {
 
 
 void sample(APU* apu) {
+    float sample = biquad(get_sample(apu), &apu->aa_filter);
 #if AVERAGE_DOWNSAMPLING
     static float avg = -1;
     // average samples in a bin
     if(avg < 0)
-        avg = get_sample(apu);
+        avg = sample;
     else
-        avg = (avg + get_sample(apu))/2;
+        avg = (avg + sample)/2;
 #endif
 
     Sampler* sampler = &apu->sampler;
@@ -389,7 +392,7 @@ void sample(APU* apu) {
         avg = -1;
 #else
 
-        apu->buff[sampler->index++] = 32000 * biquad(get_sample(apu), &apu->filter);
+        apu->buff[sampler->index++] = 32000 * biquad(sample, &apu->filter);
 #endif
         if(sampler->index >= sampler->max_index) {
             sampler->index = 0;
