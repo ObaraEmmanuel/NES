@@ -215,6 +215,7 @@ void run_NSF_player(struct Emulator* emulator) {
     SDL_Event e;
     Timer frame_timer;
     PERIOD = 1000 * emulator->mapper.NSF->speed;
+    double ms_per_frame = emulator->mapper.NSF->speed / 1000.0;
     init_timer(&frame_timer, PERIOD);
     mark_start(&frame_timer);
     size_t cycles_per_frame;
@@ -287,6 +288,21 @@ void run_NSF_player(struct Emulator* emulator) {
             }
         }
 
+        if(nsf->times != NULL && !nsf->initializing) {
+            double track_dur = nsf->times[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
+            if(track_dur < nsf->tick) {
+                if(nsf->tick_max < nsf->tick) {
+                    next_song(emulator, nsf);
+                } else if(nsf->fade != NULL) {
+                    // fade
+                    int fade_dur = nsf->fade[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
+                    apu->volume = (nsf->tick - track_dur) / (float)fade_dur;
+                    // clamp to range (0,1) then invert
+                    apu->volume = 1 - (apu->volume < 0 ? 0 : apu->volume > 1 ? 1 : apu->volume);
+                }
+            }
+        }
+
         if(cpu->pc == NSF_SENTINEL_ADDR) {
             nsf_jsr(emulator, nsf->play_addr);
         }
@@ -303,10 +319,14 @@ void run_NSF_player(struct Emulator* emulator) {
             }
 
             render_NSF_graphics(emulator, nsf);
-            if(!nsf->initializing)
+            if(!nsf->initializing) {
                 queue_audio(apu, g_ctx);
-            if(cpu->pc == NSF_SENTINEL_ADDR)
+                nsf->tick += ms_per_frame;
+            }
+            if(cpu->pc == NSF_SENTINEL_ADDR && nsf->initializing) {
                 nsf->initializing = 0;
+                nsf->tick = 0;
+            }
             mark_end(timer);
             adjusted_wait(timer);
         }else{

@@ -3,7 +3,8 @@
 Here lies an NES emulator I wrote to learn about emulation and generally
 sharpen my understanding of the C language. Don't let this fool you though.
 It is a pretty decent emulator with full 6502 instruction set (official, 
-unofficial and most illegal opcodes) to say the least.
+unofficial and most illegal opcodes) to say the least. It is also an 
+impressive NSF player.
 
 ## What is implemented
 
@@ -41,7 +42,7 @@ over time. Any help is welcome.
     - [x] iNES
     - [x] NES2.0
     - [x] NSF
-    - [ ] NSFe
+    - [x] NSFe
     - [ ] NSF2
     - [ ] UNIF
     - [ ] FDS
@@ -85,6 +86,10 @@ _1943: Battle of Midway_
 _NSF Player: Ninja Gaiden_
 
 ![Ninja Gaiden NSF](resources/ninja-gaiden-nsf.png)
+
+_NSFe Player: Castlevania 3_
+
+![Castlevania 3 NSF](resources/castlevania-3-nsfe.png)
 
 _Android: Ninja Gaiden_
 

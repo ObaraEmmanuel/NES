@@ -194,6 +194,13 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         return;
     }
 
+    if(strncmp(header, "NSFE", 4) == 0){
+        LOG(INFO, "Using NSFe format");
+        load_nsfe(file, mapper);
+        SDL_RWclose(file);
+        return;
+    }
+
     if(strncmp(header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
         quit(EXIT_FAILURE);
@@ -383,9 +390,7 @@ void free_mapper(Mapper* mapper){
     if(mapper->genie != NULL)
         free(mapper->genie);
     if(mapper->NSF != NULL) {
-        SDL_DestroyTexture(mapper->NSF->song_num_tx);
-        SDL_DestroyTexture(mapper->NSF->song_info_tx);
-        free(mapper->NSF);
+        free_NSF(mapper->NSF);
     }
     LOG(DEBUG, "Mapper cleanup complete");
 }

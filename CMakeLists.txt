@@ -4,6 +4,10 @@ project(nes)
 set(CMAKE_C_STANDARD 11)
 set(BUILD_DIR build)
 
+if(MSVC)
+  add_definitions(-D_CRT_SECURE_NO_WARNINGS)
+endif()
+
 set(SDL_DIR ${CMAKE_SOURCE_DIR}/external/SDL)
 set(SDL_ttf_DIR ${CMAKE_SOURCE_DIR}/external/SDL_ttf)
 option(TTF_WITH_HARFBUZZ "use harfbuzz to improve text shaping" ON)

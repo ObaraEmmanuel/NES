@@ -131,6 +131,7 @@ typedef struct APU{
     size_t stat_index;
     Biquad filter;
     Biquad aa_filter;
+    float volume;
 } APU;
 
 

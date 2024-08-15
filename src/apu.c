@@ -123,6 +123,7 @@ void init_APU(struct Emulator *emulator) {
     memset(&emulator->apu, 0, sizeof(APU));
     compute_mixer_LUT();
     APU *apu = &emulator->apu;
+    apu->volume = 1;
     apu->emulator = emulator;
     apu->cycles = 0;
     apu->sequencer = 0;
@@ -392,7 +393,7 @@ void sample(APU* apu) {
         avg = -1;
 #else
 
-        apu->buff[sampler->index++] = 32000 * biquad(sample, &apu->filter);
+        apu->buff[sampler->index++] = 32000 * biquad(sample, &apu->filter) * apu->volume;
 #endif
         if(sampler->index >= sampler->max_index) {
             sampler->index = 0;
