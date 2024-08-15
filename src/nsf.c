@@ -674,7 +674,6 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         nsf->song_num_rect.h = text_surf->h;
         nsf->song_num_rect.w = text_surf->w;
         nsf->song_num_rect.x = 10 + offset_x;
-        nsf->song_num_rect.y = height - 45 - text_surf->h + offset_y;
         song_num = nsf->current_song;
 
         if(nsf->times != NULL) {
@@ -692,6 +691,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
             nsf->song_num_rect.x = (width - text_surf->w) / 2 + offset_x;;
             nsf->song_num_rect.y = height - 15 - text_surf->h + offset_y;
         }
+        nsf->song_num_rect.y = nsf->song_dur_max_rect.y - 0.12*height - text_surf->h;
         SDL_FreeSurface(text_surf);
     }
 
@@ -700,9 +700,9 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         int cur_sec = ((long)nsf->tick % 60000) / 1000;
 
         dest.x = offset_x + 10;
-        dest.y = height - 35 + offset_y;
+        dest.y = nsf->song_dur_max_rect.y - 0.06*height;
         dest.w = width - 20;
-        dest.h = 2;
+        dest.h = 0.01 * height;
         SDL_SetRenderDrawColor(g_ctx->renderer, 30, 30, 30, 0x1f);
         SDL_RenderFillRect(g_ctx->renderer, &dest);
 

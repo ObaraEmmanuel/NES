@@ -41,7 +41,7 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         holder.gameName.setText(item.getName());
         if(item.getImage() != null)
             Glide.with(context).load(item.getImage()).into(holder.gameImage);
-        else if (item.getRom().endsWith(".nsf")) {
+        else if (item.getRom().endsWith(".nsf") || item.getRom().endsWith(".nsfe")) {
             holder.gameImage.setImageResource(R.drawable.music);
         } else
             holder.gameImage.setImageResource(R.drawable.controller);
