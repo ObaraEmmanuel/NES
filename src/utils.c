@@ -211,6 +211,13 @@ char *get_file_name(char *path) {
     return pfile;
 }
 
+uint64_t next_power_of_2(uint64_t num) {
+    int64_t power = 1;
+    while(power < num)
+        power*=2;
+    return power;
+}
+
 void quit(int code) {
 #if EXIT_PAUSE
     printf("Press any key to exit . . .");
