@@ -15,6 +15,8 @@ typedef struct{
     uint8_t CHR_mode;
     uint8_t PRG_mode;
     uint8_t reg;
+    uint32_t PRG_clamp;
+    uint32_t CHR_clamp;
     size_t cpu_cycle;
 } MMC1_t;
 
@@ -41,6 +43,12 @@ void load_MMC1(Mapper* mapper){
     mmc1->reg = REG_INIT;
     mmc1->PRG_mode = 3;
     mmc1->cpu_cycle = -1;
+    // PRG banks in 8k chunks
+    mmc1->PRG_clamp = next_power_of_2(mapper->PRG_banks);
+    mmc1->PRG_clamp = mmc1->PRG_clamp > 0 ? mmc1->PRG_clamp - 1: 0;
+    // CHR banks in 1k chunks
+    mmc1->CHR_clamp = next_power_of_2(mapper->CHR_banks * 2);
+    mmc1->CHR_clamp = mmc1->CHR_clamp > 0 ? mmc1->CHR_clamp - 1: 0;
 
     if(mapper->CHR_banks) {
         mmc1->CHR_bank1 = mapper->CHR_ROM;
@@ -80,7 +88,7 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
 
         // remove register size check bit
         mmc1->reg >>= 1;
-        switch ((address & 0x6000) | 0x8000) {
+        switch (address & 0xE000) {
             case 0x8000:
                 // mirroring
                 switch (mmc1->reg & MIRROR_BITS) {
@@ -98,15 +106,18 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
                 set_CHR_banks(mmc1, mapper);
                 break;
             case 0xa000:
-                mmc1->CHR1_reg = mmc1->reg;
+                mmc1->CHR1_reg = mmc1->reg & 0x1f;
+                mmc1->CHR1_reg &= mmc1->CHR_clamp;
                 set_CHR_banks(mmc1, mapper);
                 break;
             case 0xc000:
-                mmc1->CHR2_reg = mmc1->reg;
+                mmc1->CHR2_reg = mmc1->reg & 0x1f;
+                mmc1->CHR2_reg &= mmc1->CHR_clamp;
                 set_CHR_banks(mmc1, mapper);
                 break;
             case 0xe000:
                 mmc1->PRG_reg = mmc1->reg & 0xF;
+                mmc1->PRG_reg &= mmc1->PRG_clamp;
                 set_PRG_banks(mmc1, mapper);
                 break;
             default:

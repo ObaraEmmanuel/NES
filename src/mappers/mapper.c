@@ -261,10 +261,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         mapper->mapper_num |= header[7] & 0xF0;
         mapper->RAM_banks = header[8];
 
-        if(mapper->RAM_banks == 0) {
-            LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
-            mapper->RAM_size = 0x2000;
-        }else {
+        if(mapper->RAM_banks) {
             mapper->RAM_size = 0x2000 * mapper->RAM_banks;
             LOG(INFO, "SRAM Banks (8kb): %u", mapper->RAM_banks);
         }
@@ -314,6 +311,11 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
             default:
                 break;
         }
+    }
+
+    if(!mapper->RAM_banks) {
+        LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
+        mapper->RAM_size = 0x2000;
     }
 
     if(mapper->RAM_size) {

@@ -31,7 +31,7 @@ void init_cpu(struct Emulator* emulator){
     cpu->odd_cycle = cpu->t_cycles = 0;
     cpu->sr = 0x24;
     cpu->sp = 0xfd;
-#if TRACER == 1
+#if TRACER == 1 && PROFILE == 0
     cpu->pc = 0xC000;
 #else
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
