@@ -106,17 +106,35 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
                 set_CHR_banks(mmc1, mapper);
                 break;
             case 0xa000:
-                mmc1->CHR1_reg = mmc1->reg & 0x1f;
-                mmc1->CHR1_reg &= mmc1->CHR_clamp;
-                set_CHR_banks(mmc1, mapper);
+                if(mapper->CHR_RAM_size) {
+                    mmc1->PRG_reg &= ~BIT_4;
+                    mmc1->PRG_reg |= mmc1->reg & BIT_4;
+                    mmc1->PRG_reg &= mmc1->PRG_clamp;
+                    set_PRG_banks(mmc1, mapper);
+                }else {
+                    mmc1->CHR1_reg = mmc1->reg & 0x1f;
+                    mmc1->CHR1_reg &= mmc1->CHR_clamp;
+                    set_CHR_banks(mmc1, mapper);
+                }
+
                 break;
             case 0xc000:
-                mmc1->CHR2_reg = mmc1->reg & 0x1f;
-                mmc1->CHR2_reg &= mmc1->CHR_clamp;
-                set_CHR_banks(mmc1, mapper);
+                if(!mmc1->CHR_mode)
+                    break;
+                if(mapper->CHR_RAM_size) {
+                    mmc1->PRG_reg &= ~BIT_4;
+                    mmc1->PRG_reg |= mmc1->reg & BIT_4;
+                    mmc1->PRG_reg &= mmc1->PRG_clamp;
+                    set_PRG_banks(mmc1, mapper);
+                }else {
+                    mmc1->CHR2_reg = mmc1->reg & 0x1f;
+                    mmc1->CHR2_reg &= mmc1->CHR_clamp;
+                    set_CHR_banks(mmc1, mapper);
+                }
                 break;
             case 0xe000:
-                mmc1->PRG_reg = mmc1->reg & 0xF;
+                mmc1->PRG_reg &= ~0xf;
+                mmc1->PRG_reg |= mmc1->reg & 0xF;
                 mmc1->PRG_reg &= mmc1->PRG_clamp;
                 set_PRG_banks(mmc1, mapper);
                 break;
@@ -137,13 +155,16 @@ static void set_PRG_banks(MMC1_t* mmc1, Mapper* mapper){
             break;
         case 2:
             // fix first bank switch second bank
-            mmc1->PRG_bank1 = mapper->PRG_ROM;
+            mmc1->PRG_bank1 = mapper->PRG_ROM + (0x4000 * (mmc1->PRG_reg & BIT_4));
             mmc1->PRG_bank2 = mapper->PRG_ROM + 0x4000 * mmc1->PRG_reg;
             break;
         case 3:
             // fix second bank switch first bank
             mmc1->PRG_bank1 = mapper->PRG_ROM + 0x4000 * mmc1->PRG_reg;
-            mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
+            if(mapper->PRG_banks > 16)
+                mmc1->PRG_bank2 = mapper->PRG_ROM + (((mmc1->PRG_reg & BIT_4) > 0) + 1) * 0x40000 - 0x4000 ;
+            else
+                mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
             break;
         default:
             break;
