@@ -11,10 +11,13 @@ public class NESItemModel {
     private Uri image;
     private String name;
 
+    public boolean isNSF;
+    public boolean isNES;
+
     public NESItemModel(Uri image, String name, String rom) {
         this.image = image;
         this.name = name;
-        this.rom = rom;
+        setRom(rom);
     }
 
     public Uri getImage() {
@@ -39,6 +42,8 @@ public class NESItemModel {
 
     public void setRom(String rom) {
         this.rom = rom;
+        this.isNES = rom.toLowerCase().endsWith(".nes");
+        this.isNSF = rom.toLowerCase().endsWith(".nsf") || rom.toLowerCase().endsWith(".nsfe");
     }
 
     @NonNull

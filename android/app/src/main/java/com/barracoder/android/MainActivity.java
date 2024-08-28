@@ -22,12 +22,14 @@ public class MainActivity extends AppCompatActivity {
     ArrayList<NESItemModel> list;
     RecyclerView recyclerView;
     NESItemAdapter adapter;
+    public boolean hasGenie;
     private static final String TAG = "MainActivity";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        hasGenie = assetsHasGenie();
 
         SearchView searchView = findViewById(R.id.searchView);
 
@@ -106,6 +108,11 @@ public class MainActivity extends AppCompatActivity {
             return fileName.substring(0, fileName.lastIndexOf("."));
         }
         return fileName;
+    }
+
+    private boolean assetsHasGenie(){
+        // check if roms/GENIE.nes exists
+        return Arrays.asList(get_rom_files()).contains("GENIE.nes");
     }
 
     private void filter(String text) {

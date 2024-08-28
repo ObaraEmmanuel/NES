@@ -32,25 +32,44 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
     @Override
     public NESItemHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(context).inflate(R.layout.game_item, parent, false);
-        return new NESItemHolder(view);
+        NESItemHolder holder = new NESItemHolder(view);
+
+        holder.playButton.setOnClickListener(v -> {
+            if(holder.item == null)
+                return;
+            Intent intent = new Intent(context, EmulatorActivity.class);
+            intent.putExtra("rom", holder.item.getRom());
+            context.startActivity(intent);
+        });
+
+        holder.magicButton.setOnClickListener(v -> {
+            if(holder.item == null || !holder.item.isNES)
+                return;
+            Intent intent = new Intent(context, EmulatorActivity.class);
+            intent.putExtra("rom", holder.item.getRom());
+            intent.putExtra("genie", true);
+            context.startActivity(intent);
+        });
+        return holder;
     }
 
     @Override
     public void onBindViewHolder(@NonNull NESItemHolder holder, int position) {
         NESItemModel item = list.get(position);
+        holder.item = item;
         holder.gameName.setText(item.getName());
         if(item.getImage() != null)
             Glide.with(context).load(item.getImage()).into(holder.gameImage);
-        else if (item.getRom().endsWith(".nsf") || item.getRom().endsWith(".nsfe")) {
+        else if (item.isNSF)
             holder.gameImage.setImageResource(R.drawable.music);
-        } else
+        else
             holder.gameImage.setImageResource(R.drawable.controller);
 
-        holder.playButton.setOnClickListener(view -> {
-            Intent intent = new Intent(context, EmulatorActivity.class);
-            intent.putExtra("rom", item.getRom());
-            context.startActivity(intent);
-        });
+        MainActivity activity = (MainActivity) context;
+        if(activity.hasGenie && item.isNES)
+            holder.magicButton.setVisibility(View.VISIBLE);
+        else
+            holder.magicButton.setVisibility(View.GONE);
     }
 
     @Override
