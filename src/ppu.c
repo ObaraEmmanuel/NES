@@ -252,7 +252,7 @@ void execute_ppu(PPU* ppu){
             ppu->v &= ~HORIZONTAL_BITS;
             ppu->v |= ppu->t & HORIZONTAL_BITS;
         }
-        else if(ppu->dots == VISIBLE_DOTS + 5 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
+        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
         else if(ppu->dots == END_DOT && ppu->mask & RENDER_ENABLED){
@@ -292,6 +292,9 @@ void execute_ppu(PPU* ppu){
         else if(ppu->dots == VISIBLE_DOTS + 2 && (ppu->mask & RENDER_ENABLED)){
             ppu->v &= ~HORIZONTAL_BITS;
             ppu->v |= ppu->t & HORIZONTAL_BITS;
+        }
+        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
+            ppu->mapper->on_scanline(ppu->mapper);
         }
         else if(ppu->dots > 280 && ppu->dots <= 304 && (ppu->mask & RENDER_ENABLED)){
             ppu->v &= ~VERTICAL_BITS;
