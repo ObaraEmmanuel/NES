@@ -138,7 +138,7 @@ static void write_ROM(Mapper* mapper, uint16_t address, uint8_t value){
         if(mapper->PRG_RAM != NULL)
             mapper->PRG_RAM[address - 0x6000] = value;
         else {
-            LOG(DEBUG, "Attempted to write to non existent save RAM");
+            LOG(DEBUG, "Attempted to write to non existent PRG RAM");
         }
         return;
     }
@@ -263,7 +263,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
         if(mapper->RAM_banks) {
             mapper->RAM_size = 0x2000 * mapper->RAM_banks;
-            LOG(INFO, "SRAM Banks (8kb): %u", mapper->RAM_banks);
+            LOG(INFO, "PRG RAM Banks (8kb): %u", mapper->RAM_banks);
         }
 
         if(header[9] & 1){
@@ -313,8 +313,8 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         }
     }
 
-    if(!mapper->RAM_banks) {
-        LOG(INFO, "SRAM Banks (8kb): Not specified, Assuming 8kb");
+    if(!mapper->RAM_banks && mapper->format != NES2) {
+        LOG(INFO, "PRG RAM Banks (8kb): Not specified, Assuming 8kb");
         mapper->RAM_size = 0x2000;
     }
 
