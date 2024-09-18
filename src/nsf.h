@@ -4,7 +4,6 @@
 #include "mapper.h"
 #include "apu.h"
 #include "utils.h"
-#include <SDL_rwops.h>
 #include <SDL.h>
 
 #define NSF_HEADER_SIZE 0x80
@@ -46,19 +45,19 @@ typedef struct NSF {
     size_t prg_size;
 
     SDL_Texture* song_info_tx;
-    SDL_Rect song_info_rect;
+    SDL_FRect song_info_rect;
     SDL_Texture* song_num_tx;
-    SDL_Rect song_num_rect;
+    SDL_FRect song_num_rect;
     SDL_Texture* song_dur_tx;
-    SDL_Rect song_dur_rect;
+    SDL_FRect song_dur_rect;
     SDL_Texture* song_dur_max_tx;
-    SDL_Rect song_dur_max_rect;
+    SDL_FRect song_dur_max_rect;
     complx samples[AUDIO_BUFF_SIZE];
     complx temp[AUDIO_BUFF_SIZE];
 } NSF;
 
-void load_nsf(SDL_RWops* file, Mapper* mapper);
-void load_nsfe(SDL_RWops* file, Mapper* mapper);
+void load_nsf(SDL_IOStream* file, Mapper* mapper);
+void load_nsfe(SDL_IOStream* file, Mapper* mapper);
 void free_NSF(NSF* nsf);
 void next_song(struct Emulator* emulator, NSF* nsf);
 void prev_song(struct Emulator* emulator, NSF* nsf);

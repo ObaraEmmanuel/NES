@@ -62,7 +62,7 @@ void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
             break;
 
     }
-    if(event->type == SDL_KEYUP) {
+    if(event->type == SDL_EVENT_KEY_UP) {
         joyPad->status &= ~key;
         if(key == TURBO_A) {
             // clear button A
@@ -72,7 +72,7 @@ void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
             // clear button B
             joyPad->status &= ~BUTTON_B;
         }
-    } else if(event->type == SDL_KEYDOWN) {
+    } else if(event->type == SDL_EVENT_KEY_DOWN) {
         joyPad->status |= key;
         if(key == TURBO_A) {
             // set button A

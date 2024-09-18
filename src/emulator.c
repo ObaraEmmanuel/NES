@@ -1,5 +1,3 @@
-#include <SDL.h>
-
 #include "emulator.h"
 #include "gamepad.h"
 #include "touchpad.h"
@@ -111,7 +109,7 @@ void run_emulator(struct Emulator* emulator){
                 reset_emulator(emulator);
             }
             switch (e.type) {
-                case SDL_KEYDOWN:
+                case SDL_EVENT_KEY_DOWN:
                     switch (e.key.keysym.sym) {
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
@@ -128,7 +126,7 @@ void run_emulator(struct Emulator* emulator){
                             break;
                     }
                     break;
-                case SDL_QUIT:
+                case SDL_EVENT_QUIT:
                     emulator->exit = 1;
                     break;
                 default:
@@ -251,7 +249,7 @@ void run_NSF_player(struct Emulator* emulator) {
             }
 
             switch (e.type) {
-                case SDL_KEYDOWN:
+                case SDL_EVENT_KEY_DOWN:
                     switch (e.key.keysym.sym) {
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
@@ -276,7 +274,7 @@ void run_NSF_player(struct Emulator* emulator) {
                             break;
                     }
                     break;
-                case SDL_QUIT:
+                case SDL_EVENT_QUIT:
                     emulator->exit = 1;
                     break;
                 default:

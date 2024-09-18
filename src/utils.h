@@ -62,6 +62,7 @@ void TRACE(const char* fmt, ...);
 // midpoint circle algorithm rendering utils
 int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius);
 int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius);
+void SDL_PauseAudio(SDL_AudioStream* stream, int flag);
 void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format);
 void fft(complx *v, int n, complx *tmp);
 uint64_t next_power_of_2(uint64_t num);
