@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include <SDL_rwops.h>
+#include <SDL.h>
 
 #include "mapper.h"
 #include "emulator.h"
@@ -176,8 +176,8 @@ static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
 
 
 void load_file(char* file_name, char* game_genie, Mapper* mapper){
-    SDL_RWops *file;
-    file = SDL_RWFromFile(file_name, "rb");
+    SDL_IOStream *file;
+    file = SDL_IOFromFile(file_name, "rb");
 
     if(file == NULL){
         LOG(ERROR, "file '%s' not found", file_name);
@@ -188,19 +188,19 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     memset(mapper, 0, sizeof(Mapper));
 
     uint8_t header[INES_HEADER_SIZE];
-    SDL_RWread(file, header, INES_HEADER_SIZE, 1);
+    SDL_ReadIO(file, header, INES_HEADER_SIZE);
 
     if(strncmp(header, "NESM\x1A", 5) == 0){
         LOG(INFO, "Using NSF format");
         load_nsf(file, mapper);
-        SDL_RWclose(file);
+        SDL_CloseIO(file);
         return;
     }
 
     if(strncmp(header, "NSFE", 4) == 0){
         LOG(INFO, "Using NSFe format");
         load_nsfe(file, mapper);
-        SDL_RWclose(file);
+        SDL_CloseIO(file);
         return;
     }
 
@@ -343,11 +343,11 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
 
     mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    SDL_RWread(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks, 1);
+    SDL_ReadIO(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks);
 
     if(mapper->CHR_banks) {
         mapper->CHR_ROM = malloc(0x2000 * mapper->CHR_banks);
-        SDL_RWread(file, mapper->CHR_ROM, 0x2000 * mapper->CHR_banks, 1);
+        SDL_ReadIO(file, mapper->CHR_ROM, 0x2000 * mapper->CHR_banks);
     }else{
         if(!mapper->CHR_RAM_size) {
             LOG(INFO, "No CHR-RAM or CHR-ROM specified, Using 8kb CHR-RAM");
@@ -380,7 +380,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
         LOG(INFO, "-------- Game Genie Cartridge info ---------");
         load_genie(game_genie, mapper);
     }
-    SDL_RWclose(file);
+    SDL_CloseIO(file);
 }
 
 void free_mapper(Mapper* mapper){

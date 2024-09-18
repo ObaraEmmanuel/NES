@@ -62,13 +62,13 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
         BluetoothGatt mGatt;
         boolean mResult = true;
 
-        private GattOperation(BluetoothGatt gatt, Operation operation, UUID uuid) {
+        private GattOperation(BluetoothGatt gatt, GattOperation.Operation operation, UUID uuid) {
             mGatt = gatt;
             mOp = operation;
             mUuid = uuid;
         }
 
-        private GattOperation(BluetoothGatt gatt, Operation operation, UUID uuid, byte[] value) {
+        private GattOperation(BluetoothGatt gatt, GattOperation.Operation operation, UUID uuid, byte[] value) {
             mGatt = gatt;
             mOp = operation;
             mUuid = uuid;
@@ -186,7 +186,7 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
     // Because on Chromebooks we show up as a dual-mode device, it will attempt to connect TRANSPORT_AUTO, which will use TRANSPORT_BREDR instead
     // of TRANSPORT_LE.  Let's force ourselves to connect low energy.
     private BluetoothGatt connectGatt(boolean managed) {
-        if (Build.VERSION.SDK_INT >= 23) {
+        if (Build.VERSION.SDK_INT >= 23 /* Android 6.0 (M) */) {
             try {
                 return mDevice.connectGatt(mManager.getContext(), managed, this, TRANSPORT_LE);
             } catch (Exception e) {
@@ -397,17 +397,17 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
     }
 
     private void enableNotification(UUID chrUuid) {
-        GattOperation op = GattOperation.enableNotification(mGatt, chrUuid);
+        GattOperation op = HIDDeviceBLESteamController.GattOperation.enableNotification(mGatt, chrUuid);
         queueGattOperation(op);
     }
 
     public void writeCharacteristic(UUID uuid, byte[] value) {
-        GattOperation op = GattOperation.writeCharacteristic(mGatt, uuid, value);
+        GattOperation op = HIDDeviceBLESteamController.GattOperation.writeCharacteristic(mGatt, uuid, value);
         queueGattOperation(op);
     }
 
     public void readCharacteristic(UUID uuid) {
-        GattOperation op = GattOperation.readCharacteristic(mGatt, uuid);
+        GattOperation op = HIDDeviceBLESteamController.GattOperation.readCharacteristic(mGatt, uuid);
         queueGattOperation(op);
     }
 
@@ -429,7 +429,7 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
                     }
                 });
             }
-        } 
+        }
         else if (newState == 0) {
             mIsConnected = false;
         }
@@ -457,7 +457,7 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
         //Log.v(TAG, "onCharacteristicRead status=" + status + " uuid=" + characteristic.getUuid());
 
         if (characteristic.getUuid().equals(reportCharacteristic) && !mFrozen) {
-            mManager.HIDDeviceFeatureReport(getId(), characteristic.getValue());
+            mManager.HIDDeviceReportResponse(getId(), characteristic.getValue());
         }
 
         finishCurrentGattOperation();
@@ -575,50 +575,45 @@ class HIDDeviceBLESteamController extends BluetoothGattCallback implements HIDDe
     }
 
     @Override
-    public int sendFeatureReport(byte[] report) {
+    public int writeReport(byte[] report, boolean feature) {
         if (!isRegistered()) {
-            Log.e(TAG, "Attempted sendFeatureReport before Steam Controller is registered!");
+            Log.e(TAG, "Attempted writeReport before Steam Controller is registered!");
             if (mIsConnected) {
                 probeService(this);
             }
             return -1;
         }
 
-        // We need to skip the first byte, as that doesn't go over the air
-        byte[] actual_report = Arrays.copyOfRange(report, 1, report.length - 1);
-        //Log.v(TAG, "sendFeatureReport " + HexDump.dumpHexString(actual_report));
-        writeCharacteristic(reportCharacteristic, actual_report);
-        return report.length;
-    }
-
-    @Override
-    public int sendOutputReport(byte[] report) {
-        if (!isRegistered()) {
-            Log.e(TAG, "Attempted sendOutputReport before Steam Controller is registered!");
-            if (mIsConnected) {
-                probeService(this);
-            }
-            return -1;
+        if (feature) {
+            // We need to skip the first byte, as that doesn't go over the air
+            byte[] actual_report = Arrays.copyOfRange(report, 1, report.length - 1);
+            //Log.v(TAG, "writeFeatureReport " + HexDump.dumpHexString(actual_report));
+            writeCharacteristic(reportCharacteristic, actual_report);
+            return report.length;
+        } else {
+            //Log.v(TAG, "writeOutputReport " + HexDump.dumpHexString(report));
+            writeCharacteristic(reportCharacteristic, report);
+            return report.length;
         }
-
-        //Log.v(TAG, "sendFeatureReport " + HexDump.dumpHexString(report));
-        writeCharacteristic(reportCharacteristic, report);
-        return report.length;
     }
 
     @Override
-    public boolean getFeatureReport(byte[] report) {
+    public boolean readReport(byte[] report, boolean feature) {
         if (!isRegistered()) {
-            Log.e(TAG, "Attempted getFeatureReport before Steam Controller is registered!");
+            Log.e(TAG, "Attempted readReport before Steam Controller is registered!");
             if (mIsConnected) {
                 probeService(this);
             }
             return false;
         }
 
-        //Log.v(TAG, "getFeatureReport");
-        readCharacteristic(reportCharacteristic);
-        return true;
+        if (feature) {
+            readCharacteristic(reportCharacteristic);
+            return true;
+        } else {
+            // Not implemented
+            return false;
+        }
     }
 
     @Override

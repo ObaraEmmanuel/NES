@@ -17,8 +17,8 @@ public class EmulatorActivity extends SDLActivity {
     @Override
     protected String[] getLibraries() {
         return new String[]{
-                "SDL2",
-                "SDL2_ttf",
+                "SDL3",
+                "SDL3_ttf",
                 "nes"
         };
     }

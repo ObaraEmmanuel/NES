@@ -21,8 +21,8 @@ typedef struct TouchAxis{
     uint8_t h_latch;
     uint8_t v_latch;
     SDL_FingerID finger;
-    SDL_Rect bg_dest;
-    SDL_Rect joy_dest;
+    SDL_FRect bg_dest;
+    SDL_FRect joy_dest;
     SDL_Texture* bg_tx;
     SDL_Texture* joy_tx;
 } TouchAxis;
@@ -30,7 +30,7 @@ typedef struct TouchAxis{
 
 typedef struct  TouchButton{
     SDL_Texture * texture;
-    SDL_Rect dest;
+    SDL_FRect dest;
     KeyPad id;
     int x;
     int y;
