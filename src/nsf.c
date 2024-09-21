@@ -688,11 +688,11 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
             nsf->song_dur_max_rect.w = text_surf->w;
             nsf->song_dur_max_rect.x = (width - text_surf->w - 10) + offset_x;
             nsf->song_dur_max_rect.y = height - 15 - text_surf->h + offset_y;
+            nsf->song_num_rect.y = nsf->song_dur_max_rect.y - 0.12*height - text_surf->h;
         }else {
             nsf->song_num_rect.x = (width - text_surf->w) / 2 + offset_x;;
             nsf->song_num_rect.y = height - 15 - text_surf->h + offset_y;
         }
-        nsf->song_num_rect.y = nsf->song_dur_max_rect.y - 0.12*height - text_surf->h;
         SDL_DestroySurface(text_surf);
     }
 
