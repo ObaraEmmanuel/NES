@@ -91,6 +91,7 @@ void get_graphics_context(GraphicsContext* ctx){
         quit(EXIT_FAILURE);
     }
 
+    SDL_SetTextureScaleMode(ctx->texture, SDL_SCALEMODE_NEAREST);
     SDL_SetRenderDrawColor(ctx->renderer, 0, 0, 0, 255);
     SDL_RenderClear(ctx->renderer);
     SDL_RenderPresent(ctx->renderer);
