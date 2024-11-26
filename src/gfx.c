@@ -25,7 +25,8 @@ void get_graphics_context(GraphicsContext* ctx){
     if(ctx->font == NULL){
         LOG(ERROR, SDL_GetError());
     }
-    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "1");
+    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "0");
+    SDL_SetHint(SDL_HINT_ANDROID_ALLOW_RECREATE_ACTIVITY, "1");
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
         // width and height not used in FULLSCREEN
