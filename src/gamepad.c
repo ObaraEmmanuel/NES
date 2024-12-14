@@ -4,6 +4,8 @@
 #include "utils.h"
 #include "controller.h"
 
+#define JOYSTICK_DEADZONE 10000
+
 static GamePad* game_pads[MAX_PADS];
 static int game_pad_c = 0;
 static const uint16_t key_map[CONTROLLER_KEY_COUNT] = {
@@ -11,75 +13,77 @@ static const uint16_t key_map[CONTROLLER_KEY_COUNT] = {
     BUTTON_B,
     TURBO_B,
     BUTTON_A,
-    BUTTON_A,
-    BUTTON_B,
-    TURBO_A,
-    TURBO_B,
     SELECT,
     START,
+    START,
+    TURBO_A,
+    TURBO_B,
+    BUTTON_A,
+    BUTTON_B,
 };
 
 static int pad_index(GamePad* pad);
-static int num_joystics();
+static int num_gamepads();
 
 void init_pads(){
-    for (int i = 0; i < num_joystics(); i++) {
-        GamePad* pad = SDL_OpenJoystick(i);
+    for (int i = 0; i < num_gamepads(); i++) {
+        GamePad* pad = SDL_OpenGamepad(i);
         if(pad != NULL) {
             game_pads[game_pad_c++] = pad;
-            LOG(INFO, "Joypad connected");
+            LOG(INFO, "Gamepad connected");
         }
     }
 }
 
-static int num_joystics() {
+static int num_gamepads() {
     int count = 0;
-    SDL_GetJoysticks(&count);
+    SDL_GetGamepads(&count);
     return count;
 }
 
 void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = 0;
     switch (event->type) {
-        case SDL_EVENT_JOYSTICK_ADDED: {
+        case SDL_EVENT_GAMEPAD_ADDED: {
             if(game_pad_c < MAX_PADS) {
-                GamePad* pad = SDL_OpenJoystick(event->jdevice.which);
+                GamePad* pad = SDL_OpenGamepad(event->gdevice.which);
                 if(pad != NULL && pad_index(pad) < 0) {
                     game_pads[game_pad_c++] = pad;
-                    LOG(INFO, "Joypad connected");
+                    LOG(INFO, "Gamepad connected");
                 }
             }
             break;
         }
-        case SDL_EVENT_JOYSTICK_REMOVED: {
-            GamePad* pad = SDL_GetJoystickFromInstanceID(event->jdevice.which);
+        case SDL_EVENT_GAMEPAD_REMOVED: {
+            GamePad* pad = SDL_GetGamepadFromInstanceID(event->gdevice.which);
             for(int i = 0; i < game_pad_c; i++){
                 if(pad == game_pads[i]){
                     for(int j = i; j < game_pad_c - 1; j++){
                         game_pads[j] = game_pads[j + 1];
                     }
                     game_pads[game_pad_c--] = NULL;
-                    SDL_CloseJoystick(pad);
-                    LOG(INFO, "Joypad removed");
+                    SDL_CloseGamepad(pad);
+                    LOG(INFO, "Gamepad removed");
                     break;
                 }
             }
             break;
         }
         default: {
-            GamePad* pad = SDL_GetJoystickFromInstanceID(event->jdevice.which);
+            GamePad* pad = SDL_GetGamepadFromInstanceID(event->gdevice.which);
             if(joyPad->player != pad_index(pad))
                 // the joypad is not interested in the active controller's input
                 // this check allows management of multiple controllers
                 return;
             switch (event->type) {
-                case SDL_EVENT_JOYSTICK_BUTTON_DOWN:
-                case SDL_EVENT_JOYSTICK_BUTTON_UP:
-                    if (event->jbutton.button < 10) {
-                        key = key_map[event->jbutton.button];
+                case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+                case SDL_EVENT_GAMEPAD_BUTTON_UP:
+                // LOG(DEBUG, "BUTTON: %u", event->gbutton.button);
+                    if (event->gbutton.button < CONTROLLER_KEY_COUNT) {
+                        key = key_map[event->gbutton.button];
                     }
 
-                    if(event->type == SDL_EVENT_JOYSTICK_BUTTON_DOWN) {
+                    if(event->type == SDL_EVENT_GAMEPAD_BUTTON_DOWN) {
                         joyPad->status |= key;
                         if(key == TURBO_A) {
                             // set button A
@@ -89,7 +93,7 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
                             // set button B
                             joyPad->status |= BUTTON_B;
                         }
-                    } else if(event->type == SDL_EVENT_JOYSTICK_BUTTON_UP) {
+                    } else if(event->type == SDL_EVENT_GAMEPAD_BUTTON_UP) {
                         joyPad->status &= ~key;
                         if(key == TURBO_A) {
                             // clear button A
@@ -119,24 +123,24 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
                         joyPad->status |= key;
                     }
                     break;
-                case SDL_EVENT_JOYSTICK_AXIS_MOTION:
-                    if (event->jaxis.value < -3200) {
-                        if (event->jaxis.axis == 0)
+                case SDL_EVENT_GAMEPAD_AXIS_MOTION:
+                    if (event->gaxis.value < -JOYSTICK_DEADZONE) {
+                        if (event->gaxis.axis == 0)
                             key = LEFT;
-                        else if (event->jaxis.axis == 1)
+                        else if (event->gaxis.axis == 1)
                             key = UP;
                         joyPad->status |= key;
-                    } else if (event->jaxis.value > 3200) {
-                        if (event->jaxis.axis == 0)
+                    } else if (event->gaxis.value > JOYSTICK_DEADZONE) {
+                        if (event->gaxis.axis == 0)
                             key = RIGHT;
-                        else if (event->jaxis.axis == 1)
+                        else if (event->gaxis.axis == 1)
                             key = DOWN;
                         joyPad->status |= key;
                     } else {
                         // Reset axis
-                        if (event->jaxis.axis == 0)
+                        if (event->gaxis.axis == 0)
                             key = RIGHT | LEFT;
-                        else if (event->jaxis.axis == 1)
+                        else if (event->gaxis.axis == 1)
                             key = UP | DOWN;
 
                         joyPad->status &= ~key;
