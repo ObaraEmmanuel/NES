@@ -552,6 +552,7 @@ void set_pulse_sweep(Pulse *pulse, uint8_t value) {
     pulse->sweep.counter = pulse->sweep.period;
     pulse->shift = value & PULSE_SHIFT;
     pulse->neg = value & BIT_3;
+    pulse->sweep_reload = 1;
     update_target_period(pulse);
 }
 
@@ -700,6 +701,7 @@ static void init_pulse(Pulse *pulse, uint8_t id) {
     pulse->t.loop = 1;
     pulse->sweep.limit = 0;
     pulse->enabled = 0;
+    pulse->sweep_reload = 0;
 }
 
 static void init_triangle(Triangle *triangle) {
@@ -779,6 +781,12 @@ static void update_target_period(Pulse* pulse) {
 }
 
 static void length_sweep_pulse(Pulse *pulse) {
+    if (pulse->sweep_reload) {
+        // trigger a reload
+        pulse->sweep_reload = 0;
+        pulse->sweep.counter = 0;
+    }
+
     if(clock_divider(&pulse->sweep)) {
         if(pulse->enable_sweep && pulse->shift > 0 && !pulse->mute) {
             pulse->t.period = pulse->target_period;

@@ -47,6 +47,7 @@ typedef struct {
     uint8_t enabled;
     uint8_t mute;
     uint16_t target_period;
+    uint8_t sweep_reload;
 } Pulse;
 
 
