@@ -226,19 +226,17 @@ void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     read_text_stream(nsf->tlbls, (char*)chunk, nsf->total_songs, len, MAX_TRACK_NAME_SIZE);
     free(chunk);
 }
-
 void load_nsfe(SDL_RWops* file, Mapper* mapper) {
     // PRG RAM
     mapper->PRG_RAM = malloc(PRG_RAM_SIZE);
     memset(mapper->PRG_RAM, 0, PRG_RAM_SIZE);
-
     // mapper R/W redirects
-    mapper->read_PRG = read_PRG;
+    mapper->read_PRG = (uint8_t(*)(struct Mapper*, uint16_t))read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
     mapper->read_ROM = read_ROM;
-    mapper->write_ROM = write_ROM;
+    mapper->write_ROM = (void(*)(struct Mapper*, uint16_t, uint8_t))write_ROM;
 
     // skip the header
     int64_t offset = 4;
@@ -408,12 +406,12 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
     memset(mapper->PRG_RAM, 0, PRG_RAM_SIZE);
 
     // mapper R/W redirects
-    mapper->read_PRG = read_PRG;
+    mapper->read_PRG = (uint8_t(*)(struct Mapper*, uint16_t))read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
     mapper->read_ROM = read_ROM;
-    mapper->write_ROM = write_ROM;
+    mapper->write_ROM = (void(*)(struct Mapper*, uint16_t, uint8_t))write_ROM;
 
 
     if(nsf->bank_switch) {
