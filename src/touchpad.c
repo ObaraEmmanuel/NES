@@ -1,9 +1,14 @@
 #ifdef __ANDROID__
 #include <stdlib.h>
+#include <math.h>
 #include <SDL_ttf.h>
 
 #include "utils.h"
 #include "touchpad.h"
+
+#ifndef M_PI
+#define M_PI		3.14159265358979323846
+#endif
 
 static TouchPad touch_pad;
 
@@ -14,7 +19,7 @@ enum{
 
 static void init_button(struct TouchButton* button, KeyPad id, size_t index, int type, char* label, int x, int y, TTF_Font* font);
 static void init_axis(GraphicsContext* ctx, int x, int y);
-static uint8_t is_within_bound(int eventX, int eventY, SDL_Rect* bound);
+static uint8_t is_within_bound(int eventX, int eventY, SDL_FRect* bound);
 static uint8_t is_within_circle(int eventX, int eventY, int centerX, int centerY, int radius);
 static void to_abs_position(double* x, double* y);
 static int angle(int x1, int y1, int x2, int y2);
@@ -54,13 +59,13 @@ static void init_button(struct TouchButton* button, KeyPad id, size_t index, int
     GraphicsContext* ctx = touch_pad.g_ctx;
     touch_pad.buttons[index] = button;
     SDL_Color color = {0xF9, 0x58, 0x1A};
-    SDL_Surface* text_surf = TTF_RenderText_Solid(font, label, color);
+    SDL_Surface* text_surf = TTF_RenderText_Solid(font, label, 0, color);
     SDL_Texture* text = SDL_CreateTextureFromSurface(ctx->renderer, text_surf);
 
     int w = text_surf->w + 50, h = text_surf->h + 30, r = h / 2;
     if(type == BUTTON_CIRCLE)
         w = h;
-    SDL_Rect dest;
+    SDL_FRect dest;
     button->texture = SDL_CreateTexture(ctx->renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_TARGET, w, h);
     SDL_SetTextureBlendMode(button->texture, SDL_BLENDMODE_BLEND);
     SDL_SetRenderTarget(ctx->renderer, button->texture);
@@ -78,8 +83,8 @@ static void init_button(struct TouchButton* button, KeyPad id, size_t index, int
         SDL_SetRenderDrawColor(ctx->renderer, 0, 0, 0, 0);
         SDL_RenderFillRect(ctx->renderer, &dest);
         SDL_SetRenderDrawColor(ctx->renderer, 255, 255, 255, 220);
-        SDL_RenderDrawLine(ctx->renderer, r, 1, w - r, 1);
-        SDL_RenderDrawLine(ctx->renderer, r, h-1, w - r, h-1);
+        SDL_RenderLine(ctx->renderer, r, 1, w - r, 1);
+        SDL_RenderLine(ctx->renderer, r, h-1, w - r, h-1);
     }else{
         SDL_SetRenderDrawColor(ctx->renderer, 0xF9, 0x58, 0x1A, 100);
         SDL_RenderDrawCircle(ctx->renderer, r, r, r-1);
@@ -91,7 +96,7 @@ static void init_button(struct TouchButton* button, KeyPad id, size_t index, int
     dest.y = (h - text_surf->h) / 2;
     dest.w = text_surf->w;
     dest.h = text_surf->h;
-    SDL_RenderCopy(ctx->renderer, text, NULL, &dest);
+    SDL_RenderTexture(ctx->renderer, text, NULL, &dest);
     SDL_SetRenderTarget(ctx->renderer, NULL);
 
     button->x = x;
@@ -102,7 +107,7 @@ static void init_button(struct TouchButton* button, KeyPad id, size_t index, int
     button->dest.h = h;
     button->id = id;
 
-    SDL_FreeSurface(text_surf);
+    SDL_DestroySurface(text_surf);
     SDL_DestroyTexture(text);
 }
 
@@ -151,12 +156,12 @@ void render_touch_controls(GraphicsContext* ctx){
         touch_pad.axis.inner_y = touch_pad.axis.y;
         update_joy_pos();
     }
-    SDL_RenderCopy(ctx->renderer, touch_pad.axis.bg_tx, NULL, &touch_pad.axis.bg_dest);
-    SDL_RenderCopy(ctx->renderer, touch_pad.axis.joy_tx, NULL, &touch_pad.axis.joy_dest);
+    SDL_RenderTexture(ctx->renderer, touch_pad.axis.bg_tx, NULL, &touch_pad.axis.bg_dest);
+    SDL_RenderTexture(ctx->renderer, touch_pad.axis.joy_tx, NULL, &touch_pad.axis.joy_dest);
 
     for(int i = 0; i < TOUCH_BUTTON_COUNT; i++){
         TouchButton* button = touch_pad.buttons[i];
-        SDL_RenderCopy(ctx->renderer, button->texture, NULL, &button->dest);
+        SDL_RenderTexture(ctx->renderer, button->texture, NULL, &button->dest);
     }
 }
 
@@ -169,18 +174,18 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = joyPad->status;
     double x, y;
     switch (event->type) {
-        case SDL_FINGERUP: {
+        case SDL_EVENT_FINGER_UP: {
             x = event->tfinger.x;
             y = event->tfinger.y;
             to_abs_position(&x, &y);
             for (int i = 0; i < TOUCH_BUTTON_COUNT; i++) {
                 TouchButton *button = touch_pad.buttons[i];
-                if (button->active && button->finger == event->tfinger.fingerId) {
+                if (button->active && button->finger == event->tfinger.fingerID) {
                     button->active = 0;
                     button->finger = -1;
                     // type as button release
                     key &= ~button->id;
-                    LOG(DEBUG, "Released button finger id: %d", event->tfinger.fingerId);
+                    LOG(DEBUG, "Released button finger id: %d", event->tfinger.fingerID);
                     if(button->id == TURBO_A) {
                         // clear button A
                         key &= ~BUTTON_A;
@@ -194,7 +199,7 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
 
             // handle axis
             TouchAxis *axis = &touch_pad.axis;
-            if (axis->finger == event->tfinger.fingerId && axis->active) {
+            if (axis->finger == event->tfinger.fingerID && axis->active) {
                 axis->active = 0;
                 axis->finger = -1;
                 // reset all axis ids
@@ -207,7 +212,7 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
 
             break;
         }
-        case SDL_FINGERDOWN: {
+        case SDL_EVENT_FINGER_DOWN: {
             x = event->tfinger.x;
             y = event->tfinger.y;
             to_abs_position(&x, &y);
@@ -224,7 +229,7 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
                 if (has_event) {
                     was_button_pressed = 1;
                     button->active = 1;
-                    button->finger = event->tfinger.fingerId;
+                    button->finger = event->tfinger.fingerID;
                     // type as button press
                     LOG(DEBUG, "Button pressed");
                     key |= button->id;
@@ -246,16 +251,16 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             if (x < touch_pad.g_ctx->screen_width / 2 ){
                 // left side of the screen
                 axis->active = 1;
-                axis->finger = event->tfinger.fingerId;
+                axis->finger = event->tfinger.fingerID;
                 axis->x = axis->inner_x = (int) x;
                 axis->y = axis->inner_y = (int) y;
             }
 
             break;
         }
-        case SDL_FINGERMOTION: {
+        case SDL_EVENT_FINGER_MOTION: {
             TouchAxis *axis = &touch_pad.axis;
-            if(!axis->active || axis->finger != event->tfinger.fingerId)
+            if(!axis->active || axis->finger != event->tfinger.fingerID)
                 break;
 
             x = event->tfinger.x;
@@ -305,6 +310,8 @@ void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             else
                 key &= ~UP;
         }
+        default:
+            break;
     }
     joyPad->status = key;
 }
@@ -316,7 +323,7 @@ static void to_abs_position(double* x, double* y){
 }
 
 
-static uint8_t is_within_bound(int eventX, int eventY, SDL_Rect* bound){
+static uint8_t is_within_bound(int eventX, int eventY, SDL_FRect* bound){
     return eventX > bound->x && eventX < (bound->x + bound->w) && eventY > bound->y && (eventY < bound->y + bound->h);
 }
 

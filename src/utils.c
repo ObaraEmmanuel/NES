@@ -81,14 +81,14 @@ int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius){
     status = 0;
 
     while (offsety >= offsetx) {
-        status += SDL_RenderDrawPoint(renderer, x + offsetx, y + offsety);
-        status += SDL_RenderDrawPoint(renderer, x + offsety, y + offsetx);
-        status += SDL_RenderDrawPoint(renderer, x - offsetx, y + offsety);
-        status += SDL_RenderDrawPoint(renderer, x - offsety, y + offsetx);
-        status += SDL_RenderDrawPoint(renderer, x + offsetx, y - offsety);
-        status += SDL_RenderDrawPoint(renderer, x + offsety, y - offsetx);
-        status += SDL_RenderDrawPoint(renderer, x - offsetx, y - offsety);
-        status += SDL_RenderDrawPoint(renderer, x - offsety, y - offsetx);
+        status += SDL_RenderPoint(renderer, x + offsetx, y + offsety);
+        status += SDL_RenderPoint(renderer, x + offsety, y + offsetx);
+        status += SDL_RenderPoint(renderer, x - offsetx, y + offsety);
+        status += SDL_RenderPoint(renderer, x - offsety, y + offsetx);
+        status += SDL_RenderPoint(renderer, x + offsetx, y - offsety);
+        status += SDL_RenderPoint(renderer, x + offsety, y - offsetx);
+        status += SDL_RenderPoint(renderer, x - offsetx, y - offsety);
+        status += SDL_RenderPoint(renderer, x - offsety, y - offsetx);
 
         if (status < 0) {
             status = -1;
@@ -125,13 +125,13 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius) {
 
     while (offsety >= offsetx) {
 
-        status += SDL_RenderDrawLine(renderer, x - offsety, y + offsetx,
+        status += SDL_RenderLine(renderer, x - offsety, y + offsetx,
                                      x + offsety, y + offsetx);
-        status += SDL_RenderDrawLine(renderer, x - offsetx, y + offsety,
+        status += SDL_RenderLine(renderer, x - offsetx, y + offsety,
                                      x + offsetx, y + offsety);
-        status += SDL_RenderDrawLine(renderer, x - offsetx, y - offsety,
+        status += SDL_RenderLine(renderer, x - offsetx, y - offsety,
                                      x + offsetx, y - offsety);
-        status += SDL_RenderDrawLine(renderer, x - offsety, y - offsetx,
+        status += SDL_RenderLine(renderer, x - offsety, y - offsetx,
                                      x + offsety, y - offsetx);
 
         if (status < 0) {
@@ -153,6 +153,17 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius) {
     }
 
     return status;
+}
+
+void SDL_PauseAudio(SDL_AudioStream* stream, const int flag) {
+    SDL_AudioDeviceID dev = SDL_GetAudioStreamDevice(stream);
+    int paused = SDL_AudioDevicePaused(dev);
+    if(paused == flag)
+        return;
+    if(flag)
+        SDL_PauseAudioDevice(dev);
+    else
+        SDL_ResumeAudioDevice(dev);
 }
 
 

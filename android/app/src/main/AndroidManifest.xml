@@ -36,6 +36,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.NoActionBar">
+        <meta-data android:name="SDL_ENV.SDL_HINT_ANDROID_ALLOW_RECREATE_ACTIVITY" android:value="1"/>
         <activity
             android:name=".MainActivity"
             android:exported="true"

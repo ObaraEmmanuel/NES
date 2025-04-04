@@ -15,10 +15,10 @@ option(TTF_WITH_HARFBUZZ "use harfbuzz to improve text shaping" ON)
 IF(ANDROID)
   # This is the built in NDK logging library
   find_library(log-lib log)
-  option(BUILD_STATIC_LIBS "Build shared libraries" OFF)
+  option(BUILD_STATIC_LIBS "Build static libraries" OFF)
   option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 ELSE()
-  option(BUILD_STATIC_LIBS "Build shared libraries" ON)
+  option(BUILD_STATIC_LIBS "Build static libraries" ON)
   option(BUILD_SHARED_LIBS "Build shared libraries" OFF)
 ENDIF()
 
@@ -56,7 +56,7 @@ set (SRC
         src/biquad.h
         src/font.h
 )
-include_directories(src src/mappers vendor/include ${SDL_DIR}/include ${SDL_ttf_DIR})
+include_directories(src src/mappers ${SDL_DIR}/include/SDL3 ${SDL_DIR}/include ${SDL_ttf_DIR}/include/SDL3_ttf)
 
 
 IF(ANDROID)
@@ -67,8 +67,8 @@ IF(ANDROID)
   )
   target_link_libraries(
           nes
-          SDL2
-          SDL2_ttf
+          SDL3::SDL3-shared
+          SDL3_ttf::SDL3_ttf-shared
           ${log-lib}
   )
 ELSE()
@@ -79,7 +79,7 @@ ELSE()
   ELSE()
     add_executable(nes ${SRC})
   ENDIF ()
-  target_link_libraries(nes SDL2::SDL2main SDL2::SDL2-static SDL2_ttf::SDL2_ttf-static)
+  target_link_libraries(nes SDL3::SDL3-static SDL3_ttf::SDL3_ttf-static)
 ENDIF()
 
 IF (NOT WIN32)

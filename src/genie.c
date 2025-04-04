@@ -1,15 +1,18 @@
 #include <stdlib.h>
-#include <string.h>
 
 #include "genie.h"
 #include "mapper.h"
 #include "utils.h"
+#include "emulator.h"
+#include "apu.h"
 
 static uint8_t read_genie_PRG(Mapper* mapper, uint16_t address);
 static uint8_t PRG_passthrough(Mapper* mapper, uint16_t address);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
 static uint8_t read_CHR(Mapper*, uint16_t);
 static void write_CHR(Mapper*, uint16_t, uint8_t);
+static uint8_t read_ROM(Mapper* mapper, uint16_t address);
+static void write_ROM(Mapper* mapper, uint16_t address, uint8_t value);
 static void load_registers(const uint8_t* mem, uint16_t* addr, uint8_t* cmp, uint8_t* repl);
 
 static void swap_mirroring(Genie* genie);
@@ -26,12 +29,16 @@ void load_genie(char* filename, Mapper* mapper){
     genie->g_mapper.write_PRG = mapper->write_PRG;
     genie->g_mapper.read_CHR = mapper->read_CHR;
     genie->g_mapper.write_CHR = mapper->write_CHR;
+    genie->g_mapper.write_ROM = mapper->write_ROM;
+    genie->g_mapper.read_ROM = mapper->read_ROM;
 
     // intercept the mappers functions with the genie's
     mapper->read_PRG = read_genie_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
+    mapper->write_ROM = write_ROM;
+    mapper->read_ROM = read_ROM;
 
     swap_mirroring(genie);
 }
@@ -92,6 +99,8 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
             mapper->write_PRG = genie->g_mapper.write_PRG;
             mapper->write_CHR = genie->g_mapper.write_CHR;
             mapper->read_CHR = genie->g_mapper.read_CHR;
+            mapper->read_ROM = genie->g_mapper.read_ROM;
+            mapper->write_ROM = genie->g_mapper.write_ROM;
             if((genie->ctrl >> 4) == 0x7){
                 // all codes disabled no passthrough needed connect directly to mapper
                 mapper->read_PRG = genie->g_mapper.read_PRG;
@@ -101,8 +110,24 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t value){
                 LOG(INFO, "Game genie PRG passthrough engaged");
             }
             swap_mirroring(genie);
+            // audio sometimes gets wonky, so we'll re-init
+            init_APU(mapper->emulator);
         }
     }
+}
+
+static uint8_t read_ROM(Mapper* mapper, uint16_t address) {
+    if(address < 0x6000) {
+        return mapper->emulator->mem.bus;
+    }
+    return mapper->read_PRG(mapper, address);
+}
+
+static void write_ROM(Mapper* mapper, uint16_t address, uint8_t value) {
+    if(address < 0x6000){
+        return;
+    }
+    mapper->write_PRG(mapper, address, value);
 }
 
 

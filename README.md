@@ -103,10 +103,10 @@ as shown here.
 |---------|--------------|-------------------|-------------------|
  | Start   | Enter        | Start             | Menu              |
  | Select  | Shift        | Select            | View              |
- | A       | J            | ▢                 | X                 |
+ | A       | J            | ▢                 | Y                 |
  | B       | K            | ◯                 | B                 |
- | Turbo A | H            | △                 | Y                 |
- | Turbo B | B            | X                 | A                 |
+ | Turbo A | H            | △                 | A                 |
+ | Turbo B | B            | X                 | X                 |
  | up      | Up           | D-pad/stick Up    | D-pad/stick Up    |
  | down    | Down         | D-pad/stick Down  | D-pad/stick Down  |
  | left    | Left         | D-pad/stick Left  | D-pad/stick Left  |

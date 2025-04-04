@@ -29,7 +29,7 @@ void write_joypad(struct JoyPad* joyPad, uint8_t data){
 
 void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = 0;
-    switch (event->key.keysym.sym) {
+    switch (event->key.key) {
         case SDLK_RIGHT:
             key = RIGHT;
             break;
@@ -48,21 +48,21 @@ void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
         case SDLK_RSHIFT:
             key = SELECT;
             break;
-        case SDLK_j:
+        case SDLK_J:
             key = BUTTON_A;
             break;
-        case SDLK_k:
+        case SDLK_K:
             key = BUTTON_B;
             break;
-        case SDLK_l:
+        case SDLK_L:
             key = TURBO_B;
             break;
-        case SDLK_h:
+        case SDLK_H:
             key = TURBO_A;
             break;
 
     }
-    if(event->type == SDL_KEYUP) {
+    if(event->type == SDL_EVENT_KEY_UP) {
         joyPad->status &= ~key;
         if(key == TURBO_A) {
             // clear button A
@@ -72,7 +72,7 @@ void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
             // clear button B
             joyPad->status &= ~BUTTON_B;
         }
-    } else if(event->type == SDL_KEYDOWN) {
+    } else if(event->type == SDL_EVENT_KEY_DOWN) {
         joyPad->status |= key;
         if(key == TURBO_A) {
             // set button A

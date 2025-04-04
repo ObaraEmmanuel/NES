@@ -24,14 +24,14 @@ static uint8_t read_ROM(Mapper*, uint16_t);
 static void write_ROM(const Mapper*, uint16_t, uint8_t);
 
 static void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len);
-static void load_info_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_data_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_time_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
-static void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file);
+static void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 
 void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len) {
     if(list == NULL || buf == NULL)
@@ -60,13 +60,13 @@ void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_
     }
 }
 
-void load_info_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     uint8_t chunk[10] = {0};
     if(len < 9) {
         LOG(ERROR, "INFO chunk too short");
         quit(EXIT_FAILURE);
     }
-    SDL_RWread(file, chunk, len > 10 ? 10: len, 1);
+    SDL_ReadIO(file, chunk, len > 10 ? 10: len);
     NSF* nsf = mapper->NSF;
     nsf->load_addr = (chunk[1] << 8) | chunk[0];
     if(nsf->load_addr < 0x8000) {
@@ -106,7 +106,7 @@ void load_info_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     nsf->starting_song = nsf->current_song = chunk[9] + 1;
 }
 
-void load_data_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
     if(nsf->bank_switch) {
         uint16_t padding = nsf->load_addr & 0xfff;
@@ -119,7 +119,7 @@ void load_data_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
         LOG(INFO, "PRG banks: %llu", mapper->PRG_banks);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
-        SDL_RWread(file, mapper->PRG_ROM + padding, 1, len);
+        SDL_ReadIO(file, mapper->PRG_ROM + padding, len);
 
         // compute bank pointers
         for(size_t i = 0; i < 8; i++) {
@@ -130,22 +130,22 @@ void load_data_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
         mapper->PRG_ROM = malloc(PRG_ROM_SIZE);
         memset(mapper->PRG_ROM, 0, PRG_ROM_SIZE);
         size_t read_len = MIN(len, 0x10000 - nsf->load_addr);
-        SDL_RWread(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), 1, read_len);
+        SDL_ReadIO(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), read_len);
     }
 }
 
-void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
     nsf->bank_switch = 1;
     uint8_t bank_data[8] = {0};
-    SDL_RWread(file, bank_data, len, 1);
+    SDL_ReadIO(file, bank_data, len);
 
     for(size_t i = 0; i < 8; i++) {
         nsf->bank_init[i] = bank_data[i];
     }
 }
 
-void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
     if(len < 2 || (len & 1 && len < 8)) {
         LOG(ERROR, "Invalid RATE chunk");
@@ -153,7 +153,7 @@ void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     }
 
     uint8_t chunk[6];
-    SDL_RWread(file, chunk, len > 6 ? 6 : len, 1);
+    SDL_ReadIO(file, chunk, len > 6 ? 6 : len);
 
     if(len > 0 && mapper->type == NTSC) {
         nsf->speed = (chunk[1] << 8) | chunk[0];
@@ -166,12 +166,12 @@ void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     }
 }
 
-void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
 
     uint8_t* chunk = malloc(len);
     memset(chunk, 0, len);
-    SDL_RWread(file, chunk, len, 1);
+    SDL_ReadIO(file, chunk, len);
 
     char* fields[4] = {
         nsf->song_name,
@@ -188,33 +188,33 @@ void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     free(chunk);
 }
 
-void load_time_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
 
     nsf->times = malloc(4 * nsf->total_songs);
     memset(nsf->times, 0, 4 * nsf->total_songs);
 
-    SDL_RWread(file, nsf->times, 4, len / 4);
+    SDL_ReadIO(file, nsf->times, len);
     for(int i = len / 4; i < nsf->total_songs; i++) {
         nsf->times[i] = NSF_DEFAULT_TRACK_DUR;
     }
 }
 
-void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
 
     nsf->fade = malloc(4 * nsf->total_songs);
     memset(nsf->fade, 0, 4 * nsf->total_songs);
 
-    SDL_RWread(file, nsf->fade, 4, len / 4);
+    SDL_ReadIO(file, nsf->fade, len);
 }
 
-void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
+void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
 
     uint8_t* chunk = malloc(len);
     memset(chunk, 0, len);
-    SDL_RWread(file, chunk, len, 1);
+    SDL_ReadIO(file, chunk, len);
 
     nsf->tlbls = malloc(nsf->total_songs * sizeof(char*));
     memset(nsf->tlbls, 0, nsf->total_songs * sizeof(char*));
@@ -227,7 +227,7 @@ void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_RWops* file) {
     free(chunk);
 }
 
-void load_nsfe(SDL_RWops* file, Mapper* mapper) {
+void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
     // PRG RAM
     mapper->PRG_RAM = malloc(PRG_RAM_SIZE);
     memset(mapper->PRG_RAM, 0, PRG_RAM_SIZE);
@@ -242,7 +242,7 @@ void load_nsfe(SDL_RWops* file, Mapper* mapper) {
 
     // skip the header
     int64_t offset = 4;
-    SDL_RWseek(file, offset, RW_SEEK_SET);
+    SDL_SeekIO(file, offset, SDL_IO_SEEK_SET);
 
     mapper->is_nsf = 1;
 
@@ -260,12 +260,12 @@ void load_nsfe(SDL_RWops* file, Mapper* mapper) {
 
     while(1) {
         char id[5];
-        if(!SDL_RWread(file, &len, 4, 1)) {
+        if(!SDL_ReadIO(file, &len, 4)) {
             LOG(ERROR, "Error loading NSFe");
             quit(EXIT_FAILURE);
         }
         memset(id, 0, 5);
-        SDL_RWread(file, id, 4, 1);
+        SDL_ReadIO(file, id, 4);
         offset += 8 + len;
 
         LOG(DEBUG, "Chunk: %s (%d)", id, len);
@@ -305,7 +305,7 @@ void load_nsfe(SDL_RWops* file, Mapper* mapper) {
             }
         } else if(strncmp(id, "text", 4) == 0) {
             char* chunk = malloc(len);
-            SDL_RWread(file, chunk, len, 1);
+            SDL_ReadIO(file, chunk, len);
             LOG(INFO, "TEXT: \n %s \n", chunk);
             free(chunk);
         } else if(id[0] > 65 && id[0] < 90) {
@@ -316,7 +316,7 @@ void load_nsfe(SDL_RWops* file, Mapper* mapper) {
         }
 
         // move to start of next chunk
-        if(SDL_RWseek(file, offset, RW_SEEK_SET) < 0) {
+        if(SDL_SeekIO(file, offset, SDL_IO_SEEK_SET) < 0) {
             LOG(ERROR, "Error loading NSFe");
             quit(EXIT_FAILURE);
         }
@@ -324,11 +324,11 @@ void load_nsfe(SDL_RWops* file, Mapper* mapper) {
     LOG(DEBUG, "Bank switching: %s", nsf->bank_switch ? "ON": "OFF");
 }
 
-void load_nsf(SDL_RWops* file, Mapper* mapper) {
-    SDL_RWseek(file, 0, RW_SEEK_SET);
+void load_nsf(SDL_IOStream* file, Mapper* mapper) {
+    SDL_SeekIO(file, 0, SDL_IO_SEEK_SET);
 
     uint8_t header[NSF_HEADER_SIZE];
-    SDL_RWread(file, header, NSF_HEADER_SIZE, 1);
+    SDL_ReadIO(file, header, NSF_HEADER_SIZE);
 
     mapper->is_nsf = 1;
 
@@ -383,14 +383,14 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
 
     size_t data_len = (header[0x7f] << 16) | (header[0x7e] << 8) | header[0x7d];
     if(!data_len || nsf->version == 1) {
-        long long size = SDL_RWseek(file, 0, RW_SEEK_END);
+        long long size = SDL_SeekIO(file, 0, SDL_IO_SEEK_END);
         if(size < 0) {
             LOG(ERROR, "Error reading ROM");
             quit(EXIT_FAILURE);
         }
         data_len = size - NSF_HEADER_SIZE;
         // reset file ptr
-        SDL_RWseek(file, NSF_HEADER_SIZE, RW_SEEK_SET);
+        SDL_SeekIO(file, NSF_HEADER_SIZE, SDL_IO_SEEK_SET);
     }
     LOG(DEBUG, "Program data length: %llu", data_len);
 
@@ -428,7 +428,7 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
         LOG(DEBUG, "PRG banks: %llu", mapper->PRG_banks);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
-        SDL_RWread(file, mapper->PRG_ROM + padding, 1, data_len);
+        SDL_ReadIO(file, mapper->PRG_ROM + padding, data_len);
 
         // init banks
         for(size_t i =0; i < 8; i++) {
@@ -440,7 +440,7 @@ void load_nsf(SDL_RWops* file, Mapper* mapper) {
         mapper->PRG_ROM = malloc(PRG_ROM_SIZE);
         memset(mapper->PRG_ROM, 0, PRG_ROM_SIZE);
         size_t read_len = MIN(data_len, 0x10000 - nsf->load_addr);
-        SDL_RWread(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), 1, read_len);
+        SDL_ReadIO(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), read_len);
     }
 }
 
@@ -491,7 +491,7 @@ void init_song(Emulator* emulator, size_t song_number) {
     init_cpu(emulator);
     emulator->apu.audio_start = 0;
     emulator->apu.sampler.index = 0;
-    SDL_PauseAudioDevice(emulator->g_ctx.audio_device, 1);
+    SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
 
     for(size_t i = 0; i < 14; i++) {
         write_mem(&emulator->mem, 0x4000 + i, 0);
@@ -553,14 +553,14 @@ void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
     char buf[144] = {0};
     snprintf(buf, 144, "song: %s \nartist: %s \ncopyright: %s", nsf->song_name, nsf->artist, nsf->copyright);
     SDL_Color color = {192, 0x30, 0x0, 0xff};
-    SDL_Surface* text_surf = TTF_RenderUTF8_Solid_Wrapped(g_ctx->font, buf, color, 0);
+    SDL_Surface* text_surf = TTF_RenderText_Solid_Wrapped(g_ctx->font, buf, 0, color, 0);
     nsf->song_info_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
     nsf->song_info_rect.w = text_surf->w;
     nsf->song_info_rect.h = text_surf->h;
     nsf->song_info_rect.x = 10 + offset_x;
     nsf->song_info_rect.y = 10 + offset_y;
 
-    SDL_FreeSurface(text_surf);
+    SDL_DestroySurface(text_surf);
 }
 
 static float bins[BAR_COUNT] = {0};
@@ -573,6 +573,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
 #ifdef __ANDROID__
     int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
 #else
+    SDL_SetRenderScale(g_ctx->renderer, 1, 1);
     int offset_x = 0, offset_y = 0, width = g_ctx->width, height = g_ctx->height;
 #endif
 
@@ -633,7 +634,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
     float factor = 1.0f / (max_v - min_v);
 
     SDL_RenderClear(g_ctx->renderer);
-    SDL_Rect dest;
+    SDL_FRect dest;
     int max_bar_h = 0.4f * height, min_bar_h = 0.02f * height, bar_step = min_bar_h / 2;
     for(int i = 0; i < BAR_COUNT; i++) {
         int amp = factor * bins[i] * max_bar_h;
@@ -669,7 +670,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         } else {
             snprintf(str, 32, "%d / %d", nsf->current_song, nsf->total_songs);
         }
-        SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, color);
+        SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color);
         nsf->song_num_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
         nsf->song_num_rect.h = text_surf->h;
         nsf->song_num_rect.w = text_surf->w;
@@ -677,22 +678,22 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         song_num = nsf->current_song;
 
         if(nsf->times != NULL) {
-            SDL_FreeSurface(text_surf);
+            SDL_DestroySurface(text_surf);
             SDL_DestroyTexture(nsf->song_dur_max_tx);
             snprintf(str, 8, "%02d : %02d", nsf->tick_max / 60000, ((long)nsf->tick_max % 60000) / 1000);
             SDL_Color color1 = {0x0, 0x30, 192, 0xff};
-            text_surf = TTF_RenderText_Solid(g_ctx->font, str, color1);
+            text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color1);
             nsf->song_dur_max_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
             nsf->song_dur_max_rect.h = text_surf->h;
             nsf->song_dur_max_rect.w = text_surf->w;
             nsf->song_dur_max_rect.x = (width - text_surf->w - 10) + offset_x;
             nsf->song_dur_max_rect.y = height - 15 - text_surf->h + offset_y;
+            nsf->song_num_rect.y = nsf->song_dur_max_rect.y - 0.12*height - text_surf->h;
         }else {
             nsf->song_num_rect.x = (width - text_surf->w) / 2 + offset_x;;
             nsf->song_num_rect.y = height - 15 - text_surf->h + offset_y;
         }
-        nsf->song_num_rect.y = nsf->song_dur_max_rect.y - 0.12*height - text_surf->h;
-        SDL_FreeSurface(text_surf);
+        SDL_DestroySurface(text_surf);
     }
 
     if(nsf->times != NULL) {
@@ -715,22 +716,22 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
             char str[8];
             SDL_Color color = {0x0, 0x30, 192, 0xff};
             snprintf(str, 8, "%02d : %02d", cur_min, cur_sec);
-            SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, color);
+            SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color);
             nsf->song_dur_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
             nsf->song_dur_rect.h = text_surf->h;
             nsf->song_dur_rect.w = text_surf->w;
             nsf->song_dur_rect.x = offset_x + 10;
             nsf->song_dur_rect.y = height - 15 - text_surf->h + offset_y;
-            SDL_FreeSurface(text_surf);
+            SDL_DestroySurface(text_surf);
             minutes = cur_min;
             seconds = cur_sec;
         }
     }
 
-    SDL_RenderCopy(g_ctx->renderer, nsf->song_info_tx, NULL, &nsf->song_info_rect);
-    SDL_RenderCopy(g_ctx->renderer, nsf->song_num_tx, NULL, &nsf->song_num_rect);
-    SDL_RenderCopy(g_ctx->renderer, nsf->song_dur_tx, NULL, &nsf->song_dur_rect);
-    SDL_RenderCopy(g_ctx->renderer, nsf->song_dur_max_tx, NULL, &nsf->song_dur_max_rect);
+    SDL_RenderTexture(g_ctx->renderer, nsf->song_info_tx, NULL, &nsf->song_info_rect);
+    SDL_RenderTexture(g_ctx->renderer, nsf->song_num_tx, NULL, &nsf->song_num_rect);
+    SDL_RenderTexture(g_ctx->renderer, nsf->song_dur_tx, NULL, &nsf->song_dur_rect);
+    SDL_RenderTexture(g_ctx->renderer, nsf->song_dur_max_tx, NULL, &nsf->song_dur_max_rect);
 #ifdef __ANDROID__
     ANDROID_RENDER_TOUCH_CONTROLS(g_ctx);
 #endif
