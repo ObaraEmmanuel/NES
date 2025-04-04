@@ -166,7 +166,7 @@ void init_audio_device(const APU* apu) {
         .freq = SAMPLING_FREQUENCY
     };
 
-    apu->emulator->g_ctx.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &spec, NULL, NULL);;
+    apu->emulator->g_ctx.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
     if (apu->emulator->g_ctx.audio_stream == NULL) {
         LOG(ERROR , SDL_GetError());
         quit(EXIT_FAILURE);

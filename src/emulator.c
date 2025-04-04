@@ -110,11 +110,11 @@ void run_emulator(struct Emulator* emulator){
             }
             switch (e.type) {
                 case SDL_EVENT_KEY_DOWN:
-                    switch (e.key.keysym.sym) {
+                    switch (e.key.key) {
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
                             break;
-                        case SDLK_AUDIOPLAY:
+                        case SDLK_MEDIA_PLAY:
                         case SDLK_SPACE:
                             emulator->pause ^= 1;
                             TOGGLE_TIMER_RESOLUTION();
@@ -130,8 +130,8 @@ void run_emulator(struct Emulator* emulator){
                     emulator->exit = 1;
                     break;
                 default:
-                    if(e.key.keysym.sym == SDLK_AC_BACK
-                        || e.key.keysym.scancode == SDL_SCANCODE_AC_BACK) {
+                    if(e.key.key == SDLK_AC_BACK
+                        || e.key.scancode == SDL_SCANCODE_AC_BACK) {
                         emulator->exit = 1;
                         LOG(DEBUG, "Exiting emulator session");
                     }
@@ -250,19 +250,19 @@ void run_NSF_player(struct Emulator* emulator) {
 
             switch (e.type) {
                 case SDL_EVENT_KEY_DOWN:
-                    switch (e.key.keysym.sym) {
+                    switch (e.key.key) {
                         case SDLK_ESCAPE:
                             emulator->exit = 1;
                             break;
-                        case SDLK_AUDIOPLAY:
+                        case SDLK_MEDIA_PLAY:
                         case SDLK_SPACE:
                             emulator->pause ^= 1;
                             TOGGLE_TIMER_RESOLUTION();
                             break;
-                        case SDLK_AUDIONEXT:
+                        case SDLK_MEDIA_NEXT_TRACK:
                             next_song(emulator, nsf);
                             break;
-                        case SDLK_AUDIOPREV:
+                        case SDLK_MEDIA_PREVIOUS_TRACK:
                             prev_song(emulator, nsf);
                             break;
                         case SDLK_F5:
@@ -278,8 +278,8 @@ void run_NSF_player(struct Emulator* emulator) {
                     emulator->exit = 1;
                     break;
                 default:
-                    if(e.key.keysym.sym == SDLK_AC_BACK
-                        || e.key.keysym.scancode == SDL_SCANCODE_AC_BACK) {
+                    if(e.key.key == SDLK_AC_BACK
+                        || e.key.scancode == SDL_SCANCODE_AC_BACK) {
                         emulator->exit = 1;
                         LOG(DEBUG, "Exiting emulator session");
                     }

@@ -55,7 +55,7 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             break;
         }
         case SDL_EVENT_GAMEPAD_REMOVED: {
-            GamePad* pad = SDL_GetGamepadFromInstanceID(event->gdevice.which);
+            GamePad* pad = SDL_GetGamepadFromID(event->gdevice.which);
             for(int i = 0; i < game_pad_c; i++){
                 if(pad == game_pads[i]){
                     for(int j = i; j < game_pad_c - 1; j++){
@@ -70,7 +70,7 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             break;
         }
         default: {
-            GamePad* pad = SDL_GetGamepadFromInstanceID(event->gdevice.which);
+            GamePad* pad = SDL_GetGamepadFromID(event->gdevice.which);
             if(joyPad->player != pad_index(pad))
                 // the joypad is not interested in the active controller's input
                 // this check allows management of multiple controllers

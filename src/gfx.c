@@ -11,13 +11,13 @@
 void get_graphics_context(GraphicsContext* ctx){
 
     SDL_Init(
-        SDL_INIT_TIMER |
         SDL_INIT_AUDIO |
         SDL_INIT_VIDEO |
         SDL_INIT_JOYSTICK |
         SDL_INIT_HAPTIC |
         SDL_INIT_GAMEPAD |
-        SDL_INIT_EVENTS
+        SDL_INIT_EVENTS |
+        SDL_INIT_SENSOR
     );
     TTF_Init();
 #ifdef __ANDROID__
@@ -25,8 +25,9 @@ void get_graphics_context(GraphicsContext* ctx){
     if(ctx->font == NULL){
         LOG(ERROR, SDL_GetError());
     }
-    SDL_SetHint(SDL_HINT_ANDROID_TRAP_BACK_BUTTON, "0");
+    // Set on AndroidManifest.xml as well
     SDL_SetHint(SDL_HINT_ANDROID_ALLOW_RECREATE_ACTIVITY, "1");
+    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
         // width and height not used in FULLSCREEN
@@ -73,8 +74,7 @@ void get_graphics_context(GraphicsContext* ctx){
         ctx->renderer,
         ctx->width,
         ctx->height,
-        SDL_LOGICAL_PRESENTATION_LETTERBOX,
-        SDL_SCALEMODE_NEAREST
+        SDL_LOGICAL_PRESENTATION_LETTERBOX
     );
     SDL_SetRenderScale(ctx->renderer, ctx->scale, ctx->scale);
 #endif

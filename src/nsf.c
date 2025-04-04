@@ -553,7 +553,7 @@ void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
     char buf[144] = {0};
     snprintf(buf, 144, "song: %s \nartist: %s \ncopyright: %s", nsf->song_name, nsf->artist, nsf->copyright);
     SDL_Color color = {192, 0x30, 0x0, 0xff};
-    SDL_Surface* text_surf = TTF_RenderUTF8_Solid_Wrapped(g_ctx->font, buf, color, 0);
+    SDL_Surface* text_surf = TTF_RenderText_Solid_Wrapped(g_ctx->font, buf, 0, color, 0);
     nsf->song_info_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
     nsf->song_info_rect.w = text_surf->w;
     nsf->song_info_rect.h = text_surf->h;
@@ -670,7 +670,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
         } else {
             snprintf(str, 32, "%d / %d", nsf->current_song, nsf->total_songs);
         }
-        SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, color);
+        SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color);
         nsf->song_num_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
         nsf->song_num_rect.h = text_surf->h;
         nsf->song_num_rect.w = text_surf->w;
@@ -682,7 +682,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
             SDL_DestroyTexture(nsf->song_dur_max_tx);
             snprintf(str, 8, "%02d : %02d", nsf->tick_max / 60000, ((long)nsf->tick_max % 60000) / 1000);
             SDL_Color color1 = {0x0, 0x30, 192, 0xff};
-            text_surf = TTF_RenderText_Solid(g_ctx->font, str, color1);
+            text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color1);
             nsf->song_dur_max_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
             nsf->song_dur_max_rect.h = text_surf->h;
             nsf->song_dur_max_rect.w = text_surf->w;
@@ -716,7 +716,7 @@ void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
             char str[8];
             SDL_Color color = {0x0, 0x30, 192, 0xff};
             snprintf(str, 8, "%02d : %02d", cur_min, cur_sec);
-            SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, color);
+            SDL_Surface* text_surf = TTF_RenderText_Solid(g_ctx->font, str, 0, color);
             nsf->song_dur_tx = SDL_CreateTextureFromSurface(g_ctx->renderer, text_surf);
             nsf->song_dur_rect.h = text_surf->h;
             nsf->song_dur_rect.w = text_surf->w;

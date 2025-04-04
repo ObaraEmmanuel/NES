@@ -1,5 +1,6 @@
 #ifdef __ANDROID__
 #include <stdlib.h>
+#include <math.h>
 #include <SDL_ttf.h>
 
 #include "utils.h"
@@ -58,7 +59,7 @@ static void init_button(struct TouchButton* button, KeyPad id, size_t index, int
     GraphicsContext* ctx = touch_pad.g_ctx;
     touch_pad.buttons[index] = button;
     SDL_Color color = {0xF9, 0x58, 0x1A};
-    SDL_Surface* text_surf = TTF_RenderText_Solid(font, label, color);
+    SDL_Surface* text_surf = TTF_RenderText_Solid(font, label, 0, color);
     SDL_Texture* text = SDL_CreateTextureFromSurface(ctx->renderer, text_surf);
 
     int w = text_surf->w + 50, h = text_surf->h + 30, r = h / 2;
