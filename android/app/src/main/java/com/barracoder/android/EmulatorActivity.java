@@ -1,10 +1,14 @@
 package com.barracoder.android;
 
+import android.app.Activity;
 import android.content.pm.ActivityInfo;
-import android.graphics.Point;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Bundle;
+import android.util.DisplayMetrics;
 import android.util.Log;
-import android.view.Display;
+import android.util.Pair;
+import android.view.WindowMetrics;
 
 import org.libsdl.app.SDLActivity;
 
@@ -38,17 +42,35 @@ public class EmulatorActivity extends SDLActivity {
         return args;
     }
 
+    public static Pair<Integer, Integer> getScreenDimensions(Activity activity) {
+        int width;
+        int height;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            WindowMetrics metrics = activity.getWindowManager().getCurrentWindowMetrics();
+            Rect bounds = metrics.getBounds();
+            width = bounds.width();
+            height = bounds.height();
+        } else {
+            DisplayMetrics metrics = new DisplayMetrics();
+            activity.getWindowManager().getDefaultDisplay().getMetrics(metrics);
+            width = metrics.widthPixels;
+            height = metrics.heightPixels;
+        }
+
+        return new Pair<>(width, height);
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
         mEmulatorFile = getIntent().getStringExtra("rom");
         mGenie = getIntent().getBooleanExtra("genie", false);
-        Display display = getWindowManager().getDefaultDisplay();
-        Point point = new Point();
-        display.getSize(point);
-        mWidth = point.x;
-        mHeight = point.y;
-        Log.i("ANDRONES_EMULATOR", "size: " + point);
+
+        Pair<Integer, Integer> dimensions = getScreenDimensions(this);
+        mWidth = dimensions.first;
+        mHeight = dimensions.second;
+        Log.i("ANDRONES_EMULATOR", "size: " + mWidth + "x" + mHeight);
     }
 
     @Override
