@@ -27,7 +27,6 @@ void get_graphics_context(GraphicsContext* ctx){
     }
     // Set on AndroidManifest.xml as well
     SDL_SetHint(SDL_HINT_ANDROID_ALLOW_RECREATE_ACTIVITY, "1");
-    SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
     ctx->window = SDL_CreateWindow(
         "NES Emulator",
         // width and height not used in FULLSCREEN

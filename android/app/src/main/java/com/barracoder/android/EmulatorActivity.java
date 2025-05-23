@@ -1,5 +1,6 @@
 package com.barracoder.android;
 
+import android.content.pm.ActivityInfo;
 import android.graphics.Point;
 import android.os.Bundle;
 import android.util.Log;
@@ -48,6 +49,12 @@ public class EmulatorActivity extends SDLActivity {
         mWidth = point.x;
         mHeight = point.y;
         Log.i("ANDRONES_EMULATOR", "size: " + point);
+    }
+
+    @Override
+    public void setOrientationBis(int w, int h, boolean resizable, String hint){
+        // Force sensorLandscape
+        mSingleton.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
 
 }
