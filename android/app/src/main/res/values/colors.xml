@@ -11,4 +11,10 @@
     <color name="onSecondary">#0D124C</color>
     <color name="onBackground">#FFCCBC</color>
     <color name="onSurface">#B2EBF2</color>
+    <color name="background_gradient_start">#000000</color>
+    <color name="background_gradient_end">#DDDDDD</color>
+    <color name="fastlane_background">#E9711F07</color>
+    <color name="search_opaque">#673AB7</color>
+    <color name="selected_background">#7649D3</color>
+    <color name="default_background">#3d3d3d</color>
 </resources>

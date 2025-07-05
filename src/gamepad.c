@@ -6,8 +6,7 @@
 
 #define JOYSTICK_DEADZONE 10000
 
-static GamePad* game_pads[MAX_PADS];
-static int game_pad_c = 0;
+static uint32_t index_offset = -1, gamepad_count = 0;
 static const uint16_t key_map[CONTROLLER_KEY_COUNT] = {
     TURBO_A,
     BUTTON_B,
@@ -20,65 +19,100 @@ static const uint16_t key_map[CONTROLLER_KEY_COUNT] = {
     TURBO_B,
     BUTTON_A,
     BUTTON_B,
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT
 };
 
-static int pad_index(GamePad* pad);
 static int num_gamepads();
+static void logPadInfo(GamePad* pad);
+static int validate_gamepad(GamePad* pad);
+static GamePad* open_gamepad(uint32_t index);
 
-void init_pads(){
-    for (int i = 0; i < num_gamepads(); i++) {
-        GamePad* pad = SDL_OpenGamepad(i);
-        if(pad != NULL) {
-            game_pads[game_pad_c++] = pad;
-            LOG(INFO, "Gamepad connected");
-        }
+static int validate_gamepad(GamePad* pad) {
+    SDL_Joystick* stick = SDL_GetGamepadJoystick(pad);
+    if (stick == NULL) {
+        return 0;
     }
+    if((SDL_GetNumJoystickAxes(stick) < 2 && SDL_GetNumJoystickHats(stick) < 1) || SDL_GetNumJoystickButtons(stick) < 2) {
+        return 0;
+    }
+    return 1;
 }
 
-static int num_gamepads() {
-    int count = 0;
-    SDL_GetGamepads(&count);
-    return count;
+static GamePad* open_gamepad(uint32_t index){
+    GamePad* pad = SDL_OpenGamepad(index);
+    if(pad != NULL) {
+        if(!validate_gamepad(pad)) {
+            LOG(WARN, "Gamepad (%s) was detected but is not valid", SDL_GetGamepadName(pad));
+            SDL_CloseGamepad(pad);
+            return NULL;
+        }
+        LOG(INFO, "Gamepad connected: %s \n Joysticks: %d", SDL_GetGamepadName(pad));
+        logPadInfo(pad);
+    }
+    if(index_offset <= 0 || gamepad_count == 0) {
+        // set index offset to 0 for the first gamepad
+        index_offset = index % 2;
+    }
+    return pad;
+}
+
+static void logPadInfo(GamePad* pad) {
+    SDL_Joystick* stick = SDL_GetGamepadJoystick(pad);
+    LOG(
+        DEBUG,
+        "Gamepad Info: %s \n product: %d \n vendor: %d \n version %d \n path: %s \n player index: %d \n axes: %d \nballs: %d \n hats: %d \n buttons: %d",
+        SDL_GetGamepadName(pad),
+        SDL_GetGamepadProduct(pad),
+        SDL_GetGamepadVendor(pad),
+        SDL_GetJoystickProductVersion(stick),
+        SDL_GetGamepadPath(pad),
+        SDL_GetGamepadPlayerIndex(pad),
+        SDL_GetNumJoystickAxes(stick),
+        SDL_GetNumJoystickBalls(stick),
+        SDL_GetNumJoystickHats(stick),
+        SDL_GetNumJoystickButtons(stick)
+    );
 }
 
 void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = 0;
     switch (event->type) {
         case SDL_EVENT_GAMEPAD_ADDED: {
-            if(game_pad_c < MAX_PADS) {
-                GamePad* pad = SDL_OpenGamepad(event->gdevice.which);
-                if(pad != NULL && pad_index(pad) < 0) {
-                    game_pads[game_pad_c++] = pad;
-                    LOG(INFO, "Gamepad connected");
-                }
+            GamePad* pad = SDL_GetGamepadFromID(event->gdevice.which);
+            if(pad == NULL) {
+                // pad has not been opened yet
+                if(open_gamepad(event->gdevice.which))
+                    gamepad_count++;
             }
             break;
         }
         case SDL_EVENT_GAMEPAD_REMOVED: {
             GamePad* pad = SDL_GetGamepadFromID(event->gdevice.which);
-            for(int i = 0; i < game_pad_c; i++){
-                if(pad == game_pads[i]){
-                    for(int j = i; j < game_pad_c - 1; j++){
-                        game_pads[j] = game_pads[j + 1];
-                    }
-                    game_pads[game_pad_c--] = NULL;
-                    SDL_CloseGamepad(pad);
-                    LOG(INFO, "Gamepad removed");
-                    break;
-                }
+            if(pad != NULL){
+                LOG(INFO, "Gamepad removed: %s", SDL_GetGamepadName(pad));
+                SDL_CloseGamepad(pad);
+                gamepad_count--;
             }
             break;
         }
         default: {
             GamePad* pad = SDL_GetGamepadFromID(event->gdevice.which);
-            if(joyPad->player != pad_index(pad))
+            if(pad == NULL) {
+                return;
+            }
+
+            if(joyPad->player != (event->gdevice.which + index_offset) % 2 && gamepad_count > 1)
                 // the joypad is not interested in the active controller's input
                 // this check allows management of multiple controllers
                 return;
             switch (event->type) {
                 case SDL_EVENT_GAMEPAD_BUTTON_DOWN:
+                    if(event->gbutton.button)
+                     LOG(DEBUG, "PAD: %s, BUTTON: %u", SDL_GetGamepadName(pad), event->gbutton.button);
                 case SDL_EVENT_GAMEPAD_BUTTON_UP:
-                // LOG(DEBUG, "BUTTON: %u", event->gbutton.button);
                     if (event->gbutton.button < CONTROLLER_KEY_COUNT) {
                         key = key_map[event->gbutton.button];
                     }
@@ -149,12 +183,4 @@ void gamepad_mapper(struct JoyPad* joyPad, SDL_Event* event){
             }
         }
     }
-}
-
-static int pad_index(GamePad* pad){
-    for(int i = 0; i < game_pad_c; i++){
-        if(game_pads[i] == pad)
-            return i;
-    }
-    return -1;
 }

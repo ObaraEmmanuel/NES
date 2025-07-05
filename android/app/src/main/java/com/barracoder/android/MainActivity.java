@@ -28,6 +28,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        UiModeHelper.UiModeType mode = UiModeHelper.getUiModeType(this);
+        if(mode == UiModeHelper.UiModeType.TV) {
+            // If the app is running in TV mode, start the TV activity
+            Intent intent = new Intent(this, com.barracoder.android.tv.MainActivity.class);
+            startActivity(intent);
+            finish();
+            return;
+        }
         setContentView(R.layout.activity_main);
         hasGenie = assetsHasGenie();
 
@@ -59,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
             String imageFile = String.format(Locale.US, "%s.jpg", get_base_name(rom));
             Uri imageUri = null;
             if(images.contains(imageFile)) {
-                imageUri = Uri.fromFile(new File("//android_asset/images/" + imageFile));
+                imageUri = Uri.parse("file:///android_asset/images/" + imageFile);
             }
             NESItemModel item = new NESItemModel(imageUri, get_base_name(rom), "roms/" + rom);
             list.add(item);

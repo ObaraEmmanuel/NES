@@ -26,6 +26,8 @@ static int angle(int x1, int y1, int x2, int y2);
 static void update_joy_pos();
 
 void init_touch_pad(GraphicsContext* ctx){
+    if(ctx->is_tv)
+        return;
     touch_pad.g_ctx = ctx;
     int font_size = (int)((ctx->screen_height * 0.08));
     touch_pad.font = TTF_OpenFont("asap.ttf", (font_size * 4)/3);
@@ -148,6 +150,8 @@ static void update_joy_pos(){
 
 
 void render_touch_controls(GraphicsContext* ctx){
+    if(ctx->is_tv)
+        return;
     SDL_SetRenderDrawColor(ctx->renderer, 0xF9, 0x58, 0x1A, 255);
 
     // render axis
@@ -167,6 +171,8 @@ void render_touch_controls(GraphicsContext* ctx){
 
 
 void touchpad_mapper(struct JoyPad* joyPad, SDL_Event* event){
+    if(!touch_pad.g_ctx)
+        return;
     // single player support
     if(joyPad->player != 0){
         return;
@@ -339,6 +345,8 @@ static int angle(int x1, int y1, int x2, int y2){
 
 
 void free_touch_pad(){
+    if(touch_pad.g_ctx == NULL)
+        return;
     for(int i = 0; i < TOUCH_BUTTON_COUNT; i++)
         SDL_DestroyTexture(touch_pad.buttons[i]->texture);
     SDL_DestroyTexture(touch_pad.axis.joy_tx);

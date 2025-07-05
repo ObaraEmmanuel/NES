@@ -43,7 +43,7 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         });
 
         holder.magicButton.setOnClickListener(v -> {
-            if(holder.item == null || !holder.item.isNES)
+            if(holder.item == null || !holder.item.isNES())
                 return;
             Intent intent = new Intent(context, EmulatorActivity.class);
             intent.putExtra("rom", holder.item.getRom());
@@ -60,13 +60,15 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         holder.gameName.setText(item.getName());
         if(item.getImage() != null)
             Glide.with(context).load(item.getImage()).into(holder.gameImage);
-        else if (item.isNSF)
+        else if (item.isNSF())
             holder.gameImage.setImageResource(R.drawable.music);
         else
             holder.gameImage.setImageResource(R.drawable.controller);
 
+        holder.playButton.setText(item.isNES()? context.getString(R.string.play) : context.getString(R.string.listen));
+
         MainActivity activity = (MainActivity) context;
-        if(activity.hasGenie && item.isNES)
+        if(activity.hasGenie && item.isNES())
             holder.magicButton.setVisibility(View.VISIBLE);
         else
             holder.magicButton.setVisibility(View.GONE);

@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/frameLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_gravity="center"
+    android:alpha="0.95"
+    android:baselineAligned="false"
+    android:focusableInTouchMode="false"
+    android:orientation="horizontal"
+    app:layout_anchorGravity="center"
+    tools:context=".tv.ExtraActionFragment">
+
+    <FrameLayout
+        android:layout_width="1010dp"
+        android:layout_height="match_parent"
+        android:layout_weight="2"
+        android:background="@color/surfaceVariant">
+
+        <ImageView
+            android:id="@+id/extraGameImage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="left"
+            android:scaleType="centerCrop"
+            android:src="@drawable/controller_default" />
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/box_gradient_horizontal">
+
+        </FrameLayout>
+
+    </FrameLayout>
+
+    <LinearLayout
+        android:id="@+id/linearLayout"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:background="@color/surfaceVariant"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/extraGameText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal|top"
+            android:layout_marginStart="16dp"
+            android:layout_marginTop="16dp"
+            android:layout_marginEnd="16dp"
+            android:layout_marginBottom="16dp"
+            android:text="@string/title_activity_tv"
+            android:textAlignment="center"
+            android:textSize="34sp" />
+
+        <TextView
+            android:id="@+id/extraDevText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="5dp"
+            android:text="@string/extra_developed"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="@color/onBackground" />
+
+        <TextView
+            android:id="@+id/extraPublisherText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="5dp"
+            android:text="@string/extra_published"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="@color/onBackground" />
+
+        <TextView
+            android:id="@+id/extraYearText"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_marginTop="5dp"
+            android:text="@string/app_name"
+            android:textAppearance="@style/TextAppearance.AppCompat.Small"
+            android:textColor="@color/onBackground" />
+
+        <LinearLayout
+            android:id="@+id/linearLayout2"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center|center_vertical"
+            android:layout_marginTop="25dp"
+            android:gravity="center"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/extraPlayBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="10dp"
+                android:background="@drawable/button_background"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:minHeight="42dp"
+                android:nextFocusLeft="@id/extraPlayBtn"
+                android:nextFocusRight="@id/extraPlayBtn"
+                android:nextFocusUp="@id/extraLikeBtn"
+                android:nextFocusForward="@id/extraPlayBtn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="@string/play"
+                android:textAllCaps="false"
+                android:textColor="@color/onSurface"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/extraGenieBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="10dp"
+                android:background="@drawable/button_background"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:minWidth="150dp"
+                android:minHeight="42dp"
+                android:nextFocusLeft="@id/extraGenieBtn"
+                android:nextFocusRight="@id/extraGenieBtn"
+                android:nextFocusForward="@id/extraGenieBtn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="@string/play_with_genie"
+                android:textAllCaps="false"
+                android:textColor="@color/onSurface"
+                android:textSize="16sp" />
+
+            <Button
+                android:id="@+id/extraLikeBtn"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_margin="10dp"
+                android:background="@drawable/button_background"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
+                android:minHeight="42dp"
+                android:nextFocusLeft="@id/extraLikeBtn"
+                android:nextFocusRight="@id/extraLikeBtn"
+                android:nextFocusDown="@id/extraPlayBtn"
+                android:nextFocusForward="@id/extraLikeBtn"
+                android:paddingStart="10dp"
+                android:paddingEnd="10dp"
+                android:text="@string/add_favorite"
+                android:textAllCaps="false"
+                android:textColor="@color/onSurface"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

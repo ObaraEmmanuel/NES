@@ -1,6 +1,7 @@
 package com.barracoder.android;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.graphics.Rect;
 import android.os.Build;
@@ -15,8 +16,9 @@ import org.libsdl.app.SDLActivity;
 import java.util.Arrays;
 
 public class EmulatorActivity extends SDLActivity {
+    private static final String TAG = "ANDRONES_EMULATOR";
     private String mEmulatorFile;
-    private boolean mGenie;
+    private boolean mGenie, mIsTV;
     private int mWidth, mHeight;
 
     @Override
@@ -33,8 +35,10 @@ public class EmulatorActivity extends SDLActivity {
         String[] args = new String[]{
                 mEmulatorFile,
                 String.valueOf(mWidth),
-                String.valueOf(mHeight)
+                String.valueOf(mHeight),
+                String.valueOf(mIsTV? 1 : 0),
         };
+
         if(mGenie) {
             args = Arrays.copyOf(args, args.length + 1);
             args[args.length - 1] = "roms/GENIE.nes";
@@ -66,11 +70,13 @@ public class EmulatorActivity extends SDLActivity {
         super.onCreate(savedInstanceState);
         mEmulatorFile = getIntent().getStringExtra("rom");
         mGenie = getIntent().getBooleanExtra("genie", false);
+        mIsTV = getIntent().getBooleanExtra("tv", false);
 
         Pair<Integer, Integer> dimensions = getScreenDimensions(this);
         mWidth = dimensions.first;
         mHeight = dimensions.second;
-        Log.i("ANDRONES_EMULATOR", "size: " + mWidth + "x" + mHeight);
+        Log.i(TAG, "size: " + mWidth + "x" + mHeight);
+        Log.i(TAG, "IS TV: " + mIsTV);
     }
 
     @Override
@@ -79,4 +85,13 @@ public class EmulatorActivity extends SDLActivity {
         mSingleton.setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE);
     }
 
+    public static void launchROM(Activity activity, NESItemModel item, boolean genie, boolean isTV) {
+        Log.i(TAG, "Launching ROM: " + item.getRom());
+        Intent intent = new Intent(activity, EmulatorActivity.class);
+        intent.putExtra("rom", item.getRom());
+        intent.putExtra("genie", genie);
+        intent.putExtra("tv", isTV);
+        ROMList.addToCategory(activity, item, "recent");
+        activity.startActivity(intent);
+    }
 }

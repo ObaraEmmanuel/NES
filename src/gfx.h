@@ -15,6 +15,7 @@ typedef struct GraphicsContext{
     int screen_width;
     int screen_height;
     float scale;
+    int is_tv;
 
 } GraphicsContext;
 

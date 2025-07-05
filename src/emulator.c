@@ -19,7 +19,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     }
 
     char* genie = NULL;
-    if(argc == 3 || argc == 5)
+    if(argc == 3 || argc == 6)
         genie = argv[argc - 1];
 
     load_file(argv[1], genie, &emulator->mapper);
@@ -43,9 +43,14 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     char** end_ptr = NULL;
     g_ctx->screen_width = strtol(argv[2], end_ptr, 10);
     g_ctx->screen_height = strtol(argv[3], end_ptr, 10);
+    if(argc > 4)
+        g_ctx->is_tv = strtol(argv[4], end_ptr, 10);
+    else
+        g_ctx->is_tv = 0;
 #else
     g_ctx->screen_width = -1;
     g_ctx->screen_height = -1;
+    g_ctx->is_tv = 0;
 #endif
 
     g_ctx->width = 256;
@@ -71,7 +76,6 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     init_APU(emulator);
     init_timer(&emulator->timer, PERIOD);
     ANDROID_INIT_TOUCH_PAD(g_ctx);
-    init_pads();
 
     emulator->exit = 0;
     emulator->pause = 0;
@@ -133,7 +137,7 @@ void run_emulator(struct Emulator* emulator){
                     if(e.key.key == SDLK_AC_BACK
                         || e.key.scancode == SDL_SCANCODE_AC_BACK) {
                         emulator->exit = 1;
-                        LOG(DEBUG, "Exiting emulator session");
+                        LOG(DEBUG, "Exiting emulator session (back button pressed)");
                     }
             }
         }
@@ -191,6 +195,12 @@ void run_emulator(struct Emulator* emulator){
 }
 
 void reset_emulator(Emulator* emulator) {
+    // Use as exit procedure for TV mode
+    if(emulator->g_ctx.is_tv){
+        emulator->exit = 1;
+        LOG(DEBUG, "Exiting emulator session (reset on TV)");
+        return;
+    }
     LOG(INFO, "Resetting emulator");
     reset_cpu(&emulator->cpu);
     reset_APU(&emulator->apu);

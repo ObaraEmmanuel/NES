@@ -12,71 +12,82 @@
     app:cardCornerRadius="10dp"
     app:layout_constraintWidth_min="150dp">
 
-    <LinearLayout
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/surface"
-        android:orientation="vertical">
+        android:layout_height="match_parent">
 
         <ImageView
             android:id="@+id/gameImage"
             android:layout_width="match_parent"
-            android:layout_height="120dp"
+            android:layout_height="250dp"
             android:background="@drawable/box_gradient"
             android:contentDescription="@string/game_avatar"
-            android:scaleType="fitXY"
+            android:scaleType="centerCrop"
             tools:srcCompat="@tools:sample/backgrounds/scenic" />
 
-        <TextView
-            android:id="@+id/gameName"
+        <View
+            android:id="@+id/view"
             android:layout_width="match_parent"
-            android:layout_height="30dp"
-            android:layout_marginStart="10dp"
-            android:layout_marginTop="10dp"
-            android:layout_marginEnd="10dp"
-            android:layout_marginBottom="0dp"
-            android:background="@color/surface"
-            android:ellipsize="middle"
-            android:focusable="true"
-            android:focusableInTouchMode="true"
-            android:gravity="center"
-            android:singleLine="true"
-            android:text="TextView"
-            android:textAlignment="center"
-            android:textColor="@color/onBackground"
-            android:textSize="16sp" />
+            android:layout_height="250dp"
+            android:background="@drawable/box_gradient_vertical" />
 
         <LinearLayout
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:layout_margin="10dp"
-            android:orientation="horizontal">
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom"
+            android:orientation="vertical">
 
-            <Button
-                android:id="@+id/playButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_weight="2"
-                android:background="@drawable/button_border"
-                android:elevation="2dp"
+            <TextView
+                android:id="@+id/gameName"
+                android:layout_width="match_parent"
+                android:layout_height="30dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginTop="10dp"
+                android:layout_marginEnd="10dp"
+                android:layout_marginBottom="0dp"
+                android:ellipsize="middle"
+                android:focusable="true"
+                android:focusableInTouchMode="true"
                 android:gravity="center"
-                android:minHeight="35dp"
-                android:text="@string/play"
-                android:textColor="@color/onSurface"
-                tools:ignore="TouchTargetSizeCheck" />
+                android:singleLine="true"
+                android:text="TextView"
+                android:textAlignment="center"
+                android:textColor="@color/onBackground"
+                android:textSize="16sp" />
 
-            <ImageButton
-                android:id="@+id/magicButton"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="center"
-                android:layout_weight="1"
-                android:background="@android:color/transparent"
-                android:src="@drawable/magic" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_margin="10dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/playButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_weight="2"
+                    android:background="@drawable/button_border"
+                    android:elevation="2dp"
+                    android:gravity="center"
+                    android:minHeight="35dp"
+                    android:text="@string/play"
+                    android:textColor="@color/onSurface"
+                    tools:ignore="TouchTargetSizeCheck" />
+
+                <ImageButton
+                    android:id="@+id/magicButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:src="@drawable/magic" />
+
+            </LinearLayout>
 
         </LinearLayout>
 
-    </LinearLayout>
+    </FrameLayout>
 
 </androidx.cardview.widget.CardView>
