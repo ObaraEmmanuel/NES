@@ -36,7 +36,7 @@ void get_graphics_context(GraphicsContext* ctx){
     );
 #else
     SDL_IOStream* rw = SDL_IOFromMem(font_data, sizeof(font_data));
-    ctx->font = TTF_OpenFontIO(rw, 1, 11);
+    ctx->font = TTF_OpenFontIO(rw, 1, 20);
     if(ctx->font == NULL){
         LOG(ERROR, SDL_GetError());
     }
@@ -70,11 +70,10 @@ void get_graphics_context(GraphicsContext* ctx){
 #else
     SDL_SetRenderLogicalPresentation(
         ctx->renderer,
-        ctx->width,
-        ctx->height,
+        ctx->width * ctx->scale,
+        ctx->height * ctx->scale,
         SDL_LOGICAL_PRESENTATION_LETTERBOX
     );
-    SDL_SetRenderScale(ctx->renderer, ctx->scale, ctx->scale);
 #endif
 
     ctx->texture = SDL_CreateTexture(
