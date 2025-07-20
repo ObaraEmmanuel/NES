@@ -2,14 +2,20 @@ package com.barracoder.android;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.ArrayList;
 
@@ -59,7 +65,26 @@ public class NESItemAdapter extends RecyclerView.Adapter<NESItemHolder> {
         holder.item = item;
         holder.gameName.setText(item.getName());
         if(item.getImage() != null)
-            Glide.with(context).load(item.getImage()).into(holder.gameImage);
+            Glide.with(context).load(item.getImage()).into(new CustomTarget<Drawable>() {
+                @Override
+                public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                    if(!item.isNSF()){
+                        holder.gameImage.setImageDrawable(resource);
+                        return;
+                    }
+                    // Add a badge to distinguish NSF from NES roms
+                    Drawable[] layers = new Drawable[2];
+                    layers[0] = resource;
+                    layers[1] = ContextCompat.getDrawable(context, R.drawable.ic_badge_music); // this is the image you want to overlay.
+                    LayerDrawable drawable = new LayerDrawable(layers);
+                    holder.gameImage.setImageDrawable(drawable);
+                }
+
+                @Override
+                public void onLoadCleared(@Nullable Drawable placeholder) {
+                    holder.gameImage.setImageDrawable(placeholder);
+                }
+            });
         else if (item.isNSF())
             holder.gameImage.setImageResource(R.drawable.music);
         else

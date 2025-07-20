@@ -1,0 +1,23 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="70dp"
+    android:height="100dp"
+    android:viewportWidth="70"
+    android:viewportHeight="100">
+
+  <!-- Blue triangle (20×20 units in top-left corner) -->
+  <path
+      android:fillColor="#F44336"
+      android:strokeColor="#FF5722"
+      android:pathData="M0,0 L20,0 L0,20 Z" />
+
+  <!-- Scaled (30%) and centered white path inside the triangle -->
+  <group
+      android:scaleX="0.3"
+      android:scaleY="0.3"
+      android:translateX="2.5"
+      android:translateY="2.5">
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M20,2L8,2c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2L22,4c0,-1.1 -0.9,-2 -2,-2zM18,7h-3v5.5c0,1.38 -1.12,2.5 -2.5,2.5S10,13.88 10,12.5s1.12,-2.5 2.5,-2.5c0.57,0 1.08,0.19 1.5,0.51L14,5h4v2zM4,6L2,6v14c0,1.1 0.9,2 2,2h14v-2L4,20L4,6z" />
+  </group>
+</vector>

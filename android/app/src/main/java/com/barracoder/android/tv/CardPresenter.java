@@ -4,12 +4,14 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.LayerDrawable;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.leanback.widget.ImageCardView;
 import androidx.leanback.widget.Presenter;
@@ -17,6 +19,8 @@ import androidx.leanback.widget.Presenter;
 import com.barracoder.android.NESItemModel;
 import com.barracoder.android.R;
 import com.bumptech.glide.Glide;
+import com.bumptech.glide.request.target.CustomTarget;
+import com.bumptech.glide.request.transition.Transition;
 
 import java.util.Objects;
 
@@ -103,8 +107,27 @@ public class CardPresenter extends Presenter {
         if (rom.getImage() != null) {
             Glide.with(viewHolder.view.getContext())
                     .load(rom.getImage())
-                    .error(mDefaultCardImage)
-                    .into(cardView.getMainImageView());
+                    .placeholder(mDefaultCardImage)
+                    .into(new CustomTarget<Drawable>() {
+                        @Override
+                        public void onResourceReady(@NonNull Drawable resource, @Nullable Transition<? super Drawable> transition) {
+                            if(!rom.isNSF()){
+                                cardView.getMainImageView().setImageDrawable(resource);
+                                return;
+                            }
+                            // Add a badge to distinguish NSF from NES roms
+                            Drawable[] layers = new Drawable[2];
+                            layers[0] = resource;
+                            layers[1] = ContextCompat.getDrawable(viewHolder.view.getContext(), R.drawable.ic_badge_music); // this is the image you want to overlay.
+                            LayerDrawable drawable = new LayerDrawable(layers);
+                            cardView.getMainImageView().setImageDrawable(drawable);
+                        }
+
+                        @Override
+                        public void onLoadCleared(@Nullable Drawable placeholder) {
+                            cardView.getMainImageView().setImageDrawable(placeholder);
+                        }
+                    });
         } else if (rom.isNSF()) {
             cardView.getMainImageView().setImageResource(R.drawable.music_default);
         } else {
