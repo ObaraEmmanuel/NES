@@ -33,6 +33,9 @@ static void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 
+static int song_num = -1, silent_frames = 0;
+static int minutes = -1, seconds = -1;
+
 void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len) {
     if(list == NULL || buf == NULL)
         return;
@@ -540,6 +543,12 @@ void prev_song(Emulator* emulator, NSF* nsf) {
 static double bin_boundaries[BAR_COUNT + 1] = {0};
 
 void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf) {
+    // re-init statics
+    song_num = -1;
+    silent_frames = 0;
+    minutes = -1;
+    seconds = -1;
+
 #ifdef __ANDROID__
     int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
 #else
@@ -567,8 +576,6 @@ static float bins[BAR_COUNT] = {0};
 static int amps[BAR_COUNT] = {0};
 
 void render_NSF_graphics(Emulator* emulator, NSF* nsf) {
-    static int song_num = -1, silent_frames = 0;
-    static int minutes = -1, seconds = -1;
     GraphicsContext* g_ctx = &emulator->g_ctx;
 #ifdef __ANDROID__
     int offset_x = g_ctx->dest.x, offset_y = g_ctx->dest.y, width = g_ctx->dest.w, height = g_ctx->dest.h;
