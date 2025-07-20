@@ -4,6 +4,10 @@ project(nes)
 set(CMAKE_C_STANDARD 11)
 set(BUILD_DIR build)
 
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  add_compile_definitions(DEBUGGING_ENABLED)
+endif()
+
 if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()

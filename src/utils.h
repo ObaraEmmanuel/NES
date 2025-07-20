@@ -30,7 +30,12 @@ typedef struct{real Re; real Im;} complx;
 
 #endif
 
+#ifdef DEBUGGING_ENABLED
+#define LOGLEVEL 0
+#else
 #define LOGLEVEL 1
+#endif
+
 #define TRACER 0
 #define PROFILE 0
 #define PROFILE_STOP_FRAME 1
