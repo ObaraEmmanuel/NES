@@ -15,6 +15,7 @@
 #define PRG_RAM_SIZE 0x2000
 #define BAR_COUNT 128
 #define MAX_SILENCE 150 // frames
+#define RESTART_THRESHOLD 3000 // 3 sec
 
 static uint8_t read_PRG(const Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
@@ -536,9 +537,11 @@ void next_song(Emulator* emulator, NSF* nsf) {
 }
 
 void prev_song(Emulator* emulator, NSF* nsf) {
-    nsf->current_song = nsf->current_song <= 1 ? nsf->total_songs : nsf->current_song - 1;
+    if(nsf->tick < RESTART_THRESHOLD)
+        nsf->current_song = nsf->current_song <= 1 ? nsf->total_songs : nsf->current_song - 1;
     init_song(emulator, nsf->current_song);
 }
+
 
 static double bin_boundaries[BAR_COUNT + 1] = {0};
 
