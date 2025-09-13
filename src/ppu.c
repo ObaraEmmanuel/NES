@@ -8,6 +8,7 @@
 
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
+static void update_NMI(PPU* ppu);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -186,14 +187,23 @@ uint8_t read_status(PPU* ppu){
     uint8_t status = ppu->status;
     ppu->w = 1;
     ppu->status &= ~BIT_7; // reset v_blank
+    update_NMI(ppu);
     return status;
 }
 
 void set_ctrl(PPU* ppu, uint8_t ctrl){
     ppu->ctrl = ctrl;
+    update_NMI(ppu);
     // set name table in temp address
     ppu->t &= ~0xc00;
     ppu->t |= (ctrl & BASE_NAMETABLE) << 10;
+}
+
+static void update_NMI(PPU* ppu) {
+    if(ppu->ctrl & BIT_7 && ppu->status & BIT_7)
+        interrupt(&ppu->emulator->cpu, NMI);
+    else
+        interrupt_clear(&ppu->emulator->cpu, NMI);
 }
 
 void execute_ppu(PPU* ppu){
@@ -277,10 +287,7 @@ void execute_ppu(PPU* ppu){
         if(ppu->dots == 1 && ppu->scanlines == VISIBLE_SCANLINES + 1){
             // set v-blank
             ppu->status |= V_BLANK;
-            if(ppu->ctrl & GENERATE_NMI){
-                // generate NMI
-                interrupt(&ppu->emulator->cpu, NMI);
-            }
+            update_NMI(ppu);
         }
     }
     else{
@@ -288,6 +295,7 @@ void execute_ppu(PPU* ppu){
         if(ppu->dots == 1){
             // reset v-blank and sprite zero hit
             ppu->status &= ~(V_BLANK | SPRITE_0_HIT);
+            update_NMI(ppu);
         }
         else if(ppu->dots == VISIBLE_DOTS + 2 && (ppu->mask & RENDER_ENABLED)){
             ppu->v &= ~HORIZONTAL_BITS;

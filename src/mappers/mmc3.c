@@ -72,7 +72,7 @@ static void on_scanline(Mapper* mapper) {
     }
 
     if(!mmc3->IRQ_counter && mmc3->IRQ_enabled)
-        interrupt(&mapper->emulator->cpu, IRQ);
+        interrupt(&mapper->emulator->cpu, MAPPER_IRQ);
 }
 
 uint8_t read_PRG(Mapper *mapper, uint16_t addr) {
@@ -132,7 +132,8 @@ void write_PRG(Mapper *mapper, uint16_t addr, uint8_t val) {
             break;
         case 0xE000:
             mmc3->IRQ_enabled = 0;
-            // ack pending interrupts?
+            // acknowledge pending interrupts
+            interrupt_clear(&mapper->emulator->cpu, MAPPER_IRQ);
             break;
         case 0xE001:
             mmc3->IRQ_enabled = 1;

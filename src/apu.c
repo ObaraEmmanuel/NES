@@ -156,6 +156,7 @@ void reset_APU(APU *apu) {
     apu->triangle.sequencer.step = 0;
     apu->dmc.counter &= 1;
     apu->frame_interrupt = 0;
+    interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
 }
 
 void init_audio_device(const APU* apu) {
@@ -224,7 +225,7 @@ void execute_apu(APU *apu) {
 
                 if (!apu->IRQ_inhibit) {
                     apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
+                    interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
                 }
                 apu->sequencer = 0;
                 break;
@@ -270,7 +271,7 @@ void execute_apu(APU *apu) {
 
                 if (!apu->IRQ_inhibit) {
                     apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, IRQ);
+                    interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
                 }
                 apu->sequencer = 0;
                 break;
@@ -492,6 +493,7 @@ void set_status(APU *apu, uint8_t value) {
         apu->dmc.bytes_remaining = 0;
     }
     apu->dmc.interrupt = 0;
+    interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
 
 
     // reset length counters if disabled
@@ -512,6 +514,7 @@ uint8_t read_apu_status(APU *apu) {
     status |= (apu->dmc.bytes_remaining? BIT_4: 0);
     // clear frame interrupt
     apu->frame_interrupt = 0;
+    interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
     return status;
 }
 
@@ -521,8 +524,10 @@ void set_frame_counter_ctrl(APU *apu, uint8_t value) {
     apu->IRQ_inhibit = (value & BIT_6) > 0;
     apu->frame_mode = (value & BIT_7) > 0;
     // clear interrupt if IRQ disable set
-    if (value & BIT_6)
+    if (apu->IRQ_inhibit) {
         apu->frame_interrupt = 0;
+        interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
+    }
     apu->reset_sequencer = 1;
 }
 
@@ -602,6 +607,7 @@ void set_dmc_ctrl(APU* apu, uint8_t value) {
     apu->dmc.IRQ_enable = (value & BIT_7) > 0;
     if(!apu->dmc.IRQ_enable) {
         apu->dmc.interrupt = 0;
+        interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
     }
     if(apu->emulator->type == NTSC)
         apu->dmc.rate = dmc_rate_index_NTSC[value & 0xf] - 1;
@@ -635,6 +641,7 @@ void clock_dmc(APU* apu) {
             else
                 dmc->current_addr++;
             dmc->irq_set = 0;
+            interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
         }
         if(dmc->bytes_remaining == 0) {
             if(dmc->loop) {
@@ -643,7 +650,7 @@ void clock_dmc(APU* apu) {
             }else if(dmc->IRQ_enable && !dmc->irq_set) {
                 dmc->interrupt = 1;
                 dmc->irq_set = 1;
-                interrupt(&apu->emulator->cpu, IRQ);
+                interrupt(&apu->emulator->cpu, APU_DMC_IRQ);
             }
         }
     }

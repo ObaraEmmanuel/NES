@@ -3,7 +3,6 @@
 #include <stdint.h>
 
 #include "mmu.h"
-#include "ppu.h"
 
 #define STACK_START 0x100
 
@@ -194,15 +193,24 @@ static const uint8_t cycleLookup[256] = {
 struct Emulator;
 
 typedef enum {
-    NOI = 0,    // no interrupt
-    NMI,    // Non maskable interrupt
-    RSI,    // reset interrupt
-    IRQ,    // interrupt request
+    NOI               = 0,      // no interrupt
+    NMI               = 1 << 1, // Non maskable interrupt
+    RSI               = 1 << 2, // reset interrupt
+    BRK_I             = 1 << 3, // BRK interrupt
+    IRQ               = ~0b111, // IRQ mask
+    // IRQ sources
+    APU_FRAME_IRQ     = 1 << 4, // APU Frame IRQ
+    APU_DMC_IRQ       = 1 << 5, // APU DMC IRQ
+    MAPPER_IRQ        = 1 << 6  // General mapper IRQ
 } Interrupt;
 
+// Internal implementation states
 enum{
-    BRANCH_STATE = 1,
-    INTERRUPT_PENDING = 1 << 1
+    BRANCH_STATE      = 1,      // 1: Branch instruction upcoming
+    INTERRUPT_PENDING = 1 << 1, // 1: interrupt handling upcoming
+    INTERRUPT_POLLED  = 1 << 2, // 1: interrupt has already been polled
+    NMI_ASSERTED      = 1 << 3, // 1: NMI asserted when interrupt was polled
+    NMI_HIJACK        = 1 << 4, // 1: NMI should hijack
 };
 
 typedef struct c6502{
@@ -220,6 +228,7 @@ typedef struct c6502{
     struct Emulator* emulator;
     uint8_t state;  // (0) -> branch, (1) -> interrupt pending
     Interrupt interrupt;
+    uint8_t NMI_line;
     const Instruction* instruction;
     Memory* memory;
 } c6502;
@@ -227,5 +236,6 @@ typedef struct c6502{
 void init_cpu(struct Emulator* emulator);
 void reset_cpu(c6502* ctx);
 void execute(c6502* ctx);
-void interrupt(c6502* ctx, Interrupt interrupt);
+void interrupt(c6502* ctx, Interrupt code);
+void interrupt_clear(c6502* ctx, Interrupt code);
 void print_cpu_trace(const c6502* ctx);

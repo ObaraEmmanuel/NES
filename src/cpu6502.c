@@ -19,6 +19,7 @@ static void branch(c6502* ctx, uint8_t mask, uint8_t predicate);
 static void prep_branch(c6502* ctx);
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2);
 static void interrupt_(c6502* ctx);
+static void poll_interrupt(c6502* ctx);
 
 void init_cpu(struct Emulator* emulator){
     struct c6502* cpu = &emulator->cpu;
@@ -48,43 +49,60 @@ void reset_cpu(c6502* cpu){
 
 static void interrupt_(c6502* ctx){
     // handle interrupt
-    if((ctx->sr & INTERRUPT) && ctx->interrupt != NMI) {
-        ctx->interrupt = NOI;
+    uint16_t addr;
+    uint8_t set_brk = 0;
+
+    if(ctx->interrupt & BRK_I) {
+        // BRK instruction is 2 bytes
+        ctx->pc++;
+        if(ctx->state & NMI_HIJACK) {
+            addr = NMI_ADDRESS;
+            ctx->interrupt &= ~NMI;
+        }else {
+            addr = IRQ_ADDRESS;
+        }
+        ctx->interrupt &= ~BRK_I;
+        // re-apply Break flag
+        set_brk = 1;
+    }
+    else if(ctx->interrupt & NMI) {
+        addr = NMI_ADDRESS;
+        // NMI is edge triggered so clear it
+        ctx->interrupt &= ~NMI;
+    }
+    else if(ctx->interrupt & RSI){
+        addr = RESET_ADDRESS;
+        // not used but just in case
+        interrupt_clear(ctx, RSI);
+    }
+    else if(ctx->interrupt & IRQ) {
+        addr = IRQ_ADDRESS;
+        // ctx->sr |= BREAK;
+    } else {
+        LOG(ERROR, "No interrupt set");
         return;
     }
 
-    uint16_t addr;
-
-    switch (ctx->interrupt) {
-        case NMI:
-            addr = NMI_ADDRESS;
-            break;
-        case IRQ:
-            addr = IRQ_ADDRESS;
-            ctx->sr |= BREAK;
-            break;
-        case RSI:
-            addr = RESET_ADDRESS;
-            break;
-        case NOI:
-            LOG(ERROR, "No interrupt set");
-            return;
-        default:
-            LOG(ERROR, "Unknown interrupt");
-            return;
-    }
-
     push_address(ctx, ctx->pc);
-    push(ctx, ctx->sr);
-    ctx->sr &= ~INTERRUPT;
+    // bit 5 always set, bit 4 set on BRK
+    push(ctx, ctx->sr & ~BIT_4 | BIT_5 | (set_brk ? BIT_4 : 0));
     ctx->sr |= INTERRUPT;
     ctx->pc = read_abs_address(ctx->memory, addr);
-    ctx->interrupt = NOI;
 }
 
-void interrupt(c6502* ctx, Interrupt interrupt){
-    // the cpu will handle interrupt when ready
-    ctx->interrupt = interrupt;
+void interrupt(c6502* ctx, const Interrupt code) {
+    if(code == NMI) {
+        if(!ctx->NMI_line) {
+            ctx->interrupt |= NMI;
+        }
+        ctx->NMI_line = 1;
+    }else {
+        ctx->interrupt |= code;
+    }
+}
+void interrupt_clear(c6502* ctx, const Interrupt code) {
+    if(code == NMI) ctx->NMI_line = 0;
+    else ctx->interrupt &= ~code;
 }
 
 
@@ -132,6 +150,17 @@ static void prep_branch(c6502* ctx){
     }
 }
 
+static void poll_interrupt(c6502* ctx) {
+    ctx->state |= INTERRUPT_POLLED;
+    if(ctx->interrupt & ~IRQ || (ctx->interrupt & IRQ && !(ctx->sr & INTERRUPT))){
+        // prepare for interrupts
+        ctx->state |= INTERRUPT_PENDING;
+        // check if NMI is asserted at poll time
+        ctx->state |= ctx->interrupt & NMI ? NMI_ASSERTED : 0;
+    }
+}
+
+
 void execute(c6502* ctx){
     ctx->odd_cycle ^= 1;
     ctx->t_cycles++;
@@ -144,26 +173,41 @@ void execute(c6502* ctx){
 #if TRACER == 1
         print_cpu_trace(ctx);
 #endif
-        if(ctx->interrupt != NOI){
-            // prepare for interrupts
-            ctx->state |= INTERRUPT_PENDING;
+        if(!(ctx->state & INTERRUPT_POLLED)) {
+            poll_interrupt(ctx);
+        }
+        ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK);
+        if(ctx->state & INTERRUPT_PENDING) {
             // takes 7 cycles and this is one of them so only 6 are left
             ctx->cycles = 6;
             return;
         }
+
         uint8_t opcode = read_mem(ctx->memory, ctx->pc++);
         ctx->instruction = &instructionLookup[opcode];
         ctx->address = get_address(ctx);
+        if(ctx->instruction->opcode == BRK) {
+            // set BRK interrupt
+            ctx->interrupt |= BRK_I;
+            ctx->state |= INTERRUPT_PENDING;
+            ctx->cycles = 6;
+            return;
+        }
         ctx->cycles += cycleLookup[opcode];
         // prepare for branching and adjust cycles accordingly
         prep_branch(ctx);
         ctx->cycles--;
         return;
-    } else if(ctx->cycles == 1){
+    }
+
+    if(ctx->cycles == 1){
         ctx->cycles--;
         // proceed to execution
     } else{
         // delay execution
+        if(ctx->state & INTERRUPT_PENDING && ctx->cycles == 4) {
+            if(ctx->interrupt & NMI) ctx->state |= NMI_HIJACK;
+        }
         ctx->cycles--;
         return;
     }
@@ -243,9 +287,9 @@ void execute(c6502* ctx){
             set_ZN(ctx, ctx->ac);
             break;
         case PLP:
-            // ignore bit 5 and 4
-            ctx->sr &= (BIT_4 |BIT_5);
-            ctx->sr |= pop(ctx) & ~(BIT_4 | BIT_5);
+            // poll before updating I flag
+            poll_interrupt(ctx);
+            ctx->sr = pop(ctx);
             break;
 
         // logical opcodes
@@ -423,6 +467,8 @@ void execute(c6502* ctx){
             ctx->sr &= ~DECIMAL_;
             break;
         case CLI:
+            // poll before updating I flag
+            poll_interrupt(ctx);
             ctx->sr &= ~INTERRUPT;
             break;
         case CLV:
@@ -435,19 +481,14 @@ void execute(c6502* ctx){
             ctx->sr |= DECIMAL_;
             break;
         case SEI:
+            poll_interrupt(ctx);
             ctx->sr |= INTERRUPT;
             break;
 
         // system functions
 
         case BRK:
-            // BRK instruction is 2 bytes
-            ctx->pc++;
-            push_address(ctx, ctx->pc);
-            // 6502 quirk, bit 4 and 5 are always set
-            push(ctx, ctx->sr | BIT_5 | BIT_4);
-            ctx->pc = read_abs_address(ctx->memory, IRQ_ADDRESS);
-            ctx->sr |= INTERRUPT;
+            // Handled in interrupt_()
             break;
         case RTI:
             // ignore bit 4 and 5
@@ -456,6 +497,10 @@ void execute(c6502* ctx){
             ctx->pc = pop_address(ctx);
             break;
         case NOP:
+            if(ctx->instruction->mode == ABS) {
+                // dummy read edge case for unofficial opcode Ox0C
+                read_mem(ctx->memory, address);
+            }
             break;
 
         // unofficial
