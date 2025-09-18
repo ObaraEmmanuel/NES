@@ -116,6 +116,8 @@ void write_ppu(PPU* ppu, uint8_t value){
 void dma(PPU* ppu, uint8_t address){
     Memory* memory = &ppu->emulator->mem;
     uint8_t* ptr = get_ptr(memory, address * 0x100);
+    // halt CPU for DMA and skip extra cycle if on odd cycle
+    do_DMA(&ppu->emulator->cpu, 513 + ppu->emulator->cpu.odd_cycle);
     if(ptr == NULL) {
         // Probably in PRG ROM so it is not possible to resolve a pointer
         // due to bank switching, so we do it the slow hard way
@@ -132,9 +134,6 @@ void dma(PPU* ppu, uint8_t address){
         // last value
         memory->bus = ptr[255];
     }
-    ppu->emulator->cpu.dma_cycles += 513;
-    // skip extra cycle on odd cycle
-    ppu->emulator->cpu.dma_cycles += ppu->emulator->cpu.odd_cycle;
 }
 
 

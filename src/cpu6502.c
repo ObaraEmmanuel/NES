@@ -105,6 +105,10 @@ void interrupt_clear(c6502* ctx, const Interrupt code) {
     else ctx->interrupt &= ~code;
 }
 
+void do_DMA(c6502* ctx, size_t cycles) {
+    ctx->dma_cycles += cycles;
+    ctx->state |= DMA_OCCURRED;
+}
 
 static void branch(c6502* ctx, uint8_t mask, uint8_t predicate) {
     if(((ctx->sr & mask) > 0) == predicate){
@@ -176,7 +180,7 @@ void execute(c6502* ctx){
         if(!(ctx->state & INTERRUPT_POLLED)) {
             poll_interrupt(ctx);
         }
-        ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK);
+        ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK | DMA_OCCURRED);
         if(ctx->state & INTERRUPT_PENDING) {
             // takes 7 cycles and this is one of them so only 6 are left
             ctx->cycles = 6;
@@ -506,6 +510,9 @@ void execute(c6502* ctx){
         // unofficial
 
         case ALR:
+            // Unstable instruction.
+            // A <- A & (const | M), A <- LSR A
+            // magic const set to 0x00 but, could also be 0xff, 0xee, ..., 0x11 depending on analog effects
             ctx->ac &= read_mem(ctx->memory, address);
             ctx->ac = shift_r(ctx, ctx->ac);
             break;
@@ -515,7 +522,17 @@ void execute(c6502* ctx){
             ctx->sr |= (ctx->ac & NEGATIVE) ? (CARRY | NEGATIVE): 0;
             ctx->sr |= ((!ctx->ac)? ZERO: 0);
             break;
+        case ANE:
+            // Unstable instruction.
+            // A <- (A | const) & X & M
+            // magic const set to 0xff but, could also be 0xee, 0xdd, ..., 0x00 depending on analog effects
+            ctx->ac = ctx->x & read_mem(ctx->memory, address);
+            set_ZN(ctx, ctx->ac);
+            break;
         case ARR: {
+            // Unstable instruction.
+            // A <- A & (const | M), ROR A
+            // magic const set to 0x00 but, could also be 0xff, 0xee, ..., 0x11 depending on analog effects
             uint8_t val = ctx->ac & read_mem(ctx->memory, address);
             uint8_t rotated = val >> 1;
             rotated |= (ctx->sr & CARRY) << 7;
@@ -537,6 +554,9 @@ void execute(c6502* ctx){
             break;
         }
         case LAX:
+            // Unstable instruction.
+            // A,X <- (A | const) & M
+            // magic const set to 0xff but, could also be 0xee, 0xdd, ..., 0x00 depending on analog effects
             ctx->ac = read_mem(ctx->memory, address);
             ctx->x = ctx->ac;
             set_ZN(ctx, ctx->ac);
@@ -613,23 +633,56 @@ void execute(c6502* ctx){
             set_ZN(ctx, ctx->ac);
             break;
         }
+
+        // The next 4 instructions are extremely unstable with weird sometimes inexplicable behavior
+        // I have tried to emulate them to the best of my ability
         case SHY: {
-            uint8_t H = address >> 8, L = address & 0xff;
-            write_mem(ctx->memory, ((ctx->y & (H + 1)) << 8) | L, ctx->y & (H + 1));
+            // if RDY line goes low 2 cycles before the value write, the high byte of target address is ignored
+            // By target address I mean the unindexed address as read from memory referred to here as raw_address
+            // I have equated this behaviour with DMA occurring in the course of the instruction
+            // This also applies to SHX, SHA and SHS
+            const uint8_t val = ctx->state & DMA_OCCURRED ? ctx->y: ctx->y & ((ctx->raw_address >> 8) + 1);
+            if (has_page_break(ctx->raw_address, address))
+                // Instruction unstable, corrupt high byte of address
+                address = (address & 0xff) | (val << 8);
+            write_mem(ctx->memory, address, val);
             break;
         }
         case SHX: {
-            uint8_t H = address >> 8, L = address & 0xff;
-            write_mem(ctx->memory, ((ctx->x & (H + 1)) << 8) | L, ctx->x & (H + 1));
+            const uint8_t val = ctx->state & DMA_OCCURRED ? ctx->x: ctx->x & ((ctx->raw_address >> 8) + 1);
+            if (has_page_break(ctx->raw_address, address))
+                // Instruction unstable, corrupt high byte of address
+                address = (address & 0xff) | (val << 8);
+            write_mem(ctx->memory, address, val);
             break;
         }
+        case SHA: {
+            const uint8_t val = ctx->state & DMA_OCCURRED ? ctx->x & ctx->ac: ctx->x & ctx->ac & ((ctx->raw_address >> 8) + 1);
+            if (has_page_break(ctx->raw_address, address))
+                // Instruction unstable, corrupt high byte of address
+                address = (address & 0xff) | (val << 8);
+            write_mem(ctx->memory, address, val);
+            break;
+        }
+        case SHS:
+            ctx->sp = ctx->ac & ctx->x;
+            const uint8_t val = ctx->state & DMA_OCCURRED ? ctx->x & ctx->ac: ctx->x & ctx->ac & ((ctx->raw_address >> 8) + 1);
+            if (has_page_break(ctx->raw_address, address))
+                // Instruction unstable, corrupt high byte of address
+                address = (address & 0xff) | (val << 8);
+            write_mem(ctx->memory, address, val);
+            break;
+        case LAS:
+            ctx->ac = ctx->x = ctx->sp = read_mem(ctx->memory, address) & ctx->sp;;
+            set_ZN(ctx, ctx->ac);
+            break;
         default:
             break;
     }
 }
 
 static uint16_t read_abs_address(Memory* mem, uint16_t offset){
-    // 16 bit address is little endian so read lo then hi
+    // 16-bit address is little endian so read lo then hi
     uint16_t lo = (uint16_t)read_mem(mem, offset);
     uint16_t hi = (uint16_t)read_mem(mem, offset + 1);
     return (hi << 8) | lo;
@@ -643,27 +696,31 @@ static uint16_t get_address(c6502* ctx){
             // dummy read
             read_mem(ctx->memory, ctx->pc);
         case NONE:
+            ctx->raw_address = 0;
             return 0;
         case REL: {
             int8_t offset = (int8_t)read_mem(ctx->memory, ctx->pc++);
-            return ctx->pc + offset;
+            addr = ctx->raw_address = ctx->pc + offset;
+            return addr;
         }
         case IMT:
+            ctx->raw_address = ctx->pc + 1;
             return ctx->pc++;
         case ZPG:
-            return read_mem(ctx->memory, ctx->pc++) & 0xFF;
+            ctx->raw_address = ctx->pc + 1;
+            return read_mem(ctx->memory, ctx->pc++);
         case ZPG_X:
-            addr = read_mem(ctx->memory, ctx->pc++);
+            addr = ctx->raw_address = ctx->raw_address = read_mem(ctx->memory, ctx->pc++);
             return (addr + ctx->x) & 0xFF;
         case ZPG_Y:
-            addr = read_mem(ctx->memory, ctx->pc++);
+            addr = ctx->raw_address = read_mem(ctx->memory, ctx->pc++);
             return (addr + ctx->y) & 0xFF;
         case ABS:
-            addr = read_abs_address(ctx->memory, ctx->pc);
+            addr = ctx->raw_address = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
             return addr;
         case ABS_X:
-            addr = read_abs_address(ctx->memory, ctx->pc);
+            addr = ctx->raw_address = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
             switch (ctx->instruction->opcode) {
                 // these don't take into account absolute x page breaks
@@ -682,10 +739,11 @@ static uint16_t get_address(c6502* ctx){
             }
             return addr + ctx->x;
         case ABS_Y:
-            addr = read_abs_address(ctx->memory, ctx->pc);
+            addr = ctx->raw_address = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
             switch (ctx->instruction->opcode) {
                 case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
+                case SHX:case SHA:case SHS:
                     // invalid read
                     read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
                     break;
@@ -698,7 +756,7 @@ static uint16_t get_address(c6502* ctx){
             }
             return addr + ctx->y;
         case IND:
-            addr = read_abs_address(ctx->memory, ctx->pc);
+            addr = ctx->raw_address = read_abs_address(ctx->memory, ctx->pc);
             ctx->pc += 2;
             lo = read_mem(ctx->memory, addr);
             // handle a bug in 6502 hardware where if reading from $xxFF (page boundary) the
@@ -709,14 +767,16 @@ static uint16_t get_address(c6502* ctx){
             addr = (read_mem(ctx->memory, ctx->pc++) + ctx->x) & 0xFF;
             hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
-            return (hi << 8) | lo;
+            addr = ctx->raw_address = (hi << 8) | lo;
+            return addr;
         case IND_IDX:
             addr = read_mem(ctx->memory, ctx->pc++);
             hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
-            addr = (hi << 8) | lo;
+            addr = ctx->raw_address = (hi << 8) | lo;
             switch (ctx->instruction->opcode) {
                 case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
+                case SHA:
                     // invalid read
                     read_mem(ctx->memory, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
                     break;

@@ -632,7 +632,8 @@ void clock_dmc(APU* apu) {
 
     if(dmc->enabled && dmc->empty) {
         if(dmc->bytes_remaining > 0) {
-            apu->emulator->cpu.dma_cycles += 3;
+            // halt CPU for DMA for 3 more cycles
+            do_DMA(&apu->emulator->cpu, 3);
             dmc->sample = read_mem(&apu->emulator->mem, dmc->current_addr);
             dmc->empty = 0;
             dmc->bytes_remaining--;

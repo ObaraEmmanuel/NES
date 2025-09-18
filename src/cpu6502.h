@@ -63,7 +63,7 @@ typedef enum {
     ROR, //rotate right
     RTI, //return from interrupt
     RTS, //return from subroutine
-    SBC, //subtract with carry
+    SBC, //subtract with carry (USBC)
     SEC, //set carry
     SED, //set decimal
     SEI, //set interrupt disable
@@ -79,22 +79,25 @@ typedef enum {
 
     // unofficial
 
-    ALR,
+    ALR, // ASR
     ANC,
+    ANE, // XAA
     ARR,
-    AXS,
-    LAX,
-    LAS,
-    SAX,
-    SHY,
-    SHX,
+    AXS, // SBX, SAX
+    LAX, // LXA
+    LAS, // LAR
+    SAX, // AXS, AAX
+    SHA, // AHX,
+    SHS, // XAS, TAS
+    SHX, // A11, SXA, XAS
+    SHY, // A11, SYA, SAY
 
-    DCP,
-    ISB,
+    DCP, // DCM
+    ISB, // ISC, INS
     RLA,
     RRA,
-    SLO,
-    SRE,
+    SLO, // ASO
+    SRE, // LSE
 
     SKB,
     IGN,
@@ -137,8 +140,8 @@ static const Instruction instructionLookup[256] =
 /*  0x5  */  {BVC, REL}, {EOR, IND_IDX}, NIL_OP,     {SRE, IND_IDX}, {NOP, ZPG_X}, {EOR, ZPG_X}, {LSR, ZPG_X}, {SRE, ZPG_X}, {CLI, IMPL}, {EOR, ABS_Y}, {NOP, IMPL}, {SRE, ABS_Y}, {NOP, ABS_X}, {EOR, ABS_X}, {LSR, ABS_X}, {SRE, ABS_X},
 /*  0x6  */  {RTS, IMPL},{ADC, IDX_IND}, NIL_OP,     {RRA, IDX_IND}, {NOP, ZPG},   {ADC, ZPG},   {ROR, ZPG},   {RRA, ZPG},   {PLA, IMPL}, {ADC, IMT},   {ROR, ACC},  {ARR, IMT},   {JMP, IND},   {ADC, ABS},   {ROR, ABS},   {RRA, ABS},
 /*  0x7  */  {BVS, REL}, {ADC, IND_IDX}, NIL_OP,     {RRA, IND_IDX}, {NOP, ZPG_X}, {ADC, ZPG_X}, {ROR, ZPG_X}, {RRA, ZPG_X}, {SEI, IMPL}, {ADC, ABS_Y}, {NOP, IMPL}, {RRA, ABS_Y}, {NOP, ABS_X}, {ADC, ABS_X}, {ROR, ABS_X}, {RRA, ABS_X},
-/*  0x8  */  {NOP, IMT}, {STA, IDX_IND}, {NOP, IMT}, {SAX, IDX_IND}, {STY, ZPG},   {STA, ZPG},   {STX, ZPG},   {SAX, ZPG},   {DEY, IMPL}, {NOP, IMT},   {TXA, IMPL}, {NOP, IMT},   {STY, ABS},   {STA, ABS},   {STX, ABS},   {SAX, ABS},
-/*  0x9  */  {BCC, REL}, {STA, IND_IDX}, NIL_OP,     {NOP, IND_IDX}, {STY, ZPG_X}, {STA, ZPG_X}, {STX, ZPG_Y}, {SAX, ZPG_Y}, {TYA, IMPL}, {STA, ABS_Y}, {TXS, IMPL}, {NOP, ABS_Y}, {SHY, ABS_X}, {STA, ABS_X}, {SHX, ABS_Y}, {NOP, ABS_Y},
+/*  0x8  */  {NOP, IMT}, {STA, IDX_IND}, {NOP, IMT}, {SAX, IDX_IND}, {STY, ZPG},   {STA, ZPG},   {STX, ZPG},   {SAX, ZPG},   {DEY, IMPL}, {NOP, IMT},   {TXA, IMPL}, {ANE, IMT},   {STY, ABS},   {STA, ABS},   {STX, ABS},   {SAX, ABS},
+/*  0x9  */  {BCC, REL}, {STA, IND_IDX}, NIL_OP,     {SHA, IND_IDX}, {STY, ZPG_X}, {STA, ZPG_X}, {STX, ZPG_Y}, {SAX, ZPG_Y}, {TYA, IMPL}, {STA, ABS_Y}, {TXS, IMPL}, {SHS, ABS_Y}, {SHY, ABS_X}, {STA, ABS_X}, {SHX, ABS_Y}, {SHA, ABS_Y},
 /*  0xA  */  {LDY, IMT}, {LDA, IDX_IND}, {LDX, IMT}, {LAX, IDX_IND}, {LDY, ZPG},   {LDA, ZPG},   {LDX, ZPG},   {LAX, ZPG},   {TAY, IMPL}, {LDA, IMT},   {TAX, IMPL}, {LAX, IMT},   {LDY, ABS},   {LDA, ABS},   {LDX, ABS},   {LAX, ABS},
 /*  0xB  */  {BCS, REL}, {LDA, IND_IDX}, NIL_OP,     {LAX, IND_IDX}, {LDY, ZPG_X}, {LDA, ZPG_X}, {LDX, ZPG_Y}, {LAX, ZPG_Y}, {CLV, IMPL}, {LDA, ABS_Y}, {TSX, IMPL}, {LAS, ABS_Y}, {LDY, ABS_X}, {LDA, ABS_X}, {LDX, ABS_Y}, {LAX, ABS_Y},
 /*  0xC  */  {CPY, IMT}, {CMP, IDX_IND}, {NOP, IMT}, {DCP, IDX_IND}, {CPY, ZPG},   {CMP, ZPG},   {DEC, ZPG},   {DCP, ZPG},   {INY, IMPL}, {CMP, IMT},   {DEX, IMPL}, {AXS, IMT},   {CPY, ABS},   {CMP, ABS},   {DEC, ABS},   {DCP, ABS},
@@ -211,12 +214,14 @@ enum{
     INTERRUPT_POLLED  = 1 << 2, // 1: interrupt has already been polled
     NMI_ASSERTED      = 1 << 3, // 1: NMI asserted when interrupt was polled
     NMI_HIJACK        = 1 << 4, // 1: NMI should hijack
+    DMA_OCCURRED      = 1 << 5, // 1: DMA occurred mid instruction
 };
 
 typedef struct c6502{
     size_t t_cycles;
     uint16_t pc;
     uint16_t address;
+    uint16_t raw_address; // address before any indexing is applied
     uint16_t dma_cycles;
     uint8_t ac;
     uint8_t x;
@@ -226,7 +231,7 @@ typedef struct c6502{
     uint8_t cycles;
     uint8_t odd_cycle;
     struct Emulator* emulator;
-    uint8_t state;  // (0) -> branch, (1) -> interrupt pending
+    uint8_t state;  // Internal implementation state. See above
     Interrupt interrupt;
     uint8_t NMI_line;
     const Instruction* instruction;
@@ -238,4 +243,5 @@ void reset_cpu(c6502* ctx);
 void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt code);
 void interrupt_clear(c6502* ctx, Interrupt code);
+void do_DMA(c6502* ctx, size_t cycles);
 void print_cpu_trace(const c6502* ctx);
