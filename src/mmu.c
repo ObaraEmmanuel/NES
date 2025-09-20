@@ -189,8 +189,7 @@ uint8_t read_mem(Memory* mem, uint16_t address){
                 mem->bus |= read_joypad(&mem->joy2) & 0x1f;
                 return mem->bus;
             case APU_STATUS:
-                mem->bus = read_apu_status(&mem->emulator->apu);
-                return mem->bus;
+                return read_apu_status(&mem->emulator->apu);
             default:
                 // open bus
                 return mem->bus;

@@ -444,13 +444,16 @@ void execute(c6502* ctx){
 
         case JMP:
             ctx->pc = address;
+            ctx->memory->bus = ctx->pc >> 8;
             break;
         case JSR:
             push_address(ctx, ctx->pc - 1);
             ctx->pc = address;
+            ctx->memory->bus = ctx->pc >> 8;
             break;
         case RTS:
             ctx->pc = pop_address(ctx) + 1;
+            ctx->memory->bus = ctx->pc >> 8;
             break;
 
         // branching opcodes
@@ -765,14 +768,14 @@ static uint16_t get_address(c6502* ctx){
             return (hi << 8) | lo;
         case IDX_IND:
             addr = (read_mem(ctx->memory, ctx->pc++) + ctx->x) & 0xFF;
-            hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
+            hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             addr = ctx->raw_address = (hi << 8) | lo;
             return addr;
         case IND_IDX:
             addr = read_mem(ctx->memory, ctx->pc++);
-            hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             lo = read_mem(ctx->memory, addr & 0xFF);
+            hi = read_mem(ctx->memory, (addr + 1) & 0xFF);
             addr = ctx->raw_address = (hi << 8) | lo;
             switch (ctx->instruction->opcode) {
                 case STA:case SLO:case RLA:case SRE:case RRA:case DCP:case ISB: case NOP:
