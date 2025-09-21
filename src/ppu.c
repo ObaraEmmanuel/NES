@@ -143,7 +143,6 @@ void dma(PPU* ppu, uint8_t address){
 
 uint8_t read_vram(PPU* ppu, uint16_t address){
     address = address & 0x3fff;
-    ppu->bus = address;
 
     if(address < 0x2000) {
         ppu->bus = ppu->mapper->read_CHR(ppu->mapper, address);
@@ -157,7 +156,8 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
     }
 
     if(address < 0x4000)
-        return ppu->palette[(address - 0x3F00) % 0x20];
+        // palette RAM provide first 6 bits and remaining 2 bits are open bus
+        return ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->bus & 0xc0);
 
     return 0;
 }
