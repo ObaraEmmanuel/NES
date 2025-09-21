@@ -100,9 +100,12 @@ uint8_t read_ppu(PPU* ppu){
     uint8_t prev_buff = ppu->buffer, data;
     ppu->buffer = read_vram(ppu, ppu->v);
 
-    if(ppu->v >= 0x3F00)
+    if(ppu->v >= 0x3F00) {
         data = ppu->buffer;
-    else
+        // read underlying nametable mirrors into buffer
+        // 0x3f00 - 0x3fff maps to 0x2f00 - 0x2fff
+        ppu->buffer = read_vram(ppu, ppu->v & 0xefff);
+    }else
         data = prev_buff;
     ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
     return data;
@@ -264,7 +267,7 @@ void execute_ppu(PPU* ppu){
         else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
-        else if(ppu->dots == END_DOT && ppu->mask & RENDER_ENABLED){
+        else if(ppu->dots == 320 && ppu->mask & RENDER_ENABLED){
             memset(ppu->OAM_cache, 0, 8);
             ppu->OAM_cache_len = 0;
             uint8_t range = ppu->ctrl & LONG_SPRITE ? 16: 8;
