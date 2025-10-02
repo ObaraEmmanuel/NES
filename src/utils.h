@@ -30,17 +30,24 @@ typedef struct{real Re; real Im;} complx;
 
 #endif
 
+#define TRACING_LOGS_ENABLED 0
+
 #ifdef DEBUGGING_ENABLED
-#define LOGLEVEL 0
+    #define EXIT_PAUSE 1
+    #if TRACING_LOGS_ENABLED
+    #define LOGLEVEL 0
+    #else
+    #define LOGLEVEL 1
+#endif
 #else
-#define LOGLEVEL 1
+#define LOGLEVEL 2
+#define EXIT_PAUSE 0
 #endif
 
 #define TRACER 0
 #define PROFILE 0
 #define PROFILE_STOP_FRAME 1
 #define NAMETABLE_MODE 0
-#define EXIT_PAUSE 0
 
 enum {
     BIT_7 = 1<<7,
@@ -54,7 +61,8 @@ enum {
 };
 
 enum LogLevel{
-    DEBUG = 0,
+    TRACE = 0,
+    DEBUG,
     ERROR,
     WARN,
     INFO,
@@ -62,7 +70,6 @@ enum LogLevel{
 
 size_t file_size(FILE* file);
 void LOG(enum LogLevel logLevel, const char* fmt, ...);
-void TRACE(const char* fmt, ...);
 
 // midpoint circle algorithm rendering utils
 int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius);

@@ -52,6 +52,9 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...){
             case DEBUG:
                 printf("DEBUG > ");
                 break;
+            case TRACE:
+                printf("TRACE > ");
+                break;
             case ERROR:
                 printf("ERROR > ");
                 break;
@@ -231,7 +234,7 @@ uint64_t next_power_of_2(uint64_t num) {
 
 void quit(int code) {
 #if EXIT_PAUSE
-    printf("Press any key to exit . . .");
+    printf("Press Enter key to exit . . .");
     getchar();
 #endif
     exit(code);
