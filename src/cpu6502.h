@@ -5,6 +5,7 @@
 #include "mmu.h"
 
 #define STACK_START 0x100
+#define SENTINEL_ADDR 0x5ff5
 
 #define NIL_OP {NOP, NONE}
 
@@ -197,14 +198,14 @@ struct Emulator;
 
 typedef enum {
     NOI               = 0,      // no interrupt
-    NMI               = 1 << 1, // Non maskable interrupt
-    RSI               = 1 << 2, // reset interrupt
-    BRK_I             = 1 << 3, // BRK interrupt
+    NMI               = 1 << 0, // Non maskable interrupt
+    RSI               = 1 << 1, // reset interrupt
+    BRK_I             = 1 << 2, // BRK interrupt
     IRQ               = ~0b111, // IRQ mask
     // IRQ sources
-    APU_FRAME_IRQ     = 1 << 4, // APU Frame IRQ
-    APU_DMC_IRQ       = 1 << 5, // APU DMC IRQ
-    MAPPER_IRQ        = 1 << 6  // General mapper IRQ
+    APU_FRAME_IRQ     = 1 << 3, // APU Frame IRQ
+    APU_DMC_IRQ       = 1 << 4, // APU DMC IRQ
+    MAPPER_IRQ        = 1 << 5  // General mapper IRQ
 } Interrupt;
 
 // Internal implementation states
@@ -217,12 +218,25 @@ enum{
     DMA_OCCURRED      = 1 << 5, // 1: DMA occurred mid instruction
 };
 
+typedef enum {
+    CPU_WAIT          = 0,       // Busy wait and ignore IRQ
+    CPU_WAIT_IRQ      = 1,       // Execute only ISRs and busy wait otherwise
+    CPU_EXEC          = 1 << 1,  // Normal operation mode with interrupts and execution
+    CPU_SR            = 1 << 2,  // Executing subroutine at sub_address.
+    CPU_NMI_SR        = 1 << 3,  // Special subroutine execution mode initiated from NMI
+    CPU_ISR           = 1 << 4,  // Executing Interrupt service routine
+    CPU_EXEC_ANY      = 0b11110, // Flag: CPU_EXEC | CPU_SR | CPU_NMI_SR | CPU_ISR
+    CPU_SR_ANY        = 0b01100, // Flag: CPU_SR | CPU_NMI_SR
+} CPUMode;
+
 typedef struct c6502{
     size_t t_cycles;
     uint16_t pc;
     uint16_t address;
     uint16_t raw_address; // address before any indexing is applied
+    uint16_t sub_address; // subroutine address
     uint16_t dma_cycles;
+    uint8_t sr_started; // subroutine started
     uint8_t ac;
     uint8_t x;
     uint8_t y;
@@ -230,12 +244,14 @@ typedef struct c6502{
     uint8_t sp;
     uint8_t cycles;
     uint8_t odd_cycle;
+    uint8_t mode; // Mode of execution. Use set_spu_mode to set
     struct Emulator* emulator;
     uint8_t state;  // Internal implementation state. See above
     Interrupt interrupt;
     uint8_t NMI_line;
     const Instruction* instruction;
     Memory* memory;
+    void (*NMI_hook)(struct c6502*, int);
 } c6502;
 
 void init_cpu(struct Emulator* emulator);
@@ -244,4 +260,6 @@ void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt code);
 void interrupt_clear(c6502* ctx, Interrupt code);
 void do_DMA(c6502* ctx, size_t cycles);
+uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
+void set_cpu_mode(c6502* ctx, CPUMode mode);
 void print_cpu_trace(const c6502* ctx);

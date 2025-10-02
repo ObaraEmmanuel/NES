@@ -20,12 +20,15 @@ static void prep_branch(c6502* ctx);
 static uint8_t has_page_break(uint16_t addr1, uint16_t addr2);
 static void interrupt_(c6502* ctx);
 static void poll_interrupt(c6502* ctx);
+static void rti(c6502* ctx);
 
 void init_cpu(struct Emulator* emulator){
     struct c6502* cpu = &emulator->cpu;
     cpu->emulator = emulator;
     cpu->interrupt = NOI;
+    set_cpu_mode(cpu, CPU_EXEC); // Normal execution
     cpu->memory = &emulator->mem;
+    cpu->sr_started = 0;
 
     cpu->ac = cpu->x = cpu->y = cpu->state = 0;
     cpu->cycles = cpu->dma_cycles = 0;
@@ -41,10 +44,29 @@ void init_cpu(struct Emulator* emulator){
 
 void reset_cpu(c6502* cpu){
     cpu->sr |= INTERRUPT;
+    set_cpu_mode(cpu, CPU_EXEC);; // Normal execution
     cpu->sp -= 3;
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
     cpu->cycles = 0;
     cpu->dma_cycles = 0;
+    cpu->sr_started = 0;
+}
+
+uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address) {
+    if (ctx->mode & CPU_SR_ANY) {
+        // unable to begin subroutine because there is an executing subroutine and/or ISR
+        LOG(TRACE, "Unable to start subroutine $%4x, pending subroutine %x",address, ctx->sub_address);
+        return CPU_SR;
+    }
+    ctx->sub_address = address;
+    set_cpu_mode(ctx, ctx->mode | CPU_SR);
+    LOG(TRACE, "Running subroutine: $%4x",ctx->sub_address);
+    return 0;
+}
+
+void set_cpu_mode(c6502* ctx, CPUMode mode) {
+    ctx->mode = mode;
+    LOG(TRACE, "CPU mode: %d",mode);
 }
 
 static void interrupt_(c6502* ctx){
@@ -88,6 +110,27 @@ static void interrupt_(c6502* ctx){
     push(ctx, ctx->sr & ~BIT_4 | BIT_5 | (set_brk ? BIT_4 : 0));
     ctx->sr |= INTERRUPT;
     ctx->pc = read_abs_address(ctx->memory, addr);
+    if (addr == NMI_ADDRESS && ctx->NMI_hook != NULL) {
+        // call NMI hook for phase 0 (pre ISR)
+        push_address(ctx, ctx->sub_address);
+        ctx->NMI_hook(ctx, 0);
+        ctx->sr_started = 0;
+        LOG(TRACE, "NMI wrapper at $%4x", ctx->sub_address);
+        set_cpu_mode(ctx, ctx->mode | CPU_NMI_SR);
+    }
+}
+
+static void rti(c6502* ctx) {
+    // ignore bit 4 and 5
+    ctx->sr &= (BIT_4 | BIT_5);
+    ctx->sr |= pop(ctx) & ~(BIT_4 | BIT_5);
+    ctx->pc = pop_address(ctx);
+    // hopefully intrinsic 6502 x-tics will allow this to be enough
+    // i.e. no ISR nesting
+    if (ctx->mode & CPU_ISR) {
+        LOG(TRACE, "ISR completed");
+        set_cpu_mode(ctx, ctx->mode & ~CPU_ISR);
+    }
 }
 
 void interrupt(c6502* ctx, const Interrupt code) {
@@ -174,6 +217,20 @@ void execute(c6502* ctx){
         return;
     }
     if(ctx->cycles == 0) {
+        if (!ctx->mode) {
+            // cpu wait mode
+            return;
+        }
+        // if there is a pending ISR, we wait before we start the subroutine unless it is NMI
+        if ((ctx->mode & CPU_NMI_SR || (ctx->mode & (CPU_SR | CPU_ISR)) == CPU_SR) && ctx->sr_started == 0) {
+            // we just started cpu subroutine mode
+            // let's do a manual JSR to sub_address
+            push_address(ctx, ctx->pc);
+            push_address(ctx, SENTINEL_ADDR);
+            ctx->pc = ctx->sub_address;
+            ctx->sr_started = 1;
+        }
+
 #if TRACER == 1
         print_cpu_trace(ctx);
 #endif
@@ -183,7 +240,13 @@ void execute(c6502* ctx){
         ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK | DMA_OCCURRED);
         if(ctx->state & INTERRUPT_PENDING) {
             // takes 7 cycles and this is one of them so only 6 are left
+            LOG(TRACE, "Starting ISR: $%2x", ctx->interrupt);
             ctx->cycles = 6;
+            set_cpu_mode(ctx, ctx->mode | CPU_ISR);
+            return;
+        }
+        if (!(ctx->mode & CPU_EXEC_ANY)) {
+            // busy wait if not in any execution mode
             return;
         }
 
@@ -454,6 +517,24 @@ void execute(c6502* ctx){
         case RTS:
             ctx->pc = pop_address(ctx) + 1;
             ctx->memory->bus = ctx->pc >> 8;
+            // Keep track of external subroutine
+            if ((ctx->mode & CPU_SR_ANY) && ctx->pc == SENTINEL_ADDR + 1) {
+                ctx->pc = pop_address(ctx);
+                ctx->memory->bus = ctx->pc >> 8;
+                if (ctx->mode & CPU_NMI_SR) {
+                    if (ctx->NMI_hook != NULL) ctx->NMI_hook(ctx, 1);
+                    LOG(TRACE, "NMI wrapper at $%4x ended", ctx->sub_address);
+                    ctx->sub_address = pop_address(ctx);
+                    set_cpu_mode(ctx, ctx->mode & ~CPU_NMI_SR);
+                    if (!(ctx->mode & CPU_SR)) ctx->sr_started = 0;
+                    // end NMI
+                    rti(ctx);
+                }else {
+                    LOG(TRACE, "Exiting subroutine $%4x", ctx->sub_address);
+                    set_cpu_mode(ctx, ctx->mode & ~CPU_SR);
+                    ctx->sr_started = 0;
+                }
+            }
             break;
 
         // branching opcodes
@@ -498,10 +579,7 @@ void execute(c6502* ctx){
             // Handled in interrupt_()
             break;
         case RTI:
-            // ignore bit 4 and 5
-            ctx->sr &= (BIT_4 | BIT_5);
-            ctx->sr |= pop(ctx) & ~(BIT_4 | BIT_5);
-            ctx->pc = pop_address(ctx);
+            rti(ctx);
             break;
         case NOP:
             if(ctx->instruction->mode == ABS) {
