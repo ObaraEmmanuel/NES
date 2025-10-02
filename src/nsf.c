@@ -17,13 +17,16 @@
 #define MAX_SILENCE 150 // frames
 #define RESTART_THRESHOLD 3000 // 3 sec
 
-static uint8_t read_PRG(const Mapper*, uint16_t);
+static void NSF_NMI_hook(c6502* ctx, int phase);
+
+static uint8_t read_PRG(Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
 static uint8_t read_CHR(Mapper*, uint16_t);
 static void write_CHR(Mapper*, uint16_t, uint8_t);
 static uint8_t read_ROM(Mapper*, uint16_t);
-static void write_ROM(const Mapper*, uint16_t, uint8_t);
+static void write_ROM(Mapper*, uint16_t, uint8_t);
 
+static void log_nsf_flags(uint8_t flags);
 static void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len);
 static void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
@@ -33,9 +36,19 @@ static void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static void load_text_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 
 static int song_num = -1, silent_frames = 0;
 static int minutes = -1, seconds = -1;
+
+static void log_nsf_flags(uint8_t flags) {
+    LOG(DEBUG, "IRQ [%c] | Non returning init [%c] | No play [%c] | NSFe included [%c]",
+        flags & NSF_IRQ ? 'Y' : 'N',
+        flags & NSF_NON_RETURN_INIT ? 'Y' : 'N',
+        flags & NSF_NO_PLAY_SR ? 'Y' : 'N',
+        flags & NSF_REQ_NSFE_CHUNKS ? 'Y' : 'N'
+    );
+}
 
 void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len) {
     if(list == NULL || buf == NULL)
@@ -100,6 +113,7 @@ void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     }else {
         nsf->speed = 16666;
     }
+    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
 
     if(chunk[0x7]) {
         LOG(ERROR, "Extra Sound Chip support required");
@@ -107,7 +121,10 @@ void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     }
 
     nsf->total_songs = chunk[8];
-    nsf->starting_song = nsf->current_song = chunk[9] + 1;
+    if (len > 9)
+        nsf->starting_song = nsf->current_song = chunk[9] + 1;
+    else
+        nsf->starting_song = nsf->current_song = 1;
 }
 
 void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
@@ -142,7 +159,7 @@ void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     NSF* nsf = mapper->NSF;
     nsf->bank_switch = 1;
     uint8_t bank_data[8] = {0};
-    SDL_ReadIO(file, bank_data, len);
+    SDL_ReadIO(file, bank_data, len > 8 ? 8: len);
 
     for(size_t i = 0; i < 8; i++) {
         nsf->bank_init[i] = bank_data[i];
@@ -231,6 +248,13 @@ void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     free(chunk);
 }
 
+static void load_text_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+    char* chunk = malloc(len);
+    SDL_ReadIO(file, chunk, len);
+    LOG(INFO, "TEXT: \n%s \n", chunk);
+    free(chunk);
+}
+
 void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
     // PRG RAM
     mapper->PRG_RAM = malloc(PRG_RAM_SIZE);
@@ -252,6 +276,7 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
 
     NSF* nsf = calloc(1, sizeof(NSF));
     mapper->NSF = nsf;
+    nsf->version = 1;
 
     // defaults
     strncpy(nsf->song_name, "<?>", 3);
@@ -291,6 +316,11 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
             load_bank_chunk(len, mapper, file);
         } else if (strncmp(id, "NEND", 4) == 0) {
             break;
+        } else if (strncmp(id, "NSF2", 4) == 0) {
+            SDL_ReadIO(file, &nsf->flags, len);
+            nsf->version = 2;
+            LOG(INFO, "Using NSF 2.0");
+            log_nsf_flags(nsf->flags);
         } else if(strncmp(id, "RATE", 4) == 0) {
             load_rate_chunk(len, mapper, file);
         } else if(strncmp(id, "auth", 4) == 0) {
@@ -308,10 +338,7 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
                 load_tlbl_chunk(len, mapper, file);
             }
         } else if(strncmp(id, "text", 4) == 0) {
-            char* chunk = malloc(len);
-            SDL_ReadIO(file, chunk, len);
-            LOG(INFO, "TEXT: \n %s \n", chunk);
-            free(chunk);
+            load_text_chunk(len, mapper, file);
         } else if(id[0] > 65 && id[0] < 90) {
             LOG(ERROR, "Required chunk %s not implemented", id);
             quit(EXIT_FAILURE);
@@ -326,6 +353,11 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
         }
     }
     LOG(DEBUG, "Bank switching: %s", nsf->bank_switch ? "ON": "OFF");
+
+    if (nsf->flags & NSF_IRQ) {
+        // initialize IRQ vector with initial value at 0xfffe-0xffff if IRQ enabled
+        nsf->IRQ_vector = read_PRG(mapper, 0xfffe) | read_PRG(mapper, 0xffff) << 8;
+    }
 }
 
 void load_nsf(SDL_IOStream* file, Mapper* mapper) {
@@ -379,24 +411,41 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
     }else {
         nsf->speed = (header[0x6f] << 8) | header[0x6e];
     }
+    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
 
     if(header[0x7b]) {
         LOG(ERROR, "Extra Sound Chip support required");
         quit(EXIT_FAILURE);
     }
 
-    size_t data_len = (header[0x7f] << 16) | (header[0x7e] << 8) | header[0x7d];
-    if(!data_len || nsf->version == 1) {
-        long long size = SDL_SeekIO(file, 0, SDL_IO_SEEK_END);
-        if(size < 0) {
-            LOG(ERROR, "Error reading ROM");
-            quit(EXIT_FAILURE);
-        }
-        data_len = size - NSF_HEADER_SIZE;
-        // reset file ptr
-        SDL_SeekIO(file, NSF_HEADER_SIZE, SDL_IO_SEEK_SET);
+    nsf->flags = 0;
+    if (nsf->version == NSF2) {
+        nsf->flags = header[0x7c];
+        LOG(INFO, "Using NSF 2.0");
+        log_nsf_flags(nsf->flags);
     }
+
+    size_t data_len = (header[0x7f] << 16) | (header[0x7e] << 8) | header[0x7d];
+
+    long long size = SDL_SeekIO(file, 0, SDL_IO_SEEK_END);
+    if(size < 0) {
+        LOG(ERROR, "Error reading ROM");
+        quit(EXIT_FAILURE);
+    }
+    size -= NSF_HEADER_SIZE;
+    if (data_len > size) {
+        LOG(ERROR, "Error reading ROM, Invalid length");
+        quit(EXIT_FAILURE);
+    }
+    if (!data_len)
+        data_len = size;
+    size_t metadata_len = size - data_len;
+    // reset file ptr
+    SDL_SeekIO(file, NSF_HEADER_SIZE, SDL_IO_SEEK_SET);
+
+
     LOG(DEBUG, "Program data length: %llu", data_len);
+    LOG(DEBUG, "Metadata length: %llu", metadata_len);
 
     nsf->bank_switch = 0;
     for(size_t i = 0x70; i < 0x78; i++) {
@@ -446,12 +495,96 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
         size_t read_len = MIN(data_len, 0x10000 - nsf->load_addr);
         SDL_ReadIO(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), read_len);
     }
+
+    if (nsf->version == 2 && metadata_len > 0) {
+        size_t offset = NSF_HEADER_SIZE + data_len;
+        uint32_t len = 0;
+        while (offset < size) {
+            char id[5];
+            SDL_ReadIO(file, &len, 4);
+            memset(id, 0, 5);
+            SDL_ReadIO(file, id, 4);
+            offset += 8 + len;
+
+            LOG(DEBUG, "Chunk: %s (%d)", id, len);
+
+            if (strncmp(id, "NEND", 4) == 0) {
+                break;
+            }
+
+            if(strncmp(id, "INFO", 4) == 0 || strncmp(id, "DATA", 4) == 0 || strncmp(id, "BANK", 4) == 0 || strncmp(id, "NSF2", 4) == 0) {
+                // Skip
+            } else if(strncmp(id, "RATE", 4) == 0) {
+                load_rate_chunk(len, mapper, file);
+            } else if(strncmp(id, "auth", 4) == 0) {
+                load_auth_chunk(len, mapper, file);
+            } else if(strncmp(id, "time", 4) == 0) {
+                load_time_chunk(len, mapper, file);
+            } else if(strncmp(id, "fade", 4) == 0) {
+                load_fade_chunk(len, mapper, file);
+            } else if(strncmp(id, "tlbl", 4) == 0) {
+                load_tlbl_chunk(len, mapper, file);
+            } else if(strncmp(id, "text", 4) == 0) {
+                load_text_chunk(len, mapper, file);
+            } else if(id[0] > 65 && id[0] < 90) {
+                LOG(ERROR, "Required chunk %s not implemented", id);
+                quit(EXIT_FAILURE);
+            } else {
+                LOG(DEBUG, "Skipping chunk %s", id);
+            }
+
+            // move to start of next chunk
+            if(SDL_SeekIO(file, offset, SDL_IO_SEEK_SET) < 0) {
+                LOG(ERROR, "Error loading NSF2 Metadata");
+                quit(EXIT_FAILURE);
+            }
+        }
+    }
+
+    if (nsf->flags & NSF_IRQ) {
+        // initialize IRQ vector with initial value at 0xfffe-0xffff if IRQ enabled
+        nsf->IRQ_vector = read_PRG(mapper, 0xfffe) | read_PRG(mapper, 0xffff) << 8;
+    }
+}
+
+void nsf_execute(Emulator* emulator) {
+    // called every cpu cycle if IRQ feature is enabled
+    NSF* nsf = emulator->mapper.NSF;
+    if (nsf->IRQ_status & BIT_0) {
+        if (nsf->IRQ_counter == 0) {
+            // IRQ assert
+            nsf->IRQ_status |= BIT_7;
+            interrupt(&emulator->cpu, MAPPER_IRQ);
+            nsf->IRQ_counter = nsf->IRQ_counter_reload;
+        }else {
+            nsf->IRQ_counter--;
+        }
+    }
 }
 
 static uint8_t read_ROM(Mapper* mapper, uint16_t addr) {
-    if(addr < 0x6000)
+    if(addr < 0x6000) {
+        NSF* nsf = mapper->NSF;
+        if (nsf->flags & NSF_IRQ) {
+            switch (addr) {
+                case 0x401B:
+                    return nsf->IRQ_counter_reload & 0xff;
+                case 0x401C:
+                    return nsf->IRQ_counter_reload >> 8;
+                case 0x401D: {
+                    uint8_t flags = nsf->IRQ_status;
+                    // Acknowledge IRQ
+                    nsf->IRQ_status &= ~BIT_7;
+                    interrupt_clear(&mapper->emulator->cpu, MAPPER_IRQ);
+                    return flags;
+                }
+                default:
+                    break;
+            }
+        }
         // open bus
         return mapper->emulator->mem.bus;
+    }
 
     if(addr < 0x8000)
         return mapper->PRG_RAM[addr - 0x6000];
@@ -459,26 +592,60 @@ static uint8_t read_ROM(Mapper* mapper, uint16_t addr) {
     return mapper->read_PRG(mapper, addr);
 }
 
-static void write_ROM(const Mapper* mapper, uint16_t addr, uint8_t val) {
+static void write_ROM(Mapper* mapper, uint16_t addr, uint8_t val) {
     if(addr < 0x6000) {
+        NSF* nsf = mapper->NSF;
+        if (nsf->flags & NSF_IRQ) {
+            switch (addr) {
+                case 0x401B:
+                    nsf->IRQ_counter_reload &= ~0xff;
+                    nsf->IRQ_counter_reload |= val;
+                    break;
+                case 0x401C:
+                    nsf->IRQ_counter_reload &= ~0xff00;
+                    nsf->IRQ_counter_reload |= val << 8;
+                    break;
+                case 0x401D:
+                    nsf->IRQ_status |= val & BIT_0;
+                    break;
+                default:
+                    break;
+            }
+        }
         if(addr > 0x5ff7) {
-            mapper->NSF->bank_ptrs[addr - 0x5ff8] = mapper->PRG_ROM + val * 0x1000;
+            nsf->bank_ptrs[addr - 0x5ff8] = mapper->PRG_ROM + val * 0x1000;
         }
     } else if(addr < 0x8000) {
         mapper->PRG_RAM[addr - 0x6000] = val;
+    } else {
+        mapper->write_PRG(mapper, addr, val);
     }
 }
 
-static uint8_t read_PRG(const Mapper* mapper, uint16_t addr) {
-    if(!mapper->NSF->bank_switch) {
+static uint8_t read_PRG(Mapper* mapper, uint16_t addr) {
+    NSF* nsf = mapper->NSF;
+    if (addr >= 0xfffe) {
+        if (nsf->flags & NSF_IRQ)
+            return addr == 0xfffe ? nsf->IRQ_vector & 0xff : nsf->IRQ_vector >> 8;
+    }
+    if(!nsf->bank_switch) {
         return mapper->PRG_ROM[addr - 0x8000];
     }
     size_t bank_index = (addr - 0x8000) / 0x1000;
-    return *(mapper->NSF->bank_ptrs[bank_index] + (addr & 0xfff));
+    return *(nsf->bank_ptrs[bank_index] + (addr & 0xfff));
 }
 
 static void write_PRG(Mapper* mapper, uint16_t addr, uint8_t val) {
-    // can't write to PRG ROM
+    NSF* nsf = mapper->NSF;
+    if (!(nsf->flags & NSF_IRQ))
+        return;
+    if(addr == 0xfffe) {
+        nsf->IRQ_vector &= ~0xff;
+        nsf->IRQ_vector |= val;
+    }else if(addr == 0xffff) {
+        nsf->IRQ_vector &= ~0xff00;
+        nsf->IRQ_vector |= val << 8;
+    }
 }
 
 static uint8_t read_CHR(Mapper* mapper, uint16_t addr) {
@@ -493,6 +660,7 @@ static void write_CHR(Mapper* mapper, uint16_t addr, uint8_t val) {
 void init_song(Emulator* emulator, size_t song_number) {
     memset(emulator->mem.RAM, 0, RAM_SIZE);
     init_cpu(emulator);
+    set_cpu_mode(&emulator->cpu, CPU_WAIT_IRQ);
     emulator->apu.audio_start = 0;
     emulator->apu.sampler.index = 0;
     SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
@@ -512,6 +680,7 @@ void init_song(Emulator* emulator, size_t song_number) {
     }
     emulator->cpu.ac = song_number > 0 ? song_number - 1: song_number;
     emulator->cpu.x = emulator->type == PAL? 1: 0;
+    emulator->cpu.y = 0;
     nsf->initializing = 1;
     if(nsf->times != NULL) {
         nsf->tick_max = nsf->times[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
@@ -519,16 +688,36 @@ void init_song(Emulator* emulator, size_t song_number) {
             nsf->tick_max += nsf->fade[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
     }
     emulator->apu.volume = 1;
-    nsf_jsr(emulator, nsf->init_addr);
+    nsf->init_num = 0; // first init call
+    if (nsf->flags & NSF_NON_RETURN_INIT) {
+        emulator->cpu.y = 0x80;
+        emulator->cpu.NMI_hook = NSF_NMI_hook;
+        run_cpu_subroutine(&emulator->cpu, nsf->init_addr);
+    } else {
+        run_cpu_subroutine(&emulator->cpu, nsf->init_addr);
+    }
+
+    if (nsf->flags & NSF_IRQ) {
+        // set IRQ to inactive
+        nsf->IRQ_status &= ~BIT_0;
+        // SEI (inhibit interrupts)
+        emulator->cpu.sr |= INTERRUPT;
+    }
     LOG(DEBUG, "Initializing tune %d", nsf->current_song);
 }
 
-void nsf_jsr(Emulator* emulator, uint16_t address) {
-    // approximate JSR
-    uint16_t ret_addr = NSF_SENTINEL_ADDR - 1;
-    write_mem(&emulator->mem, STACK_START + emulator->cpu.sp--, ret_addr >> 8);
-    write_mem(&emulator->mem, STACK_START + emulator->cpu.sp--, ret_addr & 0xFF);
-    emulator->cpu.pc = address;
+static void NSF_NMI_hook(c6502* ctx, int phase) {
+    static uint8_t x, y, ac;
+    if (phase == 0) {
+        x = ctx->x;
+        y = ctx->y;
+        ac = ctx->ac;
+        ctx->sub_address = ctx->emulator->mapper.NSF->play_addr;
+    }else if(phase == 1) {
+        ctx->x = x;
+        ctx->y = y;
+        ctx->ac = ac;
+    }
 }
 
 void next_song(Emulator* emulator, NSF* nsf) {

@@ -226,11 +226,15 @@ void run_NSF_player(struct Emulator* emulator) {
     double ms_per_frame = emulator->mapper.NSF->speed / 1000.0;
     init_timer(&frame_timer, PERIOD);
     mark_start(&frame_timer);
-    size_t cycles_per_frame;
+    size_t cycles_per_frame, nmi_cycle_start;
     if(emulator->type == PAL) {
         cycles_per_frame = emulator->mapper.NSF->speed * 1.662607f;
+        // PAL has 70 scanlines (7459 cpu cycles) V-blank
+        nmi_cycle_start = cycles_per_frame - 7459;
     }else {
+        // NTSC and others have 20 scanlines (2273 cpu cycles) V-blank
         cycles_per_frame = emulator->mapper.NSF->speed * 1.789773f;
+        nmi_cycle_start = cycles_per_frame - 2273;
     }
     uint8_t status1 = 0, status2 = 0;
 
@@ -311,19 +315,43 @@ void run_NSF_player(struct Emulator* emulator) {
             }
         }
 
-        if(cpu->pc == NSF_SENTINEL_ADDR) {
-            nsf_jsr(emulator, nsf->play_addr);
-        }
-
         if(!emulator->pause){
+            if ((nsf->flags & (NSF_NO_PLAY_SR | NSF_NON_RETURN_INIT)) == 0) {
+                // run only if PLAY is not suppressed and non-return init is disabled
+                run_cpu_subroutine(cpu, nsf->play_addr);
+            }
+
             size_t cycles = 0;
             while (cycles < cycles_per_frame) {
-                // run CPU if RTS has not been called
-                if(cpu->pc != NSF_SENTINEL_ADDR)
-                    execute(cpu);
-                if(!nsf->initializing)
+                execute(cpu);
+                if (!(cpu->mode & CPU_SR_ANY)) {
+                    if (nsf->flags & NSF_NON_RETURN_INIT && nsf->init_num == 0) {
+                        // second INIT
+                        // will fail if there is an already running subroutine
+                        // we already did the check earlier but just to be safe
+                        if (run_cpu_subroutine(cpu, nsf->init_addr) == 0) {
+                            cpu->ac = nsf->current_song > 0? nsf->current_song - 1: 0;
+                            cpu->x = emulator->type == PAL? 1: 0;
+                            cpu->y = 0x81;
+                            nsf->init_num = 1;
+                        }
+                    }
+                }
+                if (nsf->flags & NSF_IRQ)
+                    nsf_execute(emulator);
+                if(!nsf->initializing) {
                     execute_apu(apu);
+                }
+                if (cycles == nmi_cycle_start) {
+                    if ((nsf->flags & (NSF_NON_RETURN_INIT|NSF_NO_PLAY_SR)) == NSF_NON_RETURN_INIT) {
+                        interrupt(cpu, NMI);
+                    }
+                }
                 cycles++;
+            }
+
+            if ((nsf->flags & (NSF_NON_RETURN_INIT|NSF_NO_PLAY_SR)) == NSF_NON_RETURN_INIT) {
+                interrupt_clear(cpu, NMI);
             }
 
             render_NSF_graphics(emulator, nsf);
@@ -331,7 +359,7 @@ void run_NSF_player(struct Emulator* emulator) {
                 queue_audio(apu, g_ctx);
                 nsf->tick += ms_per_frame;
             }
-            if(cpu->pc == NSF_SENTINEL_ADDR && nsf->initializing) {
+            if((cpu->sub_address == nsf->play_addr || nsf->init_num == 1) && nsf->initializing) {
                 nsf->initializing = 0;
                 nsf->tick = 0;
             }

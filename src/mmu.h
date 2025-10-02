@@ -12,7 +12,7 @@
 #define RAM_SIZE 0x800
 #define RAM_END 0x2000
 #define IO_REG_MIRRORED_END 0x4000
-#define IO_REG_END 0x4020
+#define IO_REG_END 0x4018
 
 typedef enum{
     PPU_CTRL = 0x2000,

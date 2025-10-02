@@ -12,22 +12,36 @@
 #define MAX_TEXT_FIELD_SIZE 40
 #define MAX_TRACK_NAME_SIZE 24
 
-#define NSF_SENTINEL_ADDR 0x5FF5
 #define NSF_DEFAULT_TRACK_DUR 180000 // ms
 
 typedef enum NSFFormat{
-    NSFE = 1,
+    NSF1 = 1,
     NSF2 = 2
 }NSFFormat;
 
+typedef enum NSFFlags {
+    NSF_IRQ                 = BIT_4,
+    NSF_NON_RETURN_INIT     = BIT_5,
+    NSF_NO_PLAY_SR          = BIT_6,
+    NSF_REQ_NSFE_CHUNKS     = BIT_7,
+}NSFFlags;
+
 typedef struct NSF {
     uint8_t version;
+    uint8_t flags;
     uint8_t total_songs;
     uint8_t starting_song;
     uint8_t current_song;
     uint16_t load_addr;
     uint16_t init_addr;
     uint16_t play_addr;
+    // --- NSF2 specific ---
+    uint16_t IRQ_vector;
+    uint16_t IRQ_counter;
+    uint16_t IRQ_counter_reload;
+    uint8_t IRQ_status;
+    uint8_t init_num;
+    // ---------------------
     char song_name[MAX_TEXT_FIELD_SIZE+1];
     char artist[MAX_TEXT_FIELD_SIZE+1];
     char copyright[MAX_TEXT_FIELD_SIZE+1];
@@ -62,6 +76,6 @@ void free_NSF(NSF* nsf);
 void next_song(struct Emulator* emulator, NSF* nsf);
 void prev_song(struct Emulator* emulator, NSF* nsf);
 void init_song(struct Emulator* emulator, size_t song_number);
-void nsf_jsr(struct Emulator* emulator, uint16_t address);
+void nsf_execute(struct Emulator* emulator);
 void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf);
 void render_NSF_graphics(struct Emulator* emulator, NSF* nsf);

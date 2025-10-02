@@ -43,7 +43,7 @@ over time. Any help is welcome.
     - [x] NES2.0
     - [x] NSF
     - [x] NSFe
-    - [ ] NSF2
+    - [x] NSF2
     - [ ] UNIF
     - [ ] FDS
     - [ ] IPS
