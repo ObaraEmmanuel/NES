@@ -29,6 +29,7 @@ void init_cpu(struct Emulator* emulator){
     set_cpu_mode(cpu, CPU_EXEC); // Normal execution
     cpu->memory = &emulator->mem;
     cpu->sr_started = 0;
+    cpu->NMI_hook = NULL;
 
     cpu->ac = cpu->x = cpu->y = cpu->state = 0;
     cpu->cycles = cpu->dma_cycles = 0;
@@ -50,6 +51,7 @@ void reset_cpu(c6502* cpu){
     cpu->cycles = 0;
     cpu->dma_cycles = 0;
     cpu->sr_started = 0;
+    cpu->NMI_hook = NULL;
 }
 
 uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address) {

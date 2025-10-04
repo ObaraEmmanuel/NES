@@ -22,6 +22,7 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     if(argc == 3 || argc == 6)
         genie = argv[argc - 1];
 
+    memset(emulator, 0, sizeof(Emulator));
     load_file(argv[1], genie, &emulator->mapper);
     emulator->type = emulator->mapper.type;
     emulator->mapper.emulator = emulator;
