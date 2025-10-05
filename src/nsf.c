@@ -27,6 +27,7 @@ static uint8_t read_ROM(Mapper*, uint16_t);
 static void write_ROM(Mapper*, uint16_t, uint8_t);
 
 static void log_nsf_flags(uint8_t flags);
+static void log_sound_chip_flags(uint8_t flags);
 static void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len);
 static void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
 static void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
@@ -47,6 +48,18 @@ static void log_nsf_flags(uint8_t flags) {
         flags & NSF_NON_RETURN_INIT ? 'Y' : 'N',
         flags & NSF_NO_PLAY_SR ? 'Y' : 'N',
         flags & NSF_REQ_NSFE_CHUNKS ? 'Y' : 'N'
+    );
+}
+
+static void log_sound_chip_flags(uint8_t flags) {
+    LOG(DEBUG, "VRC6 [%c] | VRC7 [%c] | FDS [%c] | MMC5 [%c] | Namco 163 [%c] | Sunsoft 5B [%c] | VT02+ [%c]",
+        flags & BIT_0 ? 'Y' : 'N',
+        flags & BIT_1 ? 'Y' : 'N',
+        flags & BIT_2 ? 'Y' : 'N',
+        flags & BIT_3 ? 'Y' : 'N',
+        flags & BIT_4 ? 'Y' : 'N',
+        flags & BIT_5 ? 'Y' : 'N',
+        flags & BIT_6 ? 'Y' : 'N'
     );
 }
 
@@ -116,8 +129,8 @@ void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
 
     if(chunk[0x7]) {
-        LOG(ERROR, "Extra Sound Chip support required");
-        quit(EXIT_FAILURE);
+        log_sound_chip_flags(chunk[0x7]);
+        LOG(WARN, "Requires extra sound chip support that is not available");
     }
 
     nsf->total_songs = chunk[8];
@@ -323,6 +336,8 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
             log_nsf_flags(nsf->flags);
         } else if(strncmp(id, "RATE", 4) == 0) {
             load_rate_chunk(len, mapper, file);
+        } else if(strncmp(id, "VRC7", 4) == 0) {
+            // Skip for now
         } else if(strncmp(id, "auth", 4) == 0) {
             load_auth_chunk(len, mapper, file);
         } else if(strncmp(id, "time", 4) == 0) {
@@ -414,8 +429,8 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
     LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
 
     if(header[0x7b]) {
-        LOG(ERROR, "Extra Sound Chip support required");
-        quit(EXIT_FAILURE);
+        log_sound_chip_flags(header[0x7b]);
+        LOG(WARN, "Requires extra sound chip support that is not available");
     }
 
     nsf->flags = 0;
@@ -516,6 +531,8 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
                 // Skip
             } else if(strncmp(id, "RATE", 4) == 0) {
                 load_rate_chunk(len, mapper, file);
+            } else if(strncmp(id, "VRC7", 4) == 0) {
+                // Skip for now
             } else if(strncmp(id, "auth", 4) == 0) {
                 load_auth_chunk(len, mapper, file);
             } else if(strncmp(id, "time", 4) == 0) {
