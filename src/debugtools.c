@@ -1,5 +1,6 @@
 #include "debugtools.h"
 #include "ppu.h"
+#include "utils.h"
 
 static uint8_t* get_palette(struct PPU* ppu, size_t tile_x, size_t tile_y);
 

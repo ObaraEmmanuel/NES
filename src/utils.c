@@ -170,14 +170,14 @@ void SDL_PauseAudio(SDL_AudioStream* stream, const int flag) {
 }
 
 
-void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format){
+void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, ColorFormat format){
     for(int i = 0; i < size; i++) {
         switch (format) {
-            case SDL_PIXELFORMAT_ARGB8888:{
+            case ARGB8888:{
                 out[i] = in[i];
                 break;
             }
-            case SDL_PIXELFORMAT_ABGR8888:{
+            case ABGR8888:{
                 out[i] = (in[i] & 0xff000000) | ((in[i] << 16) & 0x00ff0000) | (in[i] & 0x0000ff00) | ((in[i] >> 16) & 0x000000ff);
                 break;
             }

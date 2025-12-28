@@ -68,6 +68,11 @@ enum LogLevel{
     INFO,
 };
 
+typedef enum ColorFormat {
+    ARGB8888,
+    ABGR8888
+} ColorFormat;
+
 size_t file_size(FILE* file);
 void LOG(enum LogLevel logLevel, const char* fmt, ...);
 
@@ -75,7 +80,7 @@ void LOG(enum LogLevel logLevel, const char* fmt, ...);
 int SDL_RenderDrawCircle(SDL_Renderer * renderer, int x, int y, int radius);
 int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius);
 void SDL_PauseAudio(SDL_AudioStream* stream, int flag);
-void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, uint32_t format);
+void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, ColorFormat format);
 void fft(complx *v, int n, complx *tmp);
 uint64_t next_power_of_2(uint64_t num);
 char *get_file_name(char *path);

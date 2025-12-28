@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include "utils.h"
 #include "mapper.h"
 
 #define VISIBLE_SCANLINES 240

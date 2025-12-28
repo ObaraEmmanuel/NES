@@ -13,7 +13,7 @@ uint32_t nes_palette[64];
 static size_t screen_size;
 
 void init_ppu(struct Emulator* emulator){
-    to_pixel_format(nes_palette_raw, nes_palette, 64, SDL_PIXELFORMAT_ABGR8888);
+    to_pixel_format(nes_palette_raw, nes_palette, 64, ABGR8888);
     PPU* ppu = &emulator->ppu;
 #if NAMETABLE_MODE
     screen_size = sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS * 4;

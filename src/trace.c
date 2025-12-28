@@ -1,7 +1,7 @@
 #include <string.h>
-#include <stdlib.h>
 
 #include "cpu6502.h"
+#include "utils.h"
 
 static void get_opcode(char* out, Opcode opcode);
 static int is_official(uint8_t op_hex, Opcode opcode);
