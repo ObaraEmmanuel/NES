@@ -8,8 +8,8 @@
 #include "utils.h"
 #include "nsf.h"
 
-static void select_mapper(Mapper*  mapper);
-static void set_mapping(Mapper* mapper, uint16_t tr, uint16_t tl, uint16_t br, uint16_t bl);
+static int select_mapper(Mapper*  mapper);
+static void set_mapping(Mapper* mapper, uint16_t tl, uint16_t tr, uint16_t bl, uint16_t br);
 
 // generic mapper implementations
 static uint8_t read_PRG(Mapper*, uint16_t);
@@ -20,7 +20,7 @@ static uint8_t read_ROM(Mapper*, uint16_t);
 static void write_ROM(Mapper*, uint16_t, uint8_t);
 static void on_scanline(Mapper*);
 
-static void select_mapper(Mapper* mapper){
+static int select_mapper(Mapper* mapper){
     // load generic implementations
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
@@ -61,8 +61,9 @@ static void select_mapper(Mapper* mapper){
             break;
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
-            quit(EXIT_FAILURE);
+            return -1;
     }
+    return 0;
 }
 
 
@@ -175,38 +176,88 @@ static void write_CHR(Mapper* mapper, uint16_t address, uint8_t value){
 }
 
 
-void load_file(char* file_name, char* game_genie, Mapper* mapper){
-    SDL_IOStream *file;
-    file = SDL_IOFromFile(file_name, "rb");
+static long long read_file_to_buffer(char* file_name, uint8_t** buffer) {
+    SDL_IOStream *file = SDL_IOFromFile(file_name, "rb");
 
     if(file == NULL){
         LOG(ERROR, "file '%s' not found", file_name);
+        return -1;
+    }
+
+    long long f_size = SDL_SeekIO(file, 0, SDL_IO_SEEK_END);
+    if(f_size < 0) {
+        LOG(ERROR, "Error reading length for file %s", file_name);
+        return -1;
+    }
+    SDL_SeekIO(file, 0, SDL_IO_SEEK_SET);
+
+    *buffer = malloc(f_size);
+    if (*buffer == NULL) {
+        LOG(ERROR, "Error allocating memory for %s", file_name);
+        return -1;
+    }
+
+    size_t input_bytes = SDL_ReadIO(file, *buffer, f_size);
+    if (input_bytes != f_size) {
+        free(*buffer);
+        LOG(ERROR, "Error reading file %s", file_name);
+        return -1;
+    }
+
+    return f_size;
+}
+
+
+void load_file(char* file_name, char* game_genie, Mapper* mapper) {
+    ROMData data = {0};
+    long long rom_size = read_file_to_buffer(file_name, &data.rom);
+    if(rom_size < 0) {
         quit(EXIT_FAILURE);
     }
 
+    data.rom_size = rom_size;
+    data.rom_name = file_name;
+
+    if (game_genie != NULL) {
+        rom_size = read_file_to_buffer(game_genie, &data.genie_rom);
+        if(rom_size < 0) {
+            quit(EXIT_FAILURE);
+        }
+        data.genie_rom_size = rom_size;
+    }
+
+    const int result = load_data(&data, mapper);
+    if (data.rom != NULL)
+        free(data.rom);
+    if (data.genie_rom != NULL)
+        free(data.genie_rom);
+
+    if (result < 0) {
+        quit(EXIT_FAILURE);
+    }
+
+}
+
+
+int load_data(ROMData* rom_data, Mapper* mapper){
     // clear mapper
     memset(mapper, 0, sizeof(Mapper));
+    const uint8_t* header = rom_data->rom;
+    size_t offset = INES_HEADER_SIZE;
 
-    uint8_t header[INES_HEADER_SIZE];
-    SDL_ReadIO(file, header, INES_HEADER_SIZE);
-
-    if(strncmp(header, "NESM\x1A", 5) == 0){
+    if(strncmp((char*)header, "NESM\x1A", 5) == 0){
         LOG(INFO, "Using NSF format");
-        load_nsf(file, mapper);
-        SDL_CloseIO(file);
-        return;
+        return load_nsf(rom_data, mapper);
     }
 
-    if(strncmp(header, "NSFE", 4) == 0){
+    if(strncmp((char*)header, "NSFE", 4) == 0){
         LOG(INFO, "Using NSFe format");
-        load_nsfe(file, mapper);
-        SDL_CloseIO(file);
-        return;
+        return load_nsfe(rom_data, mapper);
     }
 
-    if(strncmp(header, "NES\x1A", 4) != 0){
+    if(strncmp((char*)header, "NES\x1A", 4) != 0){
         LOG(ERROR, "unknown file format");
-        quit(EXIT_FAILURE);
+        return -1;
     }
 
     uint8_t mapnum = header[7] & 0x0C;
@@ -243,7 +294,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
 
     if(header[6] & BIT_2) {
         LOG(ERROR, "Trainer not supported");
-        quit(EXIT_FAILURE);
+        return -1;
     }
 
     Mirroring mirroring;
@@ -310,7 +361,7 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
             case 3:
                 mapper->type = DENDY;
                 LOG(ERROR, "Dendy ROM not supported");
-                quit(EXIT_FAILURE);
+                return -1;
             default:
                 break;
         }
@@ -333,9 +384,11 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
             LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
         }
 
-        if(strstr(file_name, "(E)") != NULL && mapper->type == NTSC) {
-            // probably PAL ROM
-            mapper->type = PAL;
+        if (rom_data->rom_name != NULL) {
+            if(strstr(rom_data->rom_name, "(E)") != NULL && mapper->type == NTSC) {
+                // probably PAL ROM
+                mapper->type = PAL;
+            }
         }
     }
 
@@ -343,11 +396,13 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
 
     mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    SDL_ReadIO(file, mapper->PRG_ROM, 0x4000 * mapper->PRG_banks);
+    memcpy(mapper->PRG_ROM, rom_data->rom + offset, 0x4000 * mapper->PRG_banks);
+    offset += 0x4000 * mapper->PRG_banks;
 
     if(mapper->CHR_banks) {
         mapper->CHR_ROM = malloc(0x2000 * mapper->CHR_banks);
-        SDL_ReadIO(file, mapper->CHR_ROM, 0x2000 * mapper->CHR_banks);
+        memcpy(mapper->CHR_ROM, rom_data->rom + offset, 0x2000 * mapper->CHR_banks);
+        // offset += 0x2000 * mapper->CHR_banks;
     }else{
         if(!mapper->CHR_RAM_size) {
             LOG(INFO, "No CHR-RAM or CHR-ROM specified, Using 8kb CHR-RAM");
@@ -373,14 +428,16 @@ void load_file(char* file_name, char* game_genie, Mapper* mapper){
     }
 
     LOG(INFO, "Using mapper #%d", mapper->mapper_num);
-    select_mapper(mapper);
+
+    if (select_mapper(mapper) < 0)
+        return -1;
     set_mirroring(mapper, mirroring);
 
-    if(game_genie != NULL){
+    if(rom_data->genie_rom != NULL){
         LOG(INFO, "-------- Game Genie Cartridge info ---------");
-        load_genie(game_genie, mapper);
+        return load_genie(rom_data, mapper);
     }
-    SDL_CloseIO(file);
+    return 0;
 }
 
 void free_mapper(Mapper* mapper){

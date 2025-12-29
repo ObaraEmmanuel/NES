@@ -1,10 +1,10 @@
 # pragma once
+#include <SDL.h>
 
 #include "gfx.h"
 #include "mapper.h"
 #include "apu.h"
 #include "utils.h"
-#include <SDL.h>
 
 #define NSF_HEADER_SIZE 0x80
 #define TEXT_FIELD_SIZE 32
@@ -70,8 +70,8 @@ typedef struct NSF {
     complx temp[AUDIO_BUFF_SIZE];
 } NSF;
 
-void load_nsf(SDL_IOStream* file, Mapper* mapper);
-void load_nsfe(SDL_IOStream* file, Mapper* mapper);
+int load_nsf(ROMData* rom_data, Mapper* mapper);
+int load_nsfe(ROMData* rom_data, Mapper* mapper);
 void free_NSF(NSF* nsf);
 void next_song(struct Emulator* emulator, NSF* nsf);
 void prev_song(struct Emulator* emulator, NSF* nsf);

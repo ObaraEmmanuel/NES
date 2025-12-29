@@ -44,6 +44,14 @@ struct Genie;
 struct Emulator;
 struct NSF;
 
+typedef struct ROMData {
+    char* rom_name;
+    uint8_t* rom;
+    uint8_t* genie_rom;
+    uint64_t rom_size;
+    uint64_t genie_rom_size;
+} ROMData;
+
 typedef struct Mapper{
     uint8_t* CHR_ROM;
     uint8_t* PRG_ROM;
@@ -83,6 +91,7 @@ typedef struct Mapper{
 } Mapper;
 
 void load_file(char* file_name, char* game_genie, Mapper* mapper);
+int load_data(ROMData* data, Mapper* mapper);
 void free_mapper(struct Mapper* mapper);
 void set_mirroring(Mapper* mapper, Mirroring mirroring);
 

@@ -18,9 +18,16 @@ static void load_registers(const uint8_t* mem, uint16_t* addr, uint8_t* cmp, uin
 static void swap_mirroring(Genie* genie);
 
 
-void load_genie(char* filename, Mapper* mapper){
+int load_genie(ROMData* rom_data, Mapper* mapper){
     Genie* genie = calloc(1, sizeof(Genie));
-    load_file(filename, NULL, &genie->g_mapper);
+    ROMData genie_rom_data = {0};
+    genie_rom_data.rom = rom_data->genie_rom;
+    genie_rom_data.rom_size = rom_data->genie_rom_size;
+
+    const int result = load_data(&genie_rom_data, &genie->g_mapper);
+    if(result < 0) {
+        return result;
+    }
     mapper->genie = genie;
     genie->mapper = mapper;
 
@@ -41,6 +48,7 @@ void load_genie(char* filename, Mapper* mapper){
     mapper->read_ROM = read_ROM;
 
     swap_mirroring(genie);
+    return 0;
 }
 
 

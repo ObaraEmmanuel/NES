@@ -11,4 +11,4 @@ typedef struct Genie{
     uint8_t cmp1, cmp2, cmp3, repl1, repl2, repl3, ctrl;
 } Genie;
 
-void load_genie(char* filename, Mapper* mapper);
+int load_genie(ROMData* rom_data, Mapper* mapper);

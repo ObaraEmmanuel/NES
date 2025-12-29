@@ -29,15 +29,15 @@ static void write_ROM(Mapper*, uint16_t, uint8_t);
 static void log_nsf_flags(uint8_t flags);
 static void log_sound_chip_flags(uint8_t flags);
 static void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_len, size_t max_str_len);
-static void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
-static void load_text_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file);
+static int load_info_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_data_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_bank_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_rate_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_auth_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_time_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_fade_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_tlbl_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
+static int load_text_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf);
 
 static int song_num = -1, silent_frames = 0;
 static int minutes = -1, seconds = -1;
@@ -90,18 +90,17 @@ void read_text_stream(char** list, const char* buf, size_t list_len, size_t buf_
     }
 }
 
-void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
-    uint8_t chunk[10] = {0};
+int load_info_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
+    const uint8_t* chunk = buf;
     if(len < 9) {
         LOG(ERROR, "INFO chunk too short");
-        quit(EXIT_FAILURE);
+        return -1;
     }
-    SDL_ReadIO(file, chunk, len > 10 ? 10: len);
     NSF* nsf = mapper->NSF;
     nsf->load_addr = (chunk[1] << 8) | chunk[0];
     if(nsf->load_addr < 0x8000) {
         LOG(ERROR, "Load address ox%04x too low", nsf->load_addr);
-        quit(EXIT_FAILURE);
+        return -1;
     }
 
     nsf->init_addr = (chunk[3] << 8) | chunk[2];
@@ -138,9 +137,11 @@ void load_info_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
         nsf->starting_song = nsf->current_song = chunk[9] + 1;
     else
         nsf->starting_song = nsf->current_song = 1;
+
+    return 0;
 }
 
-void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_data_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
     if(nsf->bank_switch) {
         uint16_t padding = nsf->load_addr & 0xfff;
@@ -153,7 +154,7 @@ void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
         LOG(INFO, "PRG banks: %llu", mapper->PRG_banks);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
-        SDL_ReadIO(file, mapper->PRG_ROM + padding, len);
+        memcpy(mapper->PRG_ROM + padding, buf, len);
 
         // compute bank pointers
         for(size_t i = 0; i < 8; i++) {
@@ -164,32 +165,33 @@ void load_data_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
         mapper->PRG_ROM = malloc(PRG_ROM_SIZE);
         memset(mapper->PRG_ROM, 0, PRG_ROM_SIZE);
         size_t read_len = MIN(len, 0x10000 - nsf->load_addr);
-        SDL_ReadIO(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), read_len);
+        memcpy(mapper->PRG_ROM + (nsf->load_addr - 0x8000), buf, read_len);
     }
+    return 0;
 }
 
-void load_bank_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_bank_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
     nsf->bank_switch = 1;
-    uint8_t bank_data[8] = {0};
-    SDL_ReadIO(file, bank_data, len > 8 ? 8: len);
+    const uint8_t* bank_data = buf;
+    uint32_t cap = len > 8 ? 8 : len;
 
-    for(size_t i = 0; i < 8; i++) {
+    for(size_t i = 0; i < cap; i++) {
         nsf->bank_init[i] = bank_data[i];
     }
+    return 0;
 }
 
-void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_rate_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
     if(len < 2 || (len & 1 && len < 8)) {
         LOG(ERROR, "Invalid RATE chunk");
-        quit(EXIT_FAILURE);
+        return -1;
     }
 
-    uint8_t chunk[6];
-    SDL_ReadIO(file, chunk, len > 6 ? 6 : len);
+    const uint8_t* chunk = buf;
 
-    if(len > 0 && mapper->type == NTSC) {
+    if(mapper->type == NTSC) {
         nsf->speed = (chunk[1] << 8) | chunk[0];
     }
     if(len > 2 && mapper->type == PAL) {
@@ -198,14 +200,11 @@ void load_rate_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
     if(len > 4 && mapper->type == DENDY) {
         nsf->speed = (chunk[5] << 8) | chunk[4];
     }
+    return 0;
 }
 
-void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_auth_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
-
-    uint8_t* chunk = malloc(len);
-    memset(chunk, 0, len);
-    SDL_ReadIO(file, chunk, len);
 
     char* fields[4] = {
         nsf->song_name,
@@ -214,41 +213,38 @@ void load_auth_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
         nsf->ripper
     };
 
-    read_text_stream(fields, (char*)chunk, 4, len, MAX_TEXT_FIELD_SIZE);
+    read_text_stream(fields, (char*)buf, 4, len, MAX_TEXT_FIELD_SIZE);
     LOG(INFO, "SONG_NAME: %s", nsf->song_name);
     LOG(INFO, "ARTIST: %s", nsf->artist);
     LOG(INFO, "COPYRIGHT: %s", nsf->copyright);
     LOG(INFO, "RIPPER: %s", nsf->ripper);
-    free(chunk);
+    return 0;
 }
 
-void load_time_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_time_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
 
     nsf->times = malloc(4 * nsf->total_songs);
     memset(nsf->times, 0, 4 * nsf->total_songs);
 
-    SDL_ReadIO(file, nsf->times, len);
-    for(int i = len / 4; i < nsf->total_songs; i++) {
+    memcpy(nsf->times, buf, len);
+    for(uint32_t i = len / 4; i < nsf->total_songs; i++) {
         nsf->times[i] = NSF_DEFAULT_TRACK_DUR;
     }
+    return 0;
 }
 
-void load_fade_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_fade_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
 
     nsf->fade = malloc(4 * nsf->total_songs);
     memset(nsf->fade, 0, 4 * nsf->total_songs);
-
-    SDL_ReadIO(file, nsf->fade, len);
+    memcpy(nsf->fade, buf, len);
+    return 0;
 }
 
-void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
+int load_tlbl_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     NSF* nsf = mapper->NSF;
-
-    uint8_t* chunk = malloc(len);
-    memset(chunk, 0, len);
-    SDL_ReadIO(file, chunk, len);
 
     nsf->tlbls = malloc(nsf->total_songs * sizeof(char*));
     memset(nsf->tlbls, 0, nsf->total_songs * sizeof(char*));
@@ -257,18 +253,16 @@ void load_tlbl_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
         nsf->tlbls[i] = (char*)malloc(MAX_TRACK_NAME_SIZE + 1);
         memset(nsf->tlbls[i], 0, MAX_TRACK_NAME_SIZE + 1);
     }
-    read_text_stream(nsf->tlbls, (char*)chunk, nsf->total_songs, len, MAX_TRACK_NAME_SIZE);
-    free(chunk);
+    read_text_stream(nsf->tlbls, (char*)buf, nsf->total_songs, len, MAX_TRACK_NAME_SIZE);
+    return 0;
 }
 
-static void load_text_chunk(uint32_t len, Mapper* mapper, SDL_IOStream* file) {
-    char* chunk = malloc(len);
-    SDL_ReadIO(file, chunk, len);
-    LOG(INFO, "TEXT: \n%s \n", chunk);
-    free(chunk);
+int load_text_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
+    LOG(INFO, "TEXT: \n%.*s \n", len, buf);
+    return 0;
 }
 
-void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
+int load_nsfe(ROMData* rom_data, Mapper* mapper) {
     // PRG RAM
     mapper->PRG_RAM = malloc(PRG_RAM_SIZE);
     memset(mapper->PRG_RAM, 0, PRG_RAM_SIZE);
@@ -283,7 +277,6 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
 
     // skip the header
     int64_t offset = 4;
-    SDL_SeekIO(file, offset, SDL_IO_SEEK_SET);
 
     mapper->is_nsf = 1;
 
@@ -302,70 +295,68 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
 
     while(1) {
         char id[5];
-        if(!SDL_ReadIO(file, &len, 4)) {
-            LOG(ERROR, "Error loading NSFe");
-            quit(EXIT_FAILURE);
-        }
+        memcpy(&len, rom_data->rom + offset, 4);
+        offset += 4;
         memset(id, 0, 5);
-        SDL_ReadIO(file, id, 4);
-        offset += 8 + len;
+        memcpy(id, rom_data->rom + offset, 4);
+        offset += 4;
 
         LOG(DEBUG, "Chunk: %s (%d)", id, len);
+        int result = 0;
 
         if(strncmp(id, "INFO", 4) == 0) {
-            load_info_chunk(len, mapper, file);
+            result = load_info_chunk(len, mapper, rom_data->rom + offset);
             has_info = 1;
         } else if(strncmp(id, "DATA", 4) == 0) {
             if(!has_info) {
                 LOG(ERROR, "Missing INFO chunk before DATA");
-                quit(EXIT_FAILURE);
+                return -1;
             }
-            load_data_chunk(len, mapper, file);
+            result = load_data_chunk(len, mapper, rom_data->rom + offset);
         } else if(strncmp(id, "BANK", 4) == 0) {
             if(!has_info) {
                 LOG(ERROR, "Missing INFO chunk before BANK");
-                quit(EXIT_FAILURE);
+                return -1;
             }
-            load_bank_chunk(len, mapper, file);
+            result = load_bank_chunk(len, mapper, rom_data->rom + offset);
         } else if (strncmp(id, "NEND", 4) == 0) {
             break;
         } else if (strncmp(id, "NSF2", 4) == 0) {
-            SDL_ReadIO(file, &nsf->flags, len);
+            memcpy(&nsf->flags, rom_data->rom + offset, len);
             nsf->version = 2;
             LOG(INFO, "Using NSF 2.0");
             log_nsf_flags(nsf->flags);
         } else if(strncmp(id, "RATE", 4) == 0) {
-            load_rate_chunk(len, mapper, file);
+            result = load_rate_chunk(len, mapper, rom_data->rom + offset);
         } else if(strncmp(id, "VRC7", 4) == 0) {
             // Skip for now
         } else if(strncmp(id, "auth", 4) == 0) {
-            load_auth_chunk(len, mapper, file);
+            result = load_auth_chunk(len, mapper, rom_data->rom + offset);
         } else if(strncmp(id, "time", 4) == 0) {
             if(has_info) {
-                load_time_chunk(len, mapper, file);
+                result = load_time_chunk(len, mapper, rom_data->rom + offset);
             }
         } else if(strncmp(id, "fade", 4) == 0) {
             if(has_info) {
-                load_fade_chunk(len, mapper, file);
+                result = load_fade_chunk(len, mapper, rom_data->rom + offset);
             }
         } else if(strncmp(id, "tlbl", 4) == 0) {
             if(has_info) {
-                load_tlbl_chunk(len, mapper, file);
+                result = load_tlbl_chunk(len, mapper, rom_data->rom + offset);
             }
         } else if(strncmp(id, "text", 4) == 0) {
-            load_text_chunk(len, mapper, file);
+            result = load_text_chunk(len, mapper, rom_data->rom + offset);
         } else if(id[0] > 65 && id[0] < 90) {
             LOG(ERROR, "Required chunk %s not implemented", id);
-            quit(EXIT_FAILURE);
+            return -1;
         } else {
             LOG(DEBUG, "Skipping chunk %s", id);
         }
+        if (result < 0)
+            return result;
 
         // move to start of next chunk
-        if(SDL_SeekIO(file, offset, SDL_IO_SEEK_SET) < 0) {
-            LOG(ERROR, "Error loading NSFe");
-            quit(EXIT_FAILURE);
-        }
+        offset += len;
     }
     LOG(DEBUG, "Bank switching: %s", nsf->bank_switch ? "ON": "OFF");
 
@@ -373,13 +364,12 @@ void load_nsfe(SDL_IOStream* file, Mapper* mapper) {
         // initialize IRQ vector with initial value at 0xfffe-0xffff if IRQ enabled
         nsf->IRQ_vector = read_PRG(mapper, 0xfffe) | read_PRG(mapper, 0xffff) << 8;
     }
+    return 0;
 }
 
-void load_nsf(SDL_IOStream* file, Mapper* mapper) {
-    SDL_SeekIO(file, 0, SDL_IO_SEEK_SET);
-
-    uint8_t header[NSF_HEADER_SIZE];
-    SDL_ReadIO(file, header, NSF_HEADER_SIZE);
+int load_nsf(ROMData* rom_data, Mapper* mapper) {
+    uint8_t* const header = rom_data->rom;
+    size_t offset = NSF_HEADER_SIZE;
 
     mapper->is_nsf = 1;
 
@@ -393,7 +383,7 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
     nsf->load_addr = (header[9] << 8) | header[8];
     if(nsf->load_addr < 0x8000) {
         LOG(ERROR, "Load address ox%04x too low", nsf->load_addr);
-        quit(EXIT_FAILURE);
+        return -1;
     }
 
     nsf->init_addr = (header[0xb] << 8) | header[0xa];
@@ -442,21 +432,16 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
 
     size_t data_len = (header[0x7f] << 16) | (header[0x7e] << 8) | header[0x7d];
 
-    long long size = SDL_SeekIO(file, 0, SDL_IO_SEEK_END);
-    if(size < 0) {
-        LOG(ERROR, "Error reading ROM");
-        quit(EXIT_FAILURE);
-    }
+    size_t size = rom_data->rom_size;
+
     size -= NSF_HEADER_SIZE;
     if (data_len > size) {
         LOG(ERROR, "Error reading ROM, Invalid length");
-        quit(EXIT_FAILURE);
+        return -1;
     }
     if (!data_len)
         data_len = size;
     size_t metadata_len = size - data_len;
-    // reset file ptr
-    SDL_SeekIO(file, NSF_HEADER_SIZE, SDL_IO_SEEK_SET);
 
 
     LOG(DEBUG, "Program data length: %llu", data_len);
@@ -496,7 +481,8 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
         LOG(DEBUG, "PRG banks: %llu", mapper->PRG_banks);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
-        SDL_ReadIO(file, mapper->PRG_ROM + padding, data_len);
+        memcpy(mapper->PRG_ROM + padding, rom_data->rom + offset, data_len);
+        offset += data_len;
 
         // init banks
         for(size_t i =0; i < 8; i++) {
@@ -508,20 +494,23 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
         mapper->PRG_ROM = malloc(PRG_ROM_SIZE);
         memset(mapper->PRG_ROM, 0, PRG_ROM_SIZE);
         size_t read_len = MIN(data_len, 0x10000 - nsf->load_addr);
-        SDL_ReadIO(file, mapper->PRG_ROM + (nsf->load_addr - 0x8000), read_len);
+        memcpy(mapper->PRG_ROM + (nsf->load_addr - 0x8000), rom_data->rom + offset, read_len);
+        offset += read_len;
     }
 
     if (nsf->version == 2 && metadata_len > 0) {
-        size_t offset = NSF_HEADER_SIZE + data_len;
+        offset = NSF_HEADER_SIZE + data_len;
         uint32_t len = 0;
         while (offset < size) {
             char id[5];
-            SDL_ReadIO(file, &len, 4);
+            memcpy(&len, rom_data->rom + offset, 4);
+            offset += 4;
             memset(id, 0, 5);
-            SDL_ReadIO(file, id, 4);
-            offset += 8 + len;
+            memcpy(id, rom_data->rom + offset, 4);
+            offset += 4;
 
             LOG(DEBUG, "Chunk: %s (%d)", id, len);
+            int result = 0;
 
             if (strncmp(id, "NEND", 4) == 0) {
                 break;
@@ -530,31 +519,29 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
             if(strncmp(id, "INFO", 4) == 0 || strncmp(id, "DATA", 4) == 0 || strncmp(id, "BANK", 4) == 0 || strncmp(id, "NSF2", 4) == 0) {
                 // Skip
             } else if(strncmp(id, "RATE", 4) == 0) {
-                load_rate_chunk(len, mapper, file);
+                result = load_rate_chunk(len, mapper, rom_data->rom + offset);
             } else if(strncmp(id, "VRC7", 4) == 0) {
                 // Skip for now
             } else if(strncmp(id, "auth", 4) == 0) {
-                load_auth_chunk(len, mapper, file);
+                result = load_auth_chunk(len, mapper, rom_data->rom + offset);
             } else if(strncmp(id, "time", 4) == 0) {
-                load_time_chunk(len, mapper, file);
+                result = load_time_chunk(len, mapper, rom_data->rom + offset);
             } else if(strncmp(id, "fade", 4) == 0) {
-                load_fade_chunk(len, mapper, file);
+                result = load_fade_chunk(len, mapper, rom_data->rom + offset);
             } else if(strncmp(id, "tlbl", 4) == 0) {
-                load_tlbl_chunk(len, mapper, file);
+                result = load_tlbl_chunk(len, mapper, rom_data->rom + offset);
             } else if(strncmp(id, "text", 4) == 0) {
-                load_text_chunk(len, mapper, file);
+                result = load_text_chunk(len, mapper, rom_data->rom + offset);
             } else if(id[0] > 65 && id[0] < 90) {
                 LOG(ERROR, "Required chunk %s not implemented", id);
-                quit(EXIT_FAILURE);
+                return -1;
             } else {
                 LOG(DEBUG, "Skipping chunk %s", id);
             }
+            if (result < 0)
+                return result;
 
-            // move to start of next chunk
-            if(SDL_SeekIO(file, offset, SDL_IO_SEEK_SET) < 0) {
-                LOG(ERROR, "Error loading NSF2 Metadata");
-                quit(EXIT_FAILURE);
-            }
+            offset += len;
         }
     }
 
@@ -562,6 +549,7 @@ void load_nsf(SDL_IOStream* file, Mapper* mapper) {
         // initialize IRQ vector with initial value at 0xfffe-0xffff if IRQ enabled
         nsf->IRQ_vector = read_PRG(mapper, 0xfffe) | read_PRG(mapper, 0xffff) << 8;
     }
+    return 0;
 }
 
 void nsf_execute(Emulator* emulator) {
