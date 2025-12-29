@@ -2,7 +2,6 @@
 
 #include <stdint.h>
 
-#include "ppu.h"
 #include "mapper.h"
 #include "controller.h"
 

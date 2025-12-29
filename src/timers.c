@@ -1,9 +1,10 @@
 #include "timers.h"
+#include "utils.h"
 
 #define G 1000000000L
 #define M 1000000L
 
-#ifdef _WIN // windows 64 and 32 bit
+#ifdef _WIN32 // windows 64 and 32 bit
 #include <windows.h>
 #define SLEEP_RESOLUTION_MS 1
 

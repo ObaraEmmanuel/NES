@@ -1,7 +1,6 @@
 #pragma once
 
 #include <stdint.h>
-#include "utils.h"
 
 typedef struct Timer{
     void* timer;

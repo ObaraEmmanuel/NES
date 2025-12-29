@@ -1,6 +1,5 @@
 #pragma once
 
-#include <stdlib.h>
 #include <stdint.h>
 
 struct PPU;

@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "mmu.h"
+// #include "mmu.h"
 
 #define STACK_START 0x100
 #define SENTINEL_ADDR 0x5ff5
@@ -195,6 +195,7 @@ static const uint8_t cycleLookup[256] = {
 };
 
 struct Emulator;
+struct Memory;
 
 typedef enum {
     NOI               = 0,      // no interrupt
@@ -250,7 +251,7 @@ typedef struct c6502{
     Interrupt interrupt;
     uint8_t NMI_line;
     const Instruction* instruction;
-    Memory* memory;
+    struct Memory* memory;
     void (*NMI_hook)(struct c6502*, int);
 } c6502;
 
