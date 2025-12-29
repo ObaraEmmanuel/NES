@@ -8,6 +8,7 @@
 #include "timers.h"
 #include "debugtools.h"
 #include "utils.h"
+#include "nsf_gfx.h"
 
 static uint64_t PERIOD;
 static uint16_t TURBO_SKIP;
@@ -219,7 +220,8 @@ void run_NSF_player(struct Emulator* emulator) {
     APU* apu = &emulator->apu;
     NSF* nsf = emulator->mapper.NSF;
     GraphicsContext* g_ctx = &emulator->g_ctx;
-    init_NSF_gfx(g_ctx, nsf);
+    NSFGraphicsContext nsf_ctx = {0};
+    init_NSF_graphics(emulator, &nsf_ctx);
     Timer* timer = &emulator->timer;
     SDL_Event e;
     Timer frame_timer;
@@ -355,7 +357,8 @@ void run_NSF_player(struct Emulator* emulator) {
                 interrupt_clear(cpu, NMI);
             }
 
-            render_NSF_graphics(emulator, nsf);
+            render_NSF_graphics(&nsf_ctx);
+            nsf_tick_frame(emulator);
             if(!nsf->initializing) {
                 queue_audio(apu, g_ctx);
                 nsf->tick += ms_per_frame;
@@ -374,6 +377,7 @@ void run_NSF_player(struct Emulator* emulator) {
     mark_end(&frame_timer);
     emulator->time_diff = get_diff_ms(&frame_timer);
     release_timer(&frame_timer);
+    free_NSF_graphics(&nsf_ctx);
 }
 
 

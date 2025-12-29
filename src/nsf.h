@@ -1,7 +1,5 @@
 # pragma once
-#include <SDL.h>
 
-#include "gfx.h"
 #include "mapper.h"
 #include "apu.h"
 #include "utils.h"
@@ -57,17 +55,6 @@ typedef struct NSF {
     uint8_t bank_init[8];
     uint8_t initializing;
     size_t prg_size;
-
-    SDL_Texture* song_info_tx;
-    SDL_FRect song_info_rect;
-    SDL_Texture* song_num_tx;
-    SDL_FRect song_num_rect;
-    SDL_Texture* song_dur_tx;
-    SDL_FRect song_dur_rect;
-    SDL_Texture* song_dur_max_tx;
-    SDL_FRect song_dur_max_rect;
-    complx samples[AUDIO_BUFF_SIZE];
-    complx temp[AUDIO_BUFF_SIZE];
 } NSF;
 
 int load_nsf(ROMData* rom_data, Mapper* mapper);
@@ -77,5 +64,4 @@ void next_song(struct Emulator* emulator, NSF* nsf);
 void prev_song(struct Emulator* emulator, NSF* nsf);
 void init_song(struct Emulator* emulator, size_t song_number);
 void nsf_execute(struct Emulator* emulator);
-void init_NSF_gfx(GraphicsContext* g_ctx, NSF* nsf);
-void render_NSF_graphics(struct Emulator* emulator, NSF* nsf);
+void nsf_tick_frame(struct Emulator* emulator);

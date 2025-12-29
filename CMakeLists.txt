@@ -46,6 +46,9 @@ set (SRC
         src/trace.c
         src/utils.c
         src/main.c
+        src/nsf.c
+        src/nsf_gfx.c
+        src/biquad.c
 
         src/mappers/axrom.c
         src/mappers/cnrom.c
@@ -55,10 +58,6 @@ set (SRC
         src/mappers/uxrom.c
         src/mappers/mmc3.c
         src/mappers/colordreams.c
-        src/nsf.c
-        src/biquad.c
-        src/biquad.h
-        src/font.h
 )
 include_directories(src src/mappers ${SDL_DIR}/include/SDL3 ${SDL_DIR}/include ${SDL_ttf_DIR}/include/SDL3_ttf)
 
