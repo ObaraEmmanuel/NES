@@ -20,18 +20,18 @@ typedef struct {
 } MMC3_t;
 
 
-static uint8_t read_PRG(Mapper *, uint16_t);
+static uint8_t read_PRG(Mapper * mapper, uint16_t addr);
 
-static void write_PRG(Mapper *, uint16_t, uint8_t);
+static void write_PRG(Mapper * mapper, uint16_t addr, uint8_t val);
 
-static uint8_t read_CHR(Mapper *, uint16_t);
+static uint8_t read_CHR(Mapper * mapper, uint16_t addr);
 
 static void write_bank_data(Mapper *mapper, uint8_t val);
 
-static void on_scanline(Mapper*);
+static void on_scanline(Mapper* mapper);
 
 
-void load_MMC3(Mapper *mapper) {
+int load_MMC3(Mapper *mapper) {
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
@@ -58,6 +58,7 @@ void load_MMC3(Mapper *mapper) {
         mmc3->CHR_bank_ptrs[i] = mapper->CHR_ROM;
     mmc3->CHR_bank_ptrs[1] = mmc3->CHR_bank_ptrs[0] + 0x400;
     mmc3->CHR_bank_ptrs[3] = mmc3->CHR_bank_ptrs[0] + 0x400;
+    return 0;
 }
 
 static void on_scanline(Mapper* mapper) {

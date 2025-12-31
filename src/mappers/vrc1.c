@@ -1,18 +1,18 @@
 #include "mapper.h"
 #include "utils.h"
 
-static uint8_t read_PRG(Mapper*, uint16_t);
-static void write_PRG(Mapper*, uint16_t, uint8_t);
-static uint8_t read_CHR(Mapper*, uint16_t);
-static void update_CHR_ptrs(Mapper* mapper);
+static uint8_t read_PRG(Mapper *mapper, uint16_t address);
+static void write_PRG(Mapper *mapper, uint16_t address, uint8_t val);
+static uint8_t read_CHR(Mapper *mapper, uint16_t address);
+static void update_CHR_ptrs(Mapper *mapper);
 
 typedef struct VCR1 {
     uint8_t CHR_0;
     uint8_t CHR_1;
 } VRC1_t;
 
-void load_VRC1(Mapper* mapper) {
-    VRC1_t* vrc1 = calloc(1, sizeof(VRC1_t));
+int load_VRC1(Mapper *mapper) {
+    VRC1_t *vrc1 = calloc(1, sizeof(VRC1_t));
     mapper->extension = vrc1;
     mapper->write_PRG = write_PRG;
     mapper->read_PRG = read_PRG;
@@ -24,10 +24,11 @@ void load_VRC1(Mapper* mapper) {
     // Initialize both banks to the first bank
     vrc1->CHR_0 = vrc1->CHR_1 = 0;
     update_CHR_ptrs(mapper);
+    return 0;
 }
 
-static void write_PRG(Mapper* mapper, uint16_t address, uint8_t val) {
-    VRC1_t* vrc1 = mapper->extension;
+static void write_PRG(Mapper *mapper, uint16_t address, uint8_t val) {
+    VRC1_t *vrc1 = mapper->extension;
 
     switch (address & 0xf000) {
         case 0x8000:
@@ -63,16 +64,16 @@ static void write_PRG(Mapper* mapper, uint16_t address, uint8_t val) {
     }
 }
 
-static uint8_t read_PRG(Mapper* mapper, uint16_t address) {
+static uint8_t read_PRG(Mapper *mapper, uint16_t address) {
     return mapper->PRG_ptrs[(address & 0x7fff) >> 13][address & 0x1fff];
 }
 
-static uint8_t read_CHR(Mapper* mapper, uint16_t address) {
+static uint8_t read_CHR(Mapper *mapper, uint16_t address) {
     return mapper->CHR_ptrs[address >> 12][address & 0xfff];
 }
 
-static void update_CHR_ptrs(Mapper* mapper) {
-    VRC1_t* vrc1 = mapper->extension;
+static void update_CHR_ptrs(Mapper *mapper) {
+    VRC1_t *vrc1 = mapper->extension;
     mapper->CHR_ptrs[0] = mapper->CHR_ROM + vrc1->CHR_0 * 0x1000;
     mapper->CHR_ptrs[1] = mapper->CHR_ROM + vrc1->CHR_1 * 0x1000;
 }
