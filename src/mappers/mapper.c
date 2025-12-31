@@ -62,6 +62,9 @@ static int select_mapper(Mapper* mapper){
         case VRC_1:
             load_VRC1(mapper);
             break;
+        case UN1ROM:
+            load_UN1ROM(mapper);
+            break;
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
             return -1;
