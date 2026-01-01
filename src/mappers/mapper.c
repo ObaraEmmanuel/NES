@@ -43,6 +43,7 @@ static int select_mapper(Mapper *mapper) {
         case 66: return load_GNROM(mapper);
         case 75: return load_VRC1(mapper);
         case 94: return load_UN1ROM(mapper);
+        case 180: return load_mapper180(mapper);
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
             return -1;

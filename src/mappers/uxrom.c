@@ -3,8 +3,10 @@
 static uint8_t read_PRG(Mapper *mapper, uint16_t address);
 static void write_PRG(Mapper *mapper, uint16_t address, uint8_t value);
 static void write_PRG_UN1ROM(Mapper *mapper, uint16_t address, uint8_t value);
+static uint8_t read_PRG_180(Mapper *mapper, uint16_t address);
 
 int load_UXROM(Mapper *mapper) {
+    // Mapper #2
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     // last bank offset
@@ -14,8 +16,16 @@ int load_UXROM(Mapper *mapper) {
 }
 
 int load_UN1ROM(Mapper *mapper) {
+    // Mapper #94
     load_UXROM(mapper);
     mapper->write_PRG = write_PRG_UN1ROM;
+    return 0;
+}
+
+int load_mapper180(Mapper *mapper) {
+    // Mapper #180
+    load_UXROM(mapper);
+    mapper->read_PRG = read_PRG_180;
     return 0;
 }
 
@@ -31,4 +41,11 @@ static void write_PRG(Mapper *mapper, uint16_t address, uint8_t value) {
 
 static void write_PRG_UN1ROM(Mapper *mapper, uint16_t address, uint8_t value) {
     mapper->PRG_ptrs[0] = mapper->PRG_ROM + ((value & 0b11100) >> 2) * 0x4000;
+}
+
+static uint8_t read_PRG_180(Mapper *mapper, uint16_t address) {
+    if (address < 0xC000)
+        // Fixed to 1st bank
+        return mapper->PRG_ROM[address - 0x8000];
+    return *(mapper->PRG_ptrs[0] + (address - 0xC000));
 }

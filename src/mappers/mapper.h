@@ -96,3 +96,4 @@ int load_colordreams(Mapper *mapper);
 int load_colordreams46(Mapper *mapper);
 int load_VRC1(Mapper *mapper);
 int load_UN1ROM(Mapper *mapper);
+int load_mapper180(Mapper *mapper);
