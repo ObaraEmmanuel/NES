@@ -60,6 +60,7 @@ set (SRC
         src/mappers/mmc3.c
         src/mappers/colordreams.c
         src/mappers/vrc1.c
+        src/mappers/mapper185.c
 )
 include_directories(src src/mappers ${SDL_DIR}/include/SDL3 ${SDL_DIR}/include ${SDL_ttf_DIR}/include/SDL3_ttf)
 

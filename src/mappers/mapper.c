@@ -44,6 +44,7 @@ static int select_mapper(Mapper *mapper) {
         case 75: return load_VRC1(mapper);
         case 94: return load_UN1ROM(mapper);
         case 180: return load_mapper180(mapper);
+        case 185: return load_mapper185(mapper);
         default:
             LOG(ERROR, "Mapper no %u not implemented", mapper->mapper_num);
             return -1;
@@ -396,7 +397,7 @@ int load_data(ROMData *rom_data, Mapper *mapper) {
             LOG(INFO, "ROM type: Unknown");
     }
 
-    LOG(INFO, "Using mapper #%d", mapper->mapper_num);
+    LOG(INFO, "Using mapper #%d: sub-mapper #%d", mapper->mapper_num, mapper->submapper);
 
     if (select_mapper(mapper) < 0)
         return -1;

@@ -45,8 +45,8 @@ typedef struct Mapper {
     uint8_t *PRG_RAM;
     uint8_t *PRG_ptrs[8];
     uint8_t *CHR_ptrs[8];
-    uint8_t *PRG_regs[8];
-    uint8_t *CHR_regs[8];
+    uint8_t PRG_regs[8];
+    uint8_t CHR_regs[8];
     uint16_t PRG_banks;
     uint16_t CHR_banks;
     size_t CHR_RAM_size;
@@ -97,3 +97,4 @@ int load_colordreams46(Mapper *mapper);
 int load_VRC1(Mapper *mapper);
 int load_UN1ROM(Mapper *mapper);
 int load_mapper180(Mapper *mapper);
+int load_mapper185(Mapper *mapper);
