@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <float.h>
+#include <math.h>
 
 #include "nsf_gfx.h"
 #include "nsf.h"

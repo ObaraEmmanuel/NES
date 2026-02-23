@@ -1,5 +1,6 @@
 #include <emulator.h>
 #include <stdint.h>
+#include <stdlib.h>
 
 #include "mapper.h"
 #include "utils.h"

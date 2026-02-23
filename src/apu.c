@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "apu.h"
 #include "emulator.h"
 #include "gfx.h"

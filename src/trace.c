@@ -1,6 +1,7 @@
 #include <string.h>
-
+#include <stdio.h>
 #include "cpu6502.h"
+#include "mmu.h"
 #include "utils.h"
 
 static void get_opcode(char* out, Opcode opcode);

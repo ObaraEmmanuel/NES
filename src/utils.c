@@ -2,6 +2,7 @@
 #include <stdarg.h>
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <SDL.h>
 #include <string.h>

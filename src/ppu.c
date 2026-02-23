@@ -1,10 +1,10 @@
 #include <string.h>
-
 #include "ppu.h"
+#include "emulator.h"
+#include <stdlib.h>
 #include "utils.h"
 #include "mmu.h"
 #include "cpu6502.h"
-#include "emulator.h"
 
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);

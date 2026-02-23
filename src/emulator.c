@@ -3,6 +3,7 @@
 #include "touchpad.h"
 #include "controller.h"
 #include "gfx.h"
+#include <stdlib.h>
 #include "mapper.h"
 #include "nsf.h"
 #include "timers.h"
