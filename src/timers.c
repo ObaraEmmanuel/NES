@@ -1,4 +1,5 @@
 #include "timers.h"
+#include <stdlib.h>
 #include "utils.h"
 
 #define G 1000000000L
