@@ -10,8 +10,8 @@ android {
         applicationId "com.barracoder.android"
         minSdk 21
         targetSdk 35
-        versionCode 17
-        versionName "2.0.4"
+        versionCode 18
+        versionName "2.0.5"
 
         // Set the apk base name.
         setProperty("archivesBaseName", "androNES")
