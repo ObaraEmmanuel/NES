@@ -158,9 +158,14 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
         return ppu->bus;
     }
 
-    if(address < 0x4000)
+    if(address < 0x4000) {
         // palette RAM provide first 6 bits and remaining 2 bits are open bus
-        return ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->bus & 0xc0);
+        uint8_t val = ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->bus & 0xc0);
+        if (ppu->mask & 0x1)
+            // greyscale mode; lower 4 bits = 0000
+                return val & 0xf0;
+        return val;
+    }
 
     return 0;
 }
