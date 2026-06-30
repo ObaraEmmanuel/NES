@@ -25,7 +25,7 @@ enum{
     FLIP_VERTICAL   = 1 << 7,
     V_BLANK         = 1 << 7,
     GENERATE_NMI    = 1 << 7,
-    RENDER_ENABLED  = 0x18,
+    RENDER_BITS     = 0x18,
     BASE_NAMETABLE  = 0x3,
     FINE_Y          = 0x7000,
     COARSE_Y        = 0x3E0,
@@ -49,6 +49,10 @@ typedef struct PPU{
     uint8_t ctrl;
     uint8_t mask;
     uint8_t status;
+    uint8_t render_status;
+    uint8_t render_state_delay;
+    uint8_t supress_vblank;
+    uint8_t nmi_delay;
     size_t dots;
     size_t scanlines;
     uint16_t scanlines_per_frame;
@@ -90,6 +94,7 @@ void init_ppu(struct Emulator* emulator);
 uint8_t read_status(PPU* ppu);
 uint8_t read_ppu(PPU* ppu);
 void set_ctrl(PPU* ppu, uint8_t ctrl);
+void set_mask(PPU* ppu, uint8_t mask);
 void write_ppu(PPU* ppu, uint8_t value);
 void dma(PPU* ppu, uint8_t value);
 void set_scroll(PPU* ppu, uint8_t coord);

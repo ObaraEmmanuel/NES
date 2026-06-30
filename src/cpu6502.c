@@ -236,9 +236,6 @@ void execute(c6502* ctx){
 #if TRACER == 1
         print_cpu_trace(ctx);
 #endif
-        if(!(ctx->state & INTERRUPT_POLLED)) {
-            poll_interrupt(ctx);
-        }
         ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK | DMA_OCCURRED);
         if(ctx->state & INTERRUPT_PENDING) {
             // takes 7 cycles and this is one of them so only 6 are left
@@ -287,6 +284,8 @@ void execute(c6502* ctx){
         ctx->state &= ~INTERRUPT_PENDING;
         return;
     }
+
+    poll_interrupt(ctx);
 
     uint16_t address = ctx->address;
 

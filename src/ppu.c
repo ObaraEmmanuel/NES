@@ -1,14 +1,14 @@
 #include <string.h>
+#include <stdlib.h>
 #include "ppu.h"
 #include "emulator.h"
-#include <stdlib.h>
 #include "utils.h"
 #include "mmu.h"
 #include "cpu6502.h"
 
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
-static void update_NMI(PPU* ppu);
+static void update_NMI(PPU* ppu, uint8_t delay);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -42,6 +42,9 @@ void reset_ppu(PPU* ppu){
     ppu->mask = 0;
     ppu->status = 0;
     ppu->frames = 0;
+    ppu->render_state_delay = 0;
+    ppu->render_status = 0;
+    ppu->supress_vblank = 0;
     ppu->OAM_cache_len = 0;
     memset(ppu->OAM_cache, 0, 8);
     memset(ppu->screen, 0, screen_size);
@@ -189,23 +192,39 @@ uint8_t read_status(PPU* ppu){
     uint8_t status = ppu->status;
     ppu->w = 1;
     ppu->status &= ~BIT_7; // reset v_blank
-    update_NMI(ppu);
+    if (ppu->scanlines == 241 && (ppu->dots == 1 || ppu->dots == 2 || ppu->dots == 3))
+        ppu->supress_vblank = 1;
+    else
+        update_NMI(ppu, 0);
     return status;
 }
 
 void set_ctrl(PPU* ppu, uint8_t ctrl){
     ppu->ctrl = ctrl;
-    update_NMI(ppu);
+    update_NMI(ppu, 1);
     // set name table in temp address
     ppu->t &= ~0xc00;
     ppu->t |= (ctrl & BASE_NAMETABLE) << 10;
 }
 
-static void update_NMI(PPU* ppu) {
-    if(ppu->ctrl & BIT_7 && ppu->status & BIT_7)
+void set_mask(PPU* ppu, uint8_t mask) {
+    uint8_t should_render = (mask & RENDER_BITS) > 0;
+    if (should_render != ppu->render_status) {
+        ppu->render_state_delay = 3;
+    }
+    ppu->mask = mask;
+}
+
+static void update_NMI(PPU* ppu, uint8_t delay) {
+    if (delay) {
+        ppu->nmi_delay = delay;
+        return;
+    }
+    if(ppu->ctrl & BIT_7 && ppu->status & BIT_7 && !ppu->supress_vblank)
         interrupt(&ppu->emulator->cpu, NMI);
     else
         interrupt_clear(&ppu->emulator->cpu, NMI);
+    ppu->supress_vblank = 0;
 }
 
 void execute_ppu(PPU* ppu){
@@ -260,14 +279,14 @@ void execute_ppu(PPU* ppu){
                 ppu->v = (ppu->v & ~COARSE_Y) | (coarse_y << 5);
             }
         }
-        else if(ppu->dots == VISIBLE_DOTS + 2 && (ppu->mask & RENDER_ENABLED)){
+        else if(ppu->dots == VISIBLE_DOTS + 2 && ppu->render_status){
             ppu->v &= ~HORIZONTAL_BITS;
             ppu->v |= ppu->t & HORIZONTAL_BITS;
         }
-        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
+        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->render_status) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
-        else if(ppu->dots == 320 && ppu->mask & RENDER_ENABLED){
+        else if(ppu->dots == 320 && ppu->render_status){
             memset(ppu->OAM_cache, 0, 8);
             ppu->OAM_cache_len = 0;
             uint8_t range = ppu->ctrl & LONG_SPRITE ? 16: 8;
@@ -288,8 +307,10 @@ void execute_ppu(PPU* ppu){
         // v blanking scanlines 241 - 261/311
         if(ppu->dots == 1 && ppu->scanlines == VISIBLE_SCANLINES + 1){
             // set v-blank
-            ppu->status |= V_BLANK;
-            update_NMI(ppu);
+            if (!ppu->supress_vblank)
+                ppu->status |= V_BLANK;
+            ppu->supress_vblank = 0;
+            update_NMI(ppu, 3);
         }
     }
     else{
@@ -297,20 +318,20 @@ void execute_ppu(PPU* ppu){
         if(ppu->dots == 1){
             // reset v-blank and sprite zero hit
             ppu->status &= ~(V_BLANK | SPRITE_0_HIT);
-            update_NMI(ppu);
+            update_NMI(ppu, 0);
         }
-        else if(ppu->dots == VISIBLE_DOTS + 2 && (ppu->mask & RENDER_ENABLED)){
+        else if(ppu->dots == VISIBLE_DOTS + 2 && ppu->render_status){
             ppu->v &= ~HORIZONTAL_BITS;
             ppu->v |= ppu->t & HORIZONTAL_BITS;
         }
-        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->mask & SHOW_SPRITE && ppu->mask & SHOW_BG) {
+        else if(ppu->dots == VISIBLE_DOTS + 4 && ppu->render_status) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
-        else if(ppu->dots > 280 && ppu->dots <= 304 && (ppu->mask & RENDER_ENABLED)){
+        else if(ppu->dots > 280 && ppu->dots <= 304 && ppu->render_status){
             ppu->v &= ~VERTICAL_BITS;
             ppu->v |= ppu->t & VERTICAL_BITS;
         }
-        else if(ppu->dots == END_DOT - 1 && ppu->frames & 1 && ppu->mask & RENDER_ENABLED && ppu->emulator->type == NTSC) {
+        else if(ppu->dots == (END_DOT - 1) && ppu->frames & 1 && ppu->render_status && ppu->emulator->type == NTSC) {
             // skip one cycle on odd frames if rendering is enabled for NTSC
             ppu->dots++;
         }
@@ -328,6 +349,22 @@ void execute_ppu(PPU* ppu){
         if (ppu->scanlines++ >= ppu->scanlines_per_frame)
             ppu->scanlines = 0;
         ppu->dots = 0;
+    }
+
+    // update render status
+    if (ppu->render_state_delay) {
+        ppu->render_state_delay--;
+        if(ppu->render_state_delay == 0) {
+            ppu->render_status = (ppu->mask & RENDER_BITS) > 0;
+        }
+    }
+
+    //update NMI delay
+    if (ppu->nmi_delay) {
+        ppu->nmi_delay--;
+        if(ppu->nmi_delay == 0) {
+            update_NMI(ppu, 0);
+        }
     }
 }
 
