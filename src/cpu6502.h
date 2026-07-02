@@ -212,12 +212,11 @@ typedef enum {
 
 // Internal implementation states
 enum{
-    BRANCH_STATE      = 1,      // 1: Branch instruction upcoming
-    INTERRUPT_PENDING = 1 << 1, // 1: interrupt handling upcoming
-    INTERRUPT_POLLED  = 1 << 2, // 1: interrupt has already been polled
-    NMI_ASSERTED      = 1 << 3, // 1: NMI asserted when interrupt was polled
-    NMI_HIJACK        = 1 << 4, // 1: NMI should hijack
-    DMA_OCCURRED      = 1 << 5, // 1: DMA occurred mid instruction
+    BRANCH_MODE       = 1,      // The current instruction is a branching instruction
+    BRANCH_TAKEN      = 1 << 1, // Branch instruction; branch taken
+    BRANCH_PAGE_BREAK = 1 << 2, // Page break encountered when taking branch
+    NMI_HIJACK        = 1 << 3, // NMI should hijack
+    DMA_OCCURRED      = 1 << 4, // DMA occurred mid instruction
 };
 
 typedef enum {
@@ -235,10 +234,10 @@ typedef struct c6502{
     size_t t_cycles;
     uint16_t pc;
     uint16_t address;
-    uint16_t raw_address; // address before any indexing is applied
-    uint16_t sub_address; // subroutine address
+    uint16_t raw_address;        // address before any indexing is applied
+    uint16_t sub_address;        // subroutine address
     uint16_t dma_cycles;
-    uint8_t sr_started; // subroutine started
+    uint8_t sr_started;          // subroutine started
     uint8_t ac;
     uint8_t x;
     uint8_t y;
@@ -246,10 +245,11 @@ typedef struct c6502{
     uint8_t sp;
     uint8_t cycles;
     uint8_t odd_cycle;
-    uint8_t mode; // Mode of execution. Use set_spu_mode to set
+    uint8_t mode;                 // Mode of execution. Use set_spu_mode to set
     struct Emulator* emulator;
-    uint8_t state;  // Internal implementation state. See above
-    Interrupt interrupt;
+    uint8_t state;                // Internal implementation state. See above
+    uint8_t interrupt;            // Current interrupt status
+    uint8_t polled_interrupt;     // Interrupt status at poll time
     uint8_t NMI_line;
     const Instruction* instruction;
     struct Memory* memory;
@@ -264,4 +264,6 @@ void interrupt_clear(c6502* ctx, Interrupt code);
 void do_DMA(c6502* ctx, size_t cycles);
 uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
 void set_cpu_mode(c6502* ctx, CPUMode mode);
+// trace.c
 void print_cpu_trace(const c6502* ctx);
+void get_opcode(char* out, Opcode opcode);

@@ -26,6 +26,7 @@ void init_cpu(struct Emulator* emulator){
     struct c6502* cpu = &emulator->cpu;
     cpu->emulator = emulator;
     cpu->interrupt = NOI;
+    cpu->polled_interrupt = NOI;
     set_cpu_mode(cpu, CPU_EXEC); // Normal execution
     cpu->memory = &emulator->mem;
     cpu->sr_started = 0;
@@ -45,7 +46,7 @@ void init_cpu(struct Emulator* emulator){
 
 void reset_cpu(c6502* cpu){
     cpu->sr |= INTERRUPT;
-    set_cpu_mode(cpu, CPU_EXEC);; // Normal execution
+    set_cpu_mode(cpu, CPU_EXEC); // Normal execution
     cpu->sp -= 3;
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
     cpu->cycles = 0;
@@ -75,11 +76,15 @@ static void interrupt_(c6502* ctx){
     // handle interrupt
     uint16_t addr;
     uint8_t set_brk = 0;
+    uint8_t interrupt = ctx->polled_interrupt;
+    ctx->polled_interrupt = 0;
 
-    if(ctx->interrupt & BRK_I) {
+    if(interrupt & BRK_I) {
         // BRK instruction is 2 bytes
         ctx->pc++;
         if(ctx->state & NMI_HIJACK) {
+            // NMI asserted within the first 4 cycles
+            // NMI therefore hijacks BRK
             addr = NMI_ADDRESS;
             ctx->interrupt &= ~NMI;
         }else {
@@ -89,19 +94,18 @@ static void interrupt_(c6502* ctx){
         // re-apply Break flag
         set_brk = 1;
     }
-    else if(ctx->interrupt & NMI) {
+    else if(interrupt & NMI || ctx->state & NMI_HIJACK) {
         addr = NMI_ADDRESS;
         // NMI is edge triggered so clear it
         ctx->interrupt &= ~NMI;
     }
-    else if(ctx->interrupt & RSI){
+    else if(interrupt & RSI){
         addr = RESET_ADDRESS;
         // not used but just in case
         interrupt_clear(ctx, RSI);
     }
-    else if(ctx->interrupt & IRQ) {
+    else if(interrupt & IRQ) {
         addr = IRQ_ADDRESS;
-        // ctx->sr |= BREAK;
     } else {
         LOG(ERROR, "No interrupt set");
         return;
@@ -138,6 +142,7 @@ static void rti(c6502* ctx) {
 void interrupt(c6502* ctx, const Interrupt code) {
     if(code == NMI) {
         if(!ctx->NMI_line) {
+            // NMI line rising edge detected
             ctx->interrupt |= NMI;
         }
         ctx->NMI_line = 1;
@@ -145,6 +150,7 @@ void interrupt(c6502* ctx, const Interrupt code) {
         ctx->interrupt |= code;
     }
 }
+
 void interrupt_clear(c6502* ctx, const Interrupt code) {
     if(code == NMI) ctx->NMI_line = 0;
     else ctx->interrupt &= ~code;
@@ -156,15 +162,15 @@ void do_DMA(c6502* ctx, size_t cycles) {
 }
 
 static void branch(c6502* ctx, uint8_t mask, uint8_t predicate) {
+    ctx->state |= BRANCH_MODE;
     if(((ctx->sr & mask) > 0) == predicate){
+        ctx->state |= has_page_break(ctx->pc, ctx->address)? BRANCH_PAGE_BREAK : 0;
         // increment cycles if branching to a different page
-        ctx->cycles += has_page_break(ctx->pc, ctx->address);
+        ctx->cycles += (ctx->state & BRANCH_PAGE_BREAK) > 0;
+        // increment cycles for taken branch
         ctx->cycles++;
         // tell the cpu to perform a branch when it is ready
-        ctx->state |= BRANCH_STATE;
-    }else {
-        // remove branch state
-        ctx->state &= ~BRANCH_STATE;
+        ctx->state |= BRANCH_TAKEN;
     }
 }
 
@@ -195,17 +201,16 @@ static void prep_branch(c6502* ctx){
             branch(ctx, OVERFLW, 1);
             break;
         default:
-            ctx->state &= ~BRANCH_STATE;
+            ctx->state &= ~BRANCH_TAKEN;
     }
 }
 
 static void poll_interrupt(c6502* ctx) {
-    ctx->state |= INTERRUPT_POLLED;
     if(ctx->interrupt & ~IRQ || (ctx->interrupt & IRQ && !(ctx->sr & INTERRUPT))){
         // prepare for interrupts
-        ctx->state |= INTERRUPT_PENDING;
-        // check if NMI is asserted at poll time
-        ctx->state |= ctx->interrupt & NMI ? NMI_ASSERTED : 0;
+        ctx->polled_interrupt = ctx->interrupt;
+    } else {
+        ctx->polled_interrupt = 0;
     }
 }
 
@@ -236,10 +241,11 @@ void execute(c6502* ctx){
 #if TRACER == 1
         print_cpu_trace(ctx);
 #endif
-        ctx->state &= ~(INTERRUPT_POLLED | NMI_HIJACK | DMA_OCCURRED);
-        if(ctx->state & INTERRUPT_PENDING) {
-            // takes 7 cycles and this is one of them so only 6 are left
-            LOG(TRACE, "Starting ISR: $%2x", ctx->interrupt);
+        ctx->state &= ~DMA_OCCURRED;
+        if(ctx->polled_interrupt) {
+            // There is a pending interrupt
+            // sequence takes 7 cycles and this is one of them so only 6 are left
+            LOG(TRACE, "Starting ISR: $%2x", ctx->polled_interrupt);
             ctx->cycles = 6;
             set_cpu_mode(ctx, ctx->mode | CPU_ISR);
             return;
@@ -254,8 +260,7 @@ void execute(c6502* ctx){
         ctx->address = get_address(ctx);
         if(ctx->instruction->opcode == BRK) {
             // set BRK interrupt
-            ctx->interrupt |= BRK_I;
-            ctx->state |= INTERRUPT_PENDING;
+            ctx->polled_interrupt |= BRK_I;
             ctx->cycles = 6;
             return;
         }
@@ -271,21 +276,33 @@ void execute(c6502* ctx){
         // proceed to execution
     } else{
         // delay execution
-        if(ctx->state & INTERRUPT_PENDING && ctx->cycles == 4) {
-            if(ctx->interrupt & NMI) ctx->state |= NMI_HIJACK;
+        if(ctx->polled_interrupt && ctx->cycles >= 3) {
+            if(ctx->interrupt & NMI) {
+                // NMI asserted within the first 4 cycle hijacking IRQ/BRK
+                ctx->state |= NMI_HIJACK;
+            }
         }
+
+        if (ctx->state & (BRANCH_PAGE_BREAK)) {
+            if (ctx->cycles == 2) poll_interrupt(ctx);
+        }
+
         ctx->cycles--;
         return;
     }
 
     // handle interrupt
-    if(ctx->state & INTERRUPT_PENDING) {
+    if(ctx->polled_interrupt) {
         interrupt_(ctx);
-        ctx->state &= ~INTERRUPT_PENDING;
+        ctx->state &= ~NMI_HIJACK;
         return;
     }
 
-    poll_interrupt(ctx);
+    if (ctx->instruction->opcode != RTI && !(ctx->state & (BRANCH_TAKEN)))
+        poll_interrupt(ctx);
+
+    if (ctx->state & BRANCH_PAGE_BREAK)
+        poll_interrupt(ctx);
 
     uint16_t address = ctx->address;
 
@@ -355,8 +372,6 @@ void execute(c6502* ctx){
             set_ZN(ctx, ctx->ac);
             break;
         case PLP:
-            // poll before updating I flag
-            poll_interrupt(ctx);
             ctx->sr = pop(ctx);
             break;
 
@@ -541,10 +556,10 @@ void execute(c6502* ctx){
         // branching opcodes
 
         case BCC:case BCS:case BEQ:case BMI:case BNE:case BPL:case BVC:case BVS:
-            if(ctx->state & BRANCH_STATE) {
+            if(ctx->state & BRANCH_TAKEN) {
                 ctx->pc = ctx->address;
-                ctx->state &= ~BRANCH_STATE;
             }
+            ctx->state &= ~(BRANCH_TAKEN | BRANCH_MODE | BRANCH_PAGE_BREAK);
             break;
 
         // status flag changes
@@ -556,8 +571,6 @@ void execute(c6502* ctx){
             ctx->sr &= ~DECIMAL_;
             break;
         case CLI:
-            // poll before updating I flag
-            poll_interrupt(ctx);
             ctx->sr &= ~INTERRUPT;
             break;
         case CLV:
@@ -570,7 +583,6 @@ void execute(c6502* ctx){
             ctx->sr |= DECIMAL_;
             break;
         case SEI:
-            poll_interrupt(ctx);
             ctx->sr |= INTERRUPT;
             break;
 
@@ -581,6 +593,7 @@ void execute(c6502* ctx){
             break;
         case RTI:
             rti(ctx);
+            poll_interrupt(ctx);
             break;
         case NOP:
             if(ctx->instruction->mode == ABS) {

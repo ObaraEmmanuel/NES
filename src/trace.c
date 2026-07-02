@@ -4,7 +4,6 @@
 #include "mmu.h"
 #include "utils.h"
 
-static void get_opcode(char* out, Opcode opcode);
 static int is_official(uint8_t op_hex, Opcode opcode);
 
 void print_cpu_trace(const c6502* ctx){
@@ -158,7 +157,7 @@ void print_cpu_trace(const c6502* ctx){
     traces++;
 }
 
-static void get_opcode(char* out, Opcode opcode){
+void get_opcode(char* out, Opcode opcode){
     switch (opcode) {
         case ADC:
             strcpy(out, "ADC");
