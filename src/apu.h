@@ -125,9 +125,13 @@ typedef struct APU{
     uint8_t IRQ_inhibit;
     uint8_t frame_interrupt;
     uint8_t audio_start;
-    uint8_t reset_sequencer;
+    uint8_t reset_sequencer_delay;
+    uint8_t irq_set_delay;
+    uint8_t sequence_step;
+    uint32_t sequencer;
+    uint32_t *sequence;
+    uint8_t *directive;
     size_t cycles;
-    size_t sequencer;
     float stat;
     size_t stat_index;
     Biquad filter;

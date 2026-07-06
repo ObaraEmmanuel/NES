@@ -50,6 +50,7 @@ void reset_cpu(c6502* cpu){
     cpu->sp -= 3;
     cpu->pc = read_abs_address(cpu->memory, RESET_ADDRESS);
     cpu->cycles = 0;
+    cpu->odd_cycle = cpu->t_cycles = 0;
     cpu->dma_cycles = 0;
     cpu->sr_started = 0;
     cpu->NMI_hook = NULL;

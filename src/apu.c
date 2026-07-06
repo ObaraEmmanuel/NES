@@ -66,7 +66,7 @@ Step 2      Clock           Clock           -           14913   16627
 Step 3      Clock           -               -           22371   24939
                                         Set if enabled  29828   33252
 Step 4      Clock           Clock       Set if enabled  29829   33253
-                                        Set if enabled  0       0
+                                        Set if enabled  29830/0 33254/0
 
 Mode 1: 5-step sequence
 
@@ -77,10 +77,48 @@ $4017=$80   -               -               -           -       -
 Step 1      Clock           -               -           7457    8313
 Step 2      Clock           Clock           -           14913   16627
 Step 3      Clock           -               -           22371   24939
-Step 4      -               -               -           29829   33253
+Step 4      -               -               -           29828   33253
 Step 5      Clock           Clock           -           37281   41565
-            -               -               -           0       0
- */
+            -               -               -           37282/0 41566/0
+*/
+
+static uint32_t NTSC_frame_sequence[2][6] = {
+    {7457, 14913, 22371, 29828, 29829, 29830},  // Mode 0
+    {7457, 14913, 22371, 29828, 37281, 37282}   // Mode 1
+};
+
+static uint32_t PAL_frame_sequence[2][6] = {
+    {8313, 16627, 24939, 33252, 33253, 33254},  // Mode 0
+    {8313, 16627, 24939, 33253, 41565, 41566}   // Mode 1
+};
+
+typedef enum {
+    FRAME_NONE,                 // Do nothing
+    FRAME_QUARTER  = 1,         // Clock quarter frame
+    FRAME_HALF     = 1 << 1,    // Clock half frame
+    FRAME_IRQ      = 1 << 2     // Set frame IRQ flag
+} FrameDirective;
+
+static uint8_t frame_sequence_directives[2][6] = {
+    // Mode 0
+    {
+        FRAME_QUARTER,
+        FRAME_QUARTER | FRAME_HALF,
+        FRAME_QUARTER,
+        FRAME_IRQ,
+        FRAME_QUARTER | FRAME_HALF | FRAME_IRQ,
+        FRAME_IRQ,
+    },
+    // Mode 1
+    {
+        FRAME_QUARTER,
+        FRAME_QUARTER | FRAME_HALF,
+        FRAME_QUARTER,
+        FRAME_NONE,
+        FRAME_QUARTER | FRAME_HALF,
+        FRAME_NONE,
+    }
+};
 
 
 static float tnd_LUT[TND_LUT_SIZE];
@@ -118,6 +156,8 @@ static void half_frame(APU *apu);
 
 static void sample(APU* apu);
 
+static void set_frame_mode(APU* apu, uint8_t mode);
+
 FILE *out_wav;
 
 void init_APU(struct Emulator *emulator) {
@@ -128,7 +168,7 @@ void init_APU(struct Emulator *emulator) {
     apu->emulator = emulator;
     apu->cycles = 0;
     apu->sequencer = 0;
-    apu->reset_sequencer = 0;
+    apu->reset_sequencer_delay = 0;
     apu->audio_start = 0;
     apu->IRQ_inhibit = 0;
 
@@ -147,6 +187,13 @@ void init_APU(struct Emulator *emulator) {
     SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
     set_status(apu, 0);
     set_frame_counter_ctrl(apu, 0);
+    // On power, it's as if $4017 was written to 10 cycles before
+    // start of instructions.
+    // I have subtracted the sequencer reset delay on even clock (3 cycles)
+    apu->sequencer = 10 - 3;
+    apu->sequence_step = 0;
+    // suppress normal delay logic which is already factored in above
+    apu->reset_sequencer_delay = 0;
 #if AUDIO_TO_FILE
     out_wav = fopen("test-aud.raw", "wb");
 #endif
@@ -158,6 +205,10 @@ void reset_APU(APU *apu) {
     apu->dmc.counter &= 1;
     apu->frame_interrupt = 0;
     interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
+    apu->cycles = 0;
+    apu->sequencer = 10 - 3;
+    apu->sequence_step = 0;
+    apu->reset_sequencer_delay = 0;
 }
 
 void init_audio_device(const APU* apu) {
@@ -182,112 +233,41 @@ void exit_APU() {
 
 void execute_apu(APU *apu) {
     // Perform necessary reset after $4017 write
-    if (apu->reset_sequencer) {
-        apu->reset_sequencer = 0;
-        if (apu->frame_mode == 1) {
+    if (apu->reset_sequencer_delay) {
+        apu->reset_sequencer_delay--;
+        if (!apu->reset_sequencer_delay) {
+            apu->sequencer = 0;
+            apu->sequence_step = 0;
+        }
+    }
+
+    // assert frame IRQ line after delay
+    if (apu->irq_set_delay) {
+        apu->irq_set_delay--;
+        if (!apu->irq_set_delay) {
+            interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
+        }
+    }
+
+    if (apu->sequencer == apu->sequence[apu->sequence_step]) {
+        uint8_t directive = apu->directive[apu->sequence_step];
+        if (directive & FRAME_QUARTER)
             quarter_frame(apu);
+        if (directive & FRAME_HALF)
             half_frame(apu);
+        if (directive & FRAME_IRQ && !apu->IRQ_inhibit) {
+            apu->frame_interrupt = 1;
+            // We need to delay IRQ line assertion by one clock
+            apu->irq_set_delay = 1;
         }
-        apu->sequencer = 0;
-        goto post_sequencer;
-    }
-
-    switch (apu->emulator->type) {
-    case NTSC:
-    default:
-        switch (apu->sequencer) {
-            case 0:
-                apu->sequencer++;
-                break;
-            case 7457:
-                quarter_frame(apu);
-                apu->sequencer++;
-                break;
-            case 14913:
-                quarter_frame(apu);
-                half_frame(apu);
-                apu->sequencer++;
-                break;
-            case 22371:
-                quarter_frame(apu);
-                apu->sequencer++;
-                break;
-            case 29828:
-                apu->sequencer++;
-                break;
-            case 29829:
-                if (apu->frame_mode == 1) {
-                    apu->sequencer++;
-                    break;
-                }
-
-                quarter_frame(apu);
-                half_frame(apu);
-
-                if (!apu->IRQ_inhibit) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
-                }
-                apu->sequencer = 0;
-                break;
-            case 37281:
-                quarter_frame(apu);
-                half_frame(apu);
-                apu->sequencer = 0;
-                break;
-            default:
-                apu->sequencer++;
+        apu->sequence_step++;
+        apu->sequencer++;
+        if (apu->sequence_step == 6) {
+            apu->sequence_step = 0;
+            // Reset to 1 because the last sequence is technically 0
+            apu->sequencer = 1;
         }
-        break;
-    case PAL:
-        // code looks repetitive but if you can do it better while still being fast be my guest
-        switch (apu->sequencer) {
-            case 0:
-                apu->sequencer++;
-                break;
-            case 8313:
-                quarter_frame(apu);
-                apu->sequencer++;
-                break;
-            case 16627:
-                quarter_frame(apu);
-                half_frame(apu);
-                apu->sequencer++;
-                break;
-            case 24939:
-                quarter_frame(apu);
-                apu->sequencer++;
-                break;
-            case 33252:
-                apu->sequencer++;
-                break;
-            case 33253:
-                if (apu->frame_mode == 1) {
-                    apu->sequencer++;
-                    break;
-                }
-
-                quarter_frame(apu);
-                half_frame(apu);
-
-                if (!apu->IRQ_inhibit) {
-                    apu->frame_interrupt = 1;
-                    interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
-                }
-                apu->sequencer = 0;
-                break;
-            case 41565:
-                quarter_frame(apu);
-                half_frame(apu);
-                apu->sequencer = 0;
-                break;
-            default:
-                apu->sequencer++;
-        }
-        break;
-    }
-
-post_sequencer:
+    } else apu->sequencer++;
 
     if (apu->cycles & 1) {
         // channel sequencer
@@ -523,13 +503,30 @@ uint8_t read_apu_status(APU *apu) {
 void set_frame_counter_ctrl(APU *apu, uint8_t value) {
     // $4017
     apu->IRQ_inhibit = (value & BIT_6) > 0;
-    apu->frame_mode = (value & BIT_7) > 0;
+    set_frame_mode(apu, (value & BIT_7) > 0);
     // clear interrupt if IRQ disable set
     if (apu->IRQ_inhibit) {
         apu->frame_interrupt = 0;
         interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
     }
-    apu->reset_sequencer = 1;
+    // In mode 1, quarter and half frame are clocked immediately
+    if (apu->frame_mode == 1) {
+        quarter_frame(apu);
+        half_frame(apu);
+    }
+    // Writing to 4017 on a PUT cycle delays sequencer reset by 4 cycles
+    // If it is on a GET cycle, we delay by only 3 cycles
+    // This is needed for emulation of clock jitter
+    apu->reset_sequencer_delay = 3 + (apu->cycles & 1);
+}
+
+static void set_frame_mode(APU* apu, uint8_t mode) {
+    if (apu->emulator->type == PAL)
+        apu->sequence = PAL_frame_sequence[mode];
+    else
+        apu->sequence = NTSC_frame_sequence[mode];
+    apu->directive = frame_sequence_directives[mode];
+    apu->frame_mode = mode;
 }
 
 void set_pulse_ctrl(Pulse *pulse, uint8_t value) {
@@ -714,7 +711,7 @@ static void init_triangle(Triangle *triangle) {
     triangle->sequencer.limit = 31;
     triangle->sequencer.from = 0;
     triangle->enabled = 0;
-    triangle->halt = 1;
+    triangle->halt = 0;
 }
 
 static void init_noise(Noise *noise) {
