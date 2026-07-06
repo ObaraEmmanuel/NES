@@ -202,7 +202,7 @@ static void prep_branch(c6502* ctx){
             branch(ctx, OVERFLW, 1);
             break;
         default:
-            ctx->state &= ~BRANCH_TAKEN;
+            ctx->state &= ~(BRANCH_MODE | BRANCH_TAKEN | BRANCH_PAGE_BREAK);
     }
 }
 
@@ -268,6 +268,7 @@ void execute(c6502* ctx){
         ctx->cycles += cycleLookup[opcode];
         // prepare for branching and adjust cycles accordingly
         prep_branch(ctx);
+
         ctx->cycles--;
         return;
     }
@@ -284,8 +285,12 @@ void execute(c6502* ctx){
             }
         }
 
-        if (ctx->state & (BRANCH_PAGE_BREAK)) {
-            if (ctx->cycles == 2) poll_interrupt(ctx);
+        // Branch instructions always poll on the 2nd cycle
+        if (ctx->state & BRANCH_PAGE_BREAK) {
+            if (ctx->cycles == 3)
+                poll_interrupt(ctx);
+        } else if (ctx->state & BRANCH_TAKEN && ctx->cycles == 2) {
+            poll_interrupt(ctx);
         }
 
         ctx->cycles--;
@@ -293,13 +298,15 @@ void execute(c6502* ctx){
     }
 
     // handle interrupt
-    if(ctx->polled_interrupt) {
+    // branch instructions might do polling earlier the instruction
+    // so we can exempt such cases to prevent premature IRQ
+    if(ctx->polled_interrupt && !(ctx->state & BRANCH_MODE)) {
         interrupt_(ctx);
         ctx->state &= ~NMI_HIJACK;
         return;
     }
 
-    if (ctx->instruction->opcode != RTI && !(ctx->state & (BRANCH_TAKEN)))
+    if (ctx->instruction->opcode != RTI && !(ctx->state & BRANCH_TAKEN))
         poll_interrupt(ctx);
 
     if (ctx->state & BRANCH_PAGE_BREAK)
