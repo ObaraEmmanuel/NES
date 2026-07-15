@@ -87,6 +87,14 @@ uint8_t read_oam(PPU* ppu){
 }
 
 void write_oam(PPU* ppu, uint8_t value){
+    if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame)) {
+        // glitchy OAM increment bumping only the upper 6 bits
+        ppu->oam_address += 4;
+        return;
+    }
+    // bits 2-4 of the attr byte (byte 2 of 4) are unimplemented and always read back as 0
+    if ((ppu->oam_address & 0x03) == 0x02)
+        value &= 0xE3;
     ppu->OAM[ppu->oam_address++] = value;
 }
 
@@ -471,6 +479,9 @@ static void fetch_frame(PPU* ppu) {
         pu->attr_LSB <<= 1;
         pu->attr_MSB <<= 1;
     }
+
+    if (sprite_prefetch)
+        ppu->oam_address = 0;
 
     switch (phase) {
         case NT_ADDR: // 0
