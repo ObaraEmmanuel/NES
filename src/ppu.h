@@ -21,6 +21,7 @@ enum{
     SHOW_SPRITE     = 1 << 4,
     LONG_SPRITE     = 1 << 5,
     SPRITE_0_HIT    = 1 << 6,
+    SPRITE_OVERFLOW = 1 << 5,
     FLIP_HORIZONTAL = 1 << 6,
     FLIP_VERTICAL   = 1 << 7,
     V_BLANK         = 1 << 7,
@@ -38,12 +39,68 @@ enum{
 
 struct Emulator;
 
+typedef enum PPUPhase {
+    NT_ADDR = 0,
+    NT_READ,
+    AT_ADDR,
+    AT_READ,
+    BG_LSB_ADDR,
+    BG_LSB_READ,
+    BG_MSB_ADDR,
+    BG_MSB_READ,
+} PPUPhase;
+
+typedef enum SpriteEvalState {
+    CLEAR_OAM_READ = 0,
+    CLEAR_OAM_WRITE,
+    READ_OAM_Y,
+    CMP_OAM_Y,
+    READ_BYTE,
+    WRITE_BYTE,
+    OAM_EOF,
+} SpriteEvalState;
+
+typedef struct SpriteEvalMachine {
+    SpriteEvalState state;
+    uint8_t buffer;
+    uint8_t sec_oam_index;
+    uint8_t n;
+    uint8_t m;
+    uint8_t remaining;
+}SpriteEvalMachine;
+
+typedef struct PictureUnit {
+    uint16_t fetch_addr;
+    uint8_t NT;
+    uint8_t AT;
+    uint8_t BG_LSB;
+    uint8_t BG_MSB;
+    uint16_t pattern_LSB;
+    uint16_t pattern_MSB;
+    uint16_t attr_LSB;
+    uint16_t attr_MSB;
+} PictureUnit;
+
+typedef struct SpriteUnit {
+    uint8_t x;
+    uint8_t attr;
+    uint8_t pattern_LSB;
+    uint8_t pattern_MSB;
+} SpriteUnit;
+
+typedef struct Sprite {
+    uint8_t y;
+    uint8_t tile;
+    uint8_t attr;
+    uint8_t x;
+} Sprite;
+
 typedef struct PPU{
     size_t frames;
     uint32_t *screen;
     uint8_t V_RAM[0x1000];
     uint8_t OAM[256];
-    uint8_t OAM_cache[8];
+    uint8_t OAM_cache[32];
     uint8_t palette[0x20];
     uint8_t OAM_cache_len;
     uint8_t ctrl;
@@ -56,6 +113,10 @@ typedef struct PPU{
     size_t dots;
     size_t scanlines;
     uint16_t scanlines_per_frame;
+
+    PictureUnit p_unit;
+    SpriteEvalMachine sprite_eval_unit;
+    SpriteUnit sprite_units[8];
 
     uint16_t v;
     uint16_t t;
@@ -88,6 +149,7 @@ extern uint32_t nes_palette[64];
 
 
 void execute_ppu(PPU* ppu);
+void execute_ppu_old(PPU* ppu);
 void reset_ppu(PPU* ppu);
 void exit_ppu(PPU* ppu);
 void init_ppu(struct Emulator* emulator);

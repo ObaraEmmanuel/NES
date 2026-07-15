@@ -9,6 +9,12 @@
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 static void update_NMI(PPU* ppu, uint8_t delay);
+static void evaluate_sprites(PPU* ppu);
+static uint8_t get_bg_pixel(PPU *ppu);
+static uint8_t get_sprite_pixel(PPU* ppu);
+static uint8_t get_pixel(PPU* ppu);
+static void inc_hori_v(PPU* ppu);
+static void inc_vert_v(PPU* ppu);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -232,7 +238,439 @@ static void update_NMI(PPU* ppu, uint8_t delay) {
     ppu->supress_vblank = 0;
 }
 
-void execute_ppu(PPU* ppu){
+static void inc_hori_v(PPU* ppu) {
+    // inc horizontal V
+    if ((ppu->v & COARSE_X) == 31) {
+        ppu->v &= ~COARSE_X;
+        // switch horizontal nametable
+        ppu->v ^= 0x400;
+    } else ppu->v++;
+}
+
+static void inc_vert_v(PPU* ppu) {
+    if((ppu->v & FINE_Y) != FINE_Y) {
+        // increment coarse x
+        ppu->v += 0x1000;
+    }
+    else{
+        ppu->v &= ~FINE_Y;
+        uint16_t coarse_y = (ppu->v & COARSE_Y) >> 5;
+        if(coarse_y == 29){
+            coarse_y = 0;
+            // toggle bit 11 to switch vertical nametable
+            ppu->v ^= 0x800;
+        }
+        else if(coarse_y == 31){
+            // nametable not switched
+            coarse_y = 0;
+        }
+        else{
+            coarse_y++;
+        }
+
+        ppu->v = (ppu->v & ~COARSE_Y) | (coarse_y << 5);
+    }
+}
+
+static uint8_t get_bg_pixel(PPU *ppu) {
+    if (!(ppu->mask & SHOW_BG))
+        return 0;
+
+    if(!(ppu->mask & SHOW_BG_8) && ppu->dots <= 8)
+        return 0;
+
+    const PictureUnit* pu = &ppu->p_unit;
+    const uint16_t bit_mux = 0x8000 >> ppu->x;
+    const uint8_t pattern = (pu->pattern_LSB & bit_mux ? 1 : 0) | (pu->pattern_MSB & bit_mux ? 0b10 : 0);
+    const uint8_t palette = (pu->attr_LSB & bit_mux ? 1 : 0) | (pu->attr_MSB & bit_mux ? 0b10 : 0);
+
+    if (!pattern)
+        return 0;
+
+    return palette << 2 | pattern;
+}
+
+static uint8_t get_sprite_pixel(PPU* ppu) {
+    if (ppu->scanlines == 0)
+        return 0;
+    uint8_t pattern = 0;
+    SpriteUnit* priority_unit = NULL;
+    for (int i = 0; i < 8; i++) {
+        SpriteUnit* unit = &ppu->sprite_units[i];
+        if (unit->x != 0) {
+            unit->x--;
+            continue;
+        }
+
+        uint8_t pattern_bits = 0;
+        if (unit->attr & FLIP_HORIZONTAL) {
+            pattern_bits = unit->pattern_LSB & 1 | (unit->pattern_MSB & 1) << 1;
+            unit->pattern_LSB >>= 1;
+            unit->pattern_MSB >>= 1;
+        } else {
+            pattern_bits = unit->pattern_LSB >> 7 | (unit->pattern_MSB >> 7) << 1;
+            unit->pattern_LSB <<= 1;
+            unit->pattern_MSB <<= 1;
+        }
+        if (pattern_bits && priority_unit == NULL) {
+            priority_unit = unit;
+            pattern = pattern_bits;
+        }
+    }
+
+    if (!(ppu->mask & SHOW_SPRITE))
+        return 0;
+
+    if (!(ppu->mask & SHOW_SPRITE_8) && ppu->dots <= 8)
+        return 0;
+
+    if (priority_unit == NULL)
+        return 0;
+
+    return 0x10 | (priority_unit->attr & 3) << 2 | pattern | priority_unit->attr & BIT_5 | (priority_unit->attr & BIT_2 ? BIT_6 : 0);
+}
+
+static uint8_t get_pixel(PPU* ppu) {
+    uint8_t sprite_pixel = get_sprite_pixel(ppu);
+    uint8_t bg_pixel = get_bg_pixel(ppu);
+
+    switch ((bg_pixel > 0) << 1 | (sprite_pixel > 0)) {
+        case 0b00:
+            // this would be connected tied to EXT pins
+            // for now let's tie them to ground
+            return 0;
+        case 0b01:
+            // keep only the 5 relevant bits
+            return sprite_pixel & 0x1f;
+        case 0b10:
+            return bg_pixel;
+        case 0b11:
+            if (sprite_pixel & BIT_6 && ppu->dots < 256)
+                ppu->status |= SPRITE_0_HIT;
+
+            if (sprite_pixel & BIT_5)
+                return bg_pixel;
+            return sprite_pixel & 0x1f;
+        default:
+            return 0;
+    }
+}
+
+static void evaluate_sprites(PPU* ppu) {
+    // sprite evaluation
+    SpriteEvalMachine* su = &ppu->sprite_eval_unit;
+
+    // finish OAM clear and start evaluation
+    if (ppu->dots == 65) {
+        // OAM clear complete, move on to sprite evaluation
+        su->state = READ_OAM_Y;
+        su->n = su->m = 0;
+        su->sec_oam_index = 0;
+    }
+
+    if (ppu->dots == 1) {
+        // reset sprite evaluation machine
+        ppu->sprite_eval_unit.state = CLEAR_OAM_READ;
+        ppu->sprite_eval_unit.sec_oam_index = 0;
+    }
+
+    switch (su->state) {
+        case CLEAR_OAM_READ:
+            // (even dot) delay 1 cycle
+            su->state = CLEAR_OAM_WRITE;
+            break;
+        case CLEAR_OAM_WRITE:
+            // (odd dot) write to secondary OAM
+            ppu->OAM_cache[su->sec_oam_index++] = 0xff;
+            su->state = CLEAR_OAM_READ;
+            break;
+        case READ_OAM_Y:
+            if (su->n >= 64) {
+                su->state = OAM_EOF;
+                break;
+            }
+            su->buffer = ppu->OAM[su->n << 2 | su->m];
+            su->state = CMP_OAM_Y;
+            break;
+        case CMP_OAM_Y: {
+            uint8_t is_within_y = ppu->scanlines - su->buffer < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
+            if (su->sec_oam_index < 32) {
+                ppu->OAM_cache[su->sec_oam_index] = su->buffer;
+                if (is_within_y) {
+                    su->sec_oam_index++;
+                    su->state = READ_BYTE;
+                    // read the next 3 bytes into secondary OAM
+                    su->m++;
+                    su->remaining = 3;
+                } else {
+                    su->state = READ_OAM_Y;
+                    su->n++;
+                    // not necessary but just in case
+                    su->m = 0;
+                }
+            } else {
+                // sprite overflow
+                if (is_within_y) {
+                    ppu->status |= SPRITE_OVERFLOW;
+                    su->state = READ_BYTE;
+                    // read the next 3 bytes
+                    su->m++;
+                    su->remaining = 3;
+                } else {
+                    su->state = READ_OAM_Y;
+                    // incorrectly increment both n and m
+                    su->m = (su->m + 1) & 3;
+                    su->n++;
+                }
+            }
+            break;
+        }
+        case READ_BYTE:
+            if (su->n >= 64) {
+                su->state = OAM_EOF;
+                break;
+            }
+            su->buffer = ppu->OAM[su->n << 2 | su->m++];
+            // use unimplemented bit 2 of attr byte to mark sprite 0
+            if (su->remaining == 2) {
+                su->buffer &= ~BIT_2;
+                if (su->n == 0)
+                    su->buffer |= BIT_2;
+            }
+            if (su->m > 3) {
+                su->m = 0;
+                su->n++;
+            }
+            su->state = WRITE_BYTE;
+            break;
+        case WRITE_BYTE:
+            if (su->sec_oam_index < 32)
+                ppu->OAM_cache[su->sec_oam_index++] = su->buffer;
+            if (--su->remaining == 0)
+                su->state = READ_OAM_Y;
+            else
+                su->state = READ_BYTE;
+            break;
+        case OAM_EOF:
+            break;
+    }
+}
+
+static void fetch_frame(PPU* ppu) {
+    PPUPhase phase = (ppu->dots - 1) & 7;
+    PictureUnit* pu = &ppu->p_unit;
+
+    uint8_t sprite_prefetch = ppu->dots > 256 && ppu->dots <= 320;
+    uint8_t post_visible = ppu->dots > 256 && ppu->dots <= 320;
+    uint8_t pre_render = ppu->dots >= 337;
+
+    // clock bg output shift registers
+    if (ppu->dots <= 256 || (ppu->dots > 320 && ppu->dots < 337)) {
+        pu->pattern_LSB <<= 1;
+        pu->pattern_MSB <<= 1;
+        pu->attr_LSB <<= 1;
+        pu->attr_MSB <<= 1;
+    }
+
+    switch (phase) {
+        case NT_ADDR: // 0
+            if (ppu->dots == 257) {
+                ppu->v &= ~HORIZONTAL_BITS;
+                ppu->v |= ppu->t & HORIZONTAL_BITS;
+            }
+            if (ppu->dots == 1) {
+                // clear secondary OAM
+                memset(ppu->OAM_cache, 0, 8);
+                ppu->OAM_cache_len = 0;
+            }
+            // load NT address
+            pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
+            break;
+        case NT_READ: // 1
+            // load NT byte;
+            pu->NT = read_vram(ppu, pu->fetch_addr);
+            break;
+        case AT_ADDR: // 2
+            if (sprite_prefetch || pre_render)
+                // load NT address
+                pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
+            else
+                // load AT address
+                pu->fetch_addr = 0x23C0 | ppu->v & 0x0C00 | ppu->v >> 4 & 0x38 | ppu->v >> 2 & 0x07;
+            break;
+        case AT_READ: // 3
+            // load AT/NT byte
+            pu->AT = read_vram(ppu, pu->fetch_addr);
+            pu->AT >>= ppu->v >> 4 & 4 | ppu->v & 2;
+            break;
+        case BG_LSB_ADDR: // 4
+            if (sprite_prefetch) {
+                // load sprite LSB addr
+                uint8_t sprite_index = (ppu->dots - 257) >> 3;
+                SpriteUnit* unit = ppu->sprite_units + sprite_index;
+                Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
+
+                unit->x = sprite->x;
+                unit->attr = sprite->attr;
+
+                uint8_t offset = ppu->scanlines - sprite->y;
+                if (ppu->ctrl & LONG_SPRITE) {
+                    // 8x16 sprite
+                    uint16_t bank = sprite->tile & 1 ? 0x1000: 0;
+                    uint8_t tile = sprite->tile & 0xfe;
+                    uint8_t row = sprite->attr & FLIP_VERTICAL ? 15 - offset : offset;
+
+                    if (row >= 8) {
+                        tile++;
+                        row -= 8;
+                    }
+
+                    pu->fetch_addr = bank + tile * 16 + row;
+                } else {
+                    // 8x8 sprite
+                    uint16_t bank = ppu->ctrl & SPRITE_TABLE ? 0x1000: 0;
+                    uint8_t row = sprite->attr & FLIP_VERTICAL ? 7 - offset : offset;
+
+                    pu->fetch_addr = bank + sprite->tile * 16 + row;
+                }
+            } else {
+                // load BG LSB addr
+                pu->fetch_addr = pu->NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
+            }
+            break;
+        case BG_LSB_READ: // 5
+            if (sprite_prefetch) {
+                // load sprite LSB byte
+                uint8_t sprite_index = (ppu->dots - 257) >> 3;
+                SpriteUnit* unit = ppu->sprite_units + sprite_index;
+                unit->pattern_LSB = read_vram(ppu, pu->fetch_addr);
+            }else {
+                // load BG LSB byte
+                pu->BG_LSB = read_vram(ppu, pu->fetch_addr);
+            }
+            break;
+        case BG_MSB_ADDR: // 6
+            // load BG MSB / sprite MSB addr
+            pu->fetch_addr = pu->fetch_addr + 8;
+            break;
+        case BG_MSB_READ: // 7
+            if (sprite_prefetch) {
+                // load sprite MSB byte
+                uint8_t sprite_index = (ppu->dots - 257) >> 3;
+                SpriteUnit* unit = ppu->sprite_units + sprite_index;
+                unit->pattern_MSB = read_vram(ppu, pu->fetch_addr);
+            }else {
+                // load BG MSB byte
+                pu->BG_MSB = read_vram(ppu, pu->fetch_addr);
+            }
+
+            if (ppu->dots == 256) {
+                inc_vert_v(ppu);
+            }
+
+            if (ppu->dots <= 256 || ppu->dots > 320) {
+                inc_hori_v(ppu);
+            }
+
+            // shift relevant data for rendering
+            pu->pattern_LSB = pu->pattern_LSB & 0xff00 | pu->BG_LSB;
+            pu->pattern_MSB = pu->pattern_MSB & 0xff00 | pu->BG_MSB;
+            pu->attr_LSB = pu->attr_LSB & 0xff00 | (pu->AT & 0b01 ? 0xff : 0) ;
+            pu->attr_MSB = pu->attr_MSB & 0xff00 | (pu->AT & 0b10 ? 0xff : 0) ;
+
+            break;
+        default:
+            // we should never get here
+            break;
+    }
+}
+
+void execute_ppu(PPU* ppu) {
+    if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame)) {
+        if (ppu->dots == 0) {
+            // do dot 0 stuff
+        } else {
+            // dots 1 - 256, scanline 0 - 239 (render region)
+            if (ppu->scanlines < VISIBLE_SCANLINES && ppu->dots <= VISIBLE_DOTS) {
+                evaluate_sprites(ppu);
+                // only consider 6-bits from palette RAM since upper 2 bits are open bus
+                uint8_t pixel = read_vram(ppu, 0x3f00 + get_pixel(ppu)) & 0x3f;
+                // output pixel to output buffer
+                ppu->screen[ppu->scanlines * 256 + ppu->dots - 1] = nes_palette[pixel];
+            }
+            // tile and attr pre-fetch
+            fetch_frame(ppu);
+        }
+    }
+
+    if (ppu->scanlines == VISIBLE_SCANLINES) {
+        // post-render scanline
+    }
+
+    if(ppu->scanlines == 241 && ppu->dots == 1) {
+        // set v-blank
+        if (!ppu->supress_vblank)
+            ppu->status |= V_BLANK;
+        ppu->supress_vblank = 0;
+        update_NMI(ppu, 3);
+    }
+
+    if (ppu->scanlines == ppu->scanlines_per_frame) {
+        // pre-render scanline 262/312
+        if(ppu->dots == 1){
+            // reset v-blank and sprite zero hit
+            ppu->status &= ~(V_BLANK | SPRITE_0_HIT | SPRITE_OVERFLOW);
+            update_NMI(ppu, 0);
+        }
+        else if(ppu->dots == 257 && ppu->render_status){
+            ppu->v &= ~HORIZONTAL_BITS;
+            ppu->v |= ppu->t & HORIZONTAL_BITS;
+        }
+        else if(ppu->dots == 260 && ppu->render_status) {
+            ppu->mapper->on_scanline(ppu->mapper);
+        }
+        else if(ppu->dots > 280 && ppu->dots <= 304 && ppu->render_status){
+            ppu->v &= ~VERTICAL_BITS;
+            ppu->v |= ppu->t & VERTICAL_BITS;
+        }
+        else if(ppu->dots == 339 && ppu->frames & 1 && ppu->render_status && ppu->emulator->type == NTSC) {
+            // skip one cycle on odd frames if rendering is enabled for NTSC
+            ppu->dots++;
+        }
+
+        if(ppu->dots >= 340) {
+            // inform emulator to render contents of ppu on first dot
+            ppu->render = 1;
+            ppu->frames++;
+        }
+    }
+
+    // increment dots and scanlines
+
+    if(++ppu->dots >= DOTS_PER_SCANLINE) {
+        if (ppu->scanlines++ >= ppu->scanlines_per_frame)
+            ppu->scanlines = 0;
+        ppu->dots = 0;
+    }
+
+    // update render status
+    if (ppu->render_state_delay) {
+        ppu->render_state_delay--;
+        if(ppu->render_state_delay == 0) {
+            ppu->render_status = (ppu->mask & RENDER_BITS) > 0;
+        }
+    }
+
+    //update NMI delay
+    if (ppu->nmi_delay) {
+        ppu->nmi_delay--;
+        if(ppu->nmi_delay == 0) {
+            update_NMI(ppu, 0);
+        }
+    }
+}
+
+void execute_ppu_old(PPU* ppu){
     if(ppu->scanlines < VISIBLE_SCANLINES){
         // render scanlines 0 - 239
         if(ppu->dots > 0 && ppu->dots <= VISIBLE_DOTS){
@@ -375,6 +813,7 @@ void execute_ppu(PPU* ppu){
 
 
 static uint16_t render_background(PPU* ppu){
+    // old background rendering
     int x = (int)ppu->dots - 1;
     uint8_t fine_x = ((uint16_t)ppu->x + x) % 8;
 
@@ -397,6 +836,7 @@ static uint16_t render_background(PPU* ppu){
 }
 
 static uint16_t render_sprites(PPU* restrict ppu, uint16_t bg_addr, uint8_t* restrict back_priority){
+    // old sprite rendering
     // 4 bytes per sprite
     // byte 0 -> y index
     // byte 1 -> tile index
