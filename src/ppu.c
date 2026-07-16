@@ -652,9 +652,12 @@ void execute_ppu(PPU* ppu) {
 
     if (ppu->scanlines == ppu->scanlines_per_frame) {
         // pre-render scanline 262/312
-        if(ppu->dots == 1){
+        if (ppu->dots == 0) {
+            ppu->status &= ~(SPRITE_0_HIT | SPRITE_OVERFLOW);
+        }
+        else if(ppu->dots == 1){
             // reset v-blank and sprite zero hit
-            ppu->status &= ~(V_BLANK | SPRITE_0_HIT | SPRITE_OVERFLOW);
+            ppu->status &= ~V_BLANK;
             update_NMI(ppu, 0);
         }
         else if(ppu->dots == 257 && ppu->render_status){
