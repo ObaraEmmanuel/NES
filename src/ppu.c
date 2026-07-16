@@ -9,6 +9,8 @@
 static uint16_t render_background(PPU* ppu);
 static uint16_t render_sprites(PPU* ppu, uint16_t bg_addr, uint8_t* back_priority);
 static void update_NMI(PPU* ppu, uint8_t delay);
+static uint8_t is_y_in_range(PPU* ppu, uint8_t y);
+static void clear_oam(PPU* ppu);
 static void evaluate_sprites(PPU* ppu);
 static uint8_t get_bg_pixel(PPU *ppu);
 static uint8_t get_sprite_pixel(PPU* ppu);
@@ -177,7 +179,7 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
         uint8_t val = ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->bus & 0xc0);
         if (ppu->mask & 0x1)
             // greyscale mode; lower 4 bits = 0000
-                return val & 0xf0;
+            return val & 0xf0;
         return val;
     }
 
@@ -364,6 +366,16 @@ static uint8_t get_pixel(PPU* ppu) {
     }
 }
 
+static uint8_t is_y_in_range(PPU* ppu, uint8_t y) {
+    return ppu->scanlines - y < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
+}
+
+static void clear_oam(PPU* ppu) {
+    if (!(ppu->dots & 1))
+        // writes happen on even dots
+        ppu->OAM_cache[(ppu->dots >> 1) - 1] = 0xff;
+}
+
 static void evaluate_sprites(PPU* ppu) {
     // sprite evaluation
     SpriteEvalMachine* su = &ppu->sprite_eval_unit;
@@ -376,22 +388,7 @@ static void evaluate_sprites(PPU* ppu) {
         su->sec_oam_index = 0;
     }
 
-    if (ppu->dots == 1) {
-        // reset sprite evaluation machine
-        ppu->sprite_eval_unit.state = CLEAR_OAM_READ;
-        ppu->sprite_eval_unit.sec_oam_index = 0;
-    }
-
     switch (su->state) {
-        case CLEAR_OAM_READ:
-            // (even dot) delay 1 cycle
-            su->state = CLEAR_OAM_WRITE;
-            break;
-        case CLEAR_OAM_WRITE:
-            // (odd dot) write to secondary OAM
-            ppu->OAM_cache[su->sec_oam_index++] = 0xff;
-            su->state = CLEAR_OAM_READ;
-            break;
         case READ_OAM_Y:
             if (su->n >= 64) {
                 su->state = OAM_EOF;
@@ -400,11 +397,10 @@ static void evaluate_sprites(PPU* ppu) {
             su->buffer = ppu->OAM[su->n << 2 | su->m];
             su->state = CMP_OAM_Y;
             break;
-        case CMP_OAM_Y: {
-            uint8_t is_within_y = ppu->scanlines - su->buffer < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
+        case CMP_OAM_Y:
             if (su->sec_oam_index < 32) {
                 ppu->OAM_cache[su->sec_oam_index] = su->buffer;
-                if (is_within_y) {
+                if (is_y_in_range(ppu, su->buffer)) {
                     su->sec_oam_index++;
                     su->state = READ_BYTE;
                     // read the next 3 bytes into secondary OAM
@@ -418,7 +414,7 @@ static void evaluate_sprites(PPU* ppu) {
                 }
             } else {
                 // sprite overflow
-                if (is_within_y) {
+                if (is_y_in_range(ppu, su->buffer)) {
                     ppu->status |= SPRITE_OVERFLOW;
                     su->state = READ_BYTE;
                     // read the next 3 bytes
@@ -432,7 +428,6 @@ static void evaluate_sprites(PPU* ppu) {
                 }
             }
             break;
-        }
         case READ_BYTE:
             if (su->n >= 64) {
                 su->state = OAM_EOF;
@@ -469,7 +464,6 @@ static void fetch_frame(PPU* ppu) {
     PictureUnit* pu = &ppu->p_unit;
 
     uint8_t sprite_prefetch = ppu->dots > 256 && ppu->dots <= 320;
-    uint8_t post_visible = ppu->dots > 256 && ppu->dots <= 320;
     uint8_t pre_render = ppu->dots >= 337;
 
     // clock bg output shift registers
@@ -488,11 +482,6 @@ static void fetch_frame(PPU* ppu) {
             if (ppu->dots == 257) {
                 ppu->v &= ~HORIZONTAL_BITS;
                 ppu->v |= ppu->t & HORIZONTAL_BITS;
-            }
-            if (ppu->dots == 1) {
-                // clear secondary OAM
-                memset(ppu->OAM_cache, 0, 8);
-                ppu->OAM_cache_len = 0;
             }
             // load NT address
             pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
@@ -570,6 +559,13 @@ static void fetch_frame(PPU* ppu) {
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_MSB = read_vram(ppu, pu->fetch_addr);
+                Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
+
+                if (!is_y_in_range(ppu, sprite->y)) {
+                    // sprite is not in range
+                    unit->pattern_MSB = 0;
+                    unit->pattern_LSB = 0;
+                }
             }else {
                 // load BG MSB byte
                 pu->BG_MSB = read_vram(ppu, pu->fetch_addr);
@@ -603,7 +599,10 @@ void execute_ppu(PPU* ppu) {
         } else {
             // dots 1 - 256, scanline 0 - 239 (render region)
             if (ppu->scanlines < VISIBLE_SCANLINES && ppu->dots <= VISIBLE_DOTS) {
-                evaluate_sprites(ppu);
+                if (ppu->dots <= 64)
+                    clear_oam(ppu);
+                else if (ppu->dots <= 256)
+                    evaluate_sprites(ppu);
                 // only consider 6-bits from palette RAM since upper 2 bits are open bus
                 uint8_t pixel = read_vram(ppu, 0x3f00 + get_pixel(ppu)) & 0x3f;
                 // output pixel to output buffer

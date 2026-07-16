@@ -51,8 +51,6 @@ typedef enum PPUPhase {
 } PPUPhase;
 
 typedef enum SpriteEvalState {
-    CLEAR_OAM_READ = 0,
-    CLEAR_OAM_WRITE,
     READ_OAM_Y,
     CMP_OAM_Y,
     READ_BYTE,
