@@ -86,18 +86,20 @@ void set_oam_address(PPU* ppu, uint8_t address){
 }
 
 uint8_t read_oam(PPU* ppu){
-    return ppu->OAM[ppu->oam_address];
+    if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame)) {
+        return ppu->sprite_eval_unit.buffer;
+    }
+    // bits 2-4 of the attr byte (byte 2 of 4) are unimplemented and always read back as 0
+    return ppu->OAM[ppu->oam_address] & ((ppu->oam_address & 0x03) == 0x02 ? 0xE3 : 0xFF);
 }
 
 void write_oam(PPU* ppu, uint8_t value){
     if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame)) {
         // glitchy OAM increment bumping only the upper 6 bits
         ppu->oam_address += 4;
+        ppu->oam_address &= 0xfc;
         return;
     }
-    // bits 2-4 of the attr byte (byte 2 of 4) are unimplemented and always read back as 0
-    if ((ppu->oam_address & 0x03) == 0x02)
-        value &= 0xE3;
     ppu->OAM[ppu->oam_address++] = value;
 }
 
@@ -380,11 +382,13 @@ static void clear_oam(PPU* ppu) {
     if (!(ppu->dots & 1))
         // writes happen on even dots
         ppu->OAM_cache[(ppu->dots >> 1) - 1] = 0xff;
+    ppu->sprite_eval_unit.buffer = 0xff;
 }
 
 static void evaluate_sprites(PPU* ppu) {
     // sprite evaluation
     SpriteEvalMachine* su = &ppu->sprite_eval_unit;
+    uint16_t addr = 0;
 
     // finish OAM clear and start evaluation
     if (ppu->dots == 65) {
@@ -392,15 +396,17 @@ static void evaluate_sprites(PPU* ppu) {
         su->state = READ_OAM_Y;
         su->n = su->m = 0;
         su->sec_oam_index = 0;
+        su->oam_addr = ppu->oam_address;
     }
 
     switch (su->state) {
         case READ_OAM_Y:
-            if (su->n >= 64) {
+            addr = su->n << 2 | su->m + su->oam_addr;
+            if (addr >= 256) {
                 su->state = OAM_EOF;
                 break;
             }
-            su->buffer = ppu->OAM[su->n << 2 | su->m];
+            su->buffer = ppu->OAM[addr];
             su->state = CMP_OAM_Y;
             break;
         case CMP_OAM_Y:
@@ -435,11 +441,12 @@ static void evaluate_sprites(PPU* ppu) {
             }
             break;
         case READ_BYTE:
-            if (su->n >= 64) {
+            addr = (su->n << 2 | su->m++) + su->oam_addr;
+            if (addr >= 256) {
                 su->state = OAM_EOF;
                 break;
             }
-            su->buffer = ppu->OAM[su->n << 2 | su->m++];
+            su->buffer = ppu->OAM[addr];
             // use unimplemented bit 2 of attr byte to mark sprite 0
             if (su->remaining == 2) {
                 su->buffer &= ~BIT_2;
@@ -480,8 +487,10 @@ static void fetch_frame(PPU* ppu) {
         pu->attr_MSB <<= 1;
     }
 
-    if (sprite_prefetch)
+    if (sprite_prefetch) {
         ppu->oam_address = 0;
+        ppu->sprite_eval_unit.buffer = 0xff;
+    }
 
     switch (phase) {
         case NT_ADDR: // 0
