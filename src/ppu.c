@@ -593,23 +593,28 @@ static void fetch_frame(PPU* ppu) {
 }
 
 void execute_ppu(PPU* ppu) {
-    if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame)) {
+    if (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame) {
         if (ppu->dots == 0) {
             // do dot 0 stuff
         } else {
             // dots 1 - 256, scanline 0 - 239 (render region)
             if (ppu->scanlines < VISIBLE_SCANLINES && ppu->dots <= VISIBLE_DOTS) {
-                if (ppu->dots <= 64)
-                    clear_oam(ppu);
-                else if (ppu->dots <= 256)
-                    evaluate_sprites(ppu);
-                // only consider 6-bits from palette RAM since upper 2 bits are open bus
-                uint8_t pixel = read_vram(ppu, 0x3f00 + get_pixel(ppu)) & 0x3f;
+                uint8_t pixel = 0;
+                if (ppu->render_status) {
+                    if (ppu->dots <= 64)
+                        clear_oam(ppu);
+                    else if (ppu->dots <= 256)
+                        evaluate_sprites(ppu);
+                    // only consider 6-bits from palette RAM since upper 2 bits are open bus
+                    pixel = get_pixel(ppu);
+                }
+                pixel = read_vram(ppu, 0x3F00 | pixel) & 0x3f;
                 // output pixel to output buffer
                 ppu->screen[ppu->scanlines * 256 + ppu->dots - 1] = nes_palette[pixel];
             }
-            // tile and attr pre-fetch
-            fetch_frame(ppu);
+            if (ppu->render_status)
+                // tile and attr pre-fetch
+                fetch_frame(ppu);
         }
     }
 
