@@ -44,6 +44,7 @@ void init_ppu(struct Emulator* emulator){
 
 void reset_ppu(PPU* ppu){
     ppu->t = ppu->x = ppu->dots = 0;
+    ppu->should_inc_vert_v = ppu->should_inc_hori_v = 0;
     ppu->scanlines = 261;
     ppu->w = 1;
     ppu->ctrl &= ~0xFC;
@@ -126,7 +127,12 @@ uint8_t read_ppu(PPU* ppu){
         ppu->buffer = read_vram(ppu, ppu->v & 0xefff);
     }else
         data = prev_buff;
-    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
+
+    // reading during rendering increments both
+    if (ppu->render_status &&  (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->scanlines_per_frame))
+        ppu->should_inc_vert_v = ppu->should_inc_hori_v = 1;
+    else
+        ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
     return data;
 }
 
@@ -572,10 +578,14 @@ static void fetch_frame(PPU* ppu) {
             }
 
             if (ppu->dots == 256) {
+                // prevent double vertical inc on $2007 read
+                ppu->should_inc_vert_v = 0;
                 inc_vert_v(ppu);
             }
 
             if (ppu->dots <= 256 || ppu->dots > 320) {
+                // prevent double horizontal in on $2007 read
+                ppu->should_inc_hori_v = 0;
                 inc_hori_v(ppu);
             }
 
@@ -589,6 +599,16 @@ static void fetch_frame(PPU* ppu) {
         default:
             // we should never get here
             break;
+    }
+
+    // glitchy increments on $2007 read
+    if (ppu->should_inc_hori_v) {
+        inc_hori_v(ppu);
+        ppu->should_inc_hori_v = 0;
+    }
+    if (ppu->should_inc_vert_v) {
+        inc_vert_v(ppu);
+        ppu->should_inc_vert_v = 0;
     }
 }
 

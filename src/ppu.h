@@ -115,6 +115,8 @@ typedef struct PPU{
     PictureUnit p_unit;
     SpriteEvalMachine sprite_eval_unit;
     SpriteUnit sprite_units[8];
+    uint8_t should_inc_hori_v;
+    uint8_t should_inc_vert_v;
 
     uint16_t v;
     uint16_t t;
