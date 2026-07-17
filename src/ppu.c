@@ -666,7 +666,7 @@ void execute_ppu(PPU* ppu) {
         else if(ppu->dots == 260 && ppu->render_status) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
-        else if(ppu->dots > 280 && ppu->dots <= 304 && ppu->render_status){
+        else if(ppu->dots >= 280 && ppu->dots <= 304 && ppu->render_status){
             ppu->v &= ~VERTICAL_BITS;
             ppu->v |= ppu->t & VERTICAL_BITS;
         }
