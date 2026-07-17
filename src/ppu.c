@@ -481,10 +481,10 @@ static void fetch_frame(PPU* ppu) {
 
     // clock bg output shift registers
     if (ppu->dots <= 256 || (ppu->dots > 320 && ppu->dots < 337)) {
-        pu->pattern_LSB <<= 1;
-        pu->pattern_MSB <<= 1;
-        pu->attr_LSB <<= 1;
-        pu->attr_MSB <<= 1;
+        pu->pattern_LSB = pu->pattern_LSB << 1 | 1;
+        pu->pattern_MSB = pu->pattern_MSB << 1 | 1;
+        pu->attr_LSB  = pu->attr_LSB << 1 | 1;
+        pu->attr_MSB = pu->attr_MSB << 1 | 1;
     }
 
     if (sprite_prefetch) {
