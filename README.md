@@ -63,9 +63,7 @@ over time. Any help is welcome.
 
 I haven't really taken time to do a survey but based on mappers implemented 
 we can put the estimate at 90% of NES games. This is assuming none of them are 
-using a quirk that I haven't gotten round to implementing. Games using 
-mid-scanline trickery may not work as expected unless I find time to iron
-out timing issues in the PPU. Below are a few demos:
+using a quirk that I haven't gotten round to implementing. Below are a few demos:
 
 _Contra_
 

@@ -101,7 +101,6 @@ typedef struct PPU{
     uint8_t OAM[256];
     uint8_t OAM_cache[32];
     uint8_t palette[0x20];
-    uint8_t OAM_cache_len;
     uint8_t ctrl;
     uint8_t mask;
     uint8_t status;
@@ -111,14 +110,13 @@ typedef struct PPU{
     uint8_t nmi_delay;
     size_t dots;
     size_t scanlines;
-    uint16_t scanlines_per_frame;
+    uint16_t pre_render;
 
     PictureUnit p_unit;
     SpriteEvalMachine sprite_eval_unit;
     SpriteUnit sprite_units[8];
     uint8_t should_inc_hori_v;
     uint8_t should_inc_vert_v;
-    uint8_t OAM_buffer;
 
     uint16_t v;
     uint16_t t;
