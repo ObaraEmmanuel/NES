@@ -43,14 +43,15 @@ void init_ppu(struct Emulator* emulator){
 }
 
 void reset_ppu(PPU* ppu){
-    ppu->t = ppu->x = ppu->dots = 0;
+    ppu->t = ppu->x = 0;
     ppu->should_inc_vert_v = ppu->should_inc_hori_v = 0;
+    ppu->dots = 1;
     ppu->scanlines = 261;
     ppu->w = 1;
     ppu->ctrl &= ~0xFC;
     ppu->mask = 0;
     ppu->status = 0;
-    ppu->frames = 0;
+    ppu->frames = 1;
     ppu->render_state_delay = 0;
     ppu->render_status = 0;
     ppu->supress_vblank = 0;
@@ -79,7 +80,6 @@ void set_address(PPU* ppu, uint8_t address){
         ppu->w = 1;
     }
 }
-
 
 void set_oam_address(PPU* ppu, uint8_t address){
     ppu->oam_address = address;
@@ -165,8 +165,6 @@ void dma(PPU* ppu, uint8_t address){
         memory->bus = ptr[255];
     }
 }
-
-
 
 uint8_t read_vram(PPU* ppu, uint16_t address){
     address = address & 0x3fff;
@@ -672,10 +670,6 @@ void execute_ppu(PPU* ppu) {
             ppu->status &= ~V_BLANK;
             update_NMI(ppu, 0);
         }
-        else if(ppu->dots == 257 && ppu->render_status){
-            ppu->v &= ~HORIZONTAL_BITS;
-            ppu->v |= ppu->t & HORIZONTAL_BITS;
-        }
         else if(ppu->dots == 260 && ppu->render_status) {
             ppu->mapper->on_scanline(ppu->mapper);
         }
@@ -683,24 +677,12 @@ void execute_ppu(PPU* ppu) {
             ppu->v &= ~VERTICAL_BITS;
             ppu->v |= ppu->t & VERTICAL_BITS;
         }
-        else if(ppu->dots == 339 && ppu->frames & 1 && ppu->render_status && ppu->emulator->type == NTSC) {
-            // skip one cycle on odd frames if rendering is enabled for NTSC
-            ppu->dots++;
-        }
 
         if(ppu->dots >= 340) {
             // inform emulator to render contents of ppu on first dot
             ppu->render = 1;
             ppu->frames++;
         }
-    }
-
-    // increment dots and scanlines
-
-    if(++ppu->dots >= DOTS_PER_SCANLINE) {
-        if (ppu->scanlines++ >= ppu->scanlines_per_frame)
-            ppu->scanlines = 0;
-        ppu->dots = 0;
     }
 
     // update render status
@@ -716,6 +698,20 @@ void execute_ppu(PPU* ppu) {
         ppu->nmi_delay--;
         if(ppu->nmi_delay == 0) {
             update_NMI(ppu, 0);
+        }
+    }
+
+    // increment dots and scanlines
+    if(++ppu->dots >= DOTS_PER_SCANLINE) {
+        if (ppu->scanlines++ >= ppu->scanlines_per_frame) {
+            // skip one cycle on odd frames if rendering is enabled for NTSC
+            if (ppu->frames & 1 && ppu->render_status && ppu->emulator->type == NTSC)
+                ppu->dots = 1;
+            else
+                ppu->dots = 0;
+            ppu->scanlines = 0;
+        } else {
+            ppu->dots = 0;
         }
     }
 }
