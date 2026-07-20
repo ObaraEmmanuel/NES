@@ -63,6 +63,14 @@ void exit_ppu(PPU* ppu) {
     }
 }
 
+void set_latch(PPU* ppu, uint8_t value, uint8_t mask) {
+    ppu->latch &= ~mask;
+    ppu->latch |= value & mask;
+    // if not all bits are driven, don't refresh decay if it is not complete yet
+    if (mask == 0xff || ppu->latch_decay == 0)
+        ppu->latch_decay = 60000;
+}
+
 void set_address(PPU* ppu, uint8_t address){
     if(ppu->w){
         // first write
@@ -167,19 +175,17 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
     address = address & 0x3fff;
 
     if(address < 0x2000) {
-        ppu->bus = ppu->mapper->read_CHR(ppu->mapper, address);
-        return ppu->bus;
+        return ppu->mapper->read_CHR(ppu->mapper, address);
     }
 
     if(address < 0x3F00){
         address = (address & 0xefff) - 0x2000;
-        ppu->bus = ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
-        return ppu->bus;
+        return ppu->V_RAM[ppu->mapper->name_table_map[address / 0x400] + (address & 0x3ff)];
     }
 
     if(address < 0x4000) {
         // palette RAM provide first 6 bits and remaining 2 bits are open bus
-        uint8_t val = ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->bus & 0xc0);
+        uint8_t val = ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->latch & 0xc0);
         if (ppu->mask & 0x1)
             // greyscale mode; lower 4 bits = 0000
             return val & 0xf0;
@@ -191,7 +197,6 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
 
 void write_vram(PPU* ppu, uint16_t address, uint8_t value){
     address = address & 0x3fff;
-    ppu->bus = value;
 
     if(address < 0x2000)
         ppu->mapper->write_CHR(ppu->mapper, address, value);
@@ -691,6 +696,14 @@ void execute_ppu(PPU* ppu) {
         ppu->nmi_delay--;
         if(ppu->nmi_delay == 0) {
             update_NMI(ppu, 0);
+        }
+    }
+
+    // open bus decay delay
+    if (ppu->latch_decay) {
+        ppu->latch_decay--;
+        if (ppu->latch_decay == 0) {
+            ppu->latch = 0;
         }
     }
 

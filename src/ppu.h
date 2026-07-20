@@ -126,7 +126,8 @@ typedef struct PPU{
     uint8_t buffer;
 
     uint8_t render;
-    uint8_t bus;
+    uint8_t latch;
+    uint16_t latch_decay;
 
     struct Emulator* emulator;
     Mapper* mapper;
@@ -153,6 +154,7 @@ void execute_ppu_old(PPU* ppu);
 void reset_ppu(PPU* ppu);
 void exit_ppu(PPU* ppu);
 void init_ppu(struct Emulator* emulator);
+void set_latch(PPU* ppu, uint8_t value, uint8_t mask);
 uint8_t read_status(PPU* ppu);
 uint8_t read_ppu(PPU* ppu);
 void set_ctrl(PPU* ppu, uint8_t ctrl);

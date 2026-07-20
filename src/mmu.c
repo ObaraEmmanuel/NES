@@ -41,38 +41,38 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
 
         switch (address) {
             case PPU_CTRL:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 set_ctrl(ppu, value);
                 break;
             case PPU_MASK:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 set_mask(ppu, value);
                 break;
             case PPU_SCROLL:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 set_scroll(ppu, value);
                 break;
             case PPU_ADDR:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 set_address(ppu, value);
                 break;
             case PPU_DATA:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 write_ppu(ppu, value);
                 break;
             case OAM_ADDR:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 set_oam_address(ppu, value);
                 break;
             case OAM_DMA:
                 dma(ppu, value);
                 break;
             case OAM_DATA:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 write_oam(ppu, value);
                 break;
             case PPU_STATUS:
-                ppu->bus = value;
+                set_latch(ppu, value, 0xff);
                 break;
             case JOY1:
                 write_joypad(&mem->joy1, value);
@@ -162,15 +162,16 @@ uint8_t read_mem(Memory* mem, uint16_t address){
         PPU* ppu = &mem->emulator->ppu;
         switch (address) {
             case PPU_STATUS:
-                ppu->bus &= 0x1f;
-                ppu->bus |= read_status(ppu) & 0xe0;
-                mem->bus = ppu->bus;
+                set_latch(ppu, read_status(ppu), 0xe0);
+                mem->bus = ppu->latch;
                 return mem->bus;
             case OAM_DATA:
-                mem->bus = ppu->bus = read_oam(ppu);
+                set_latch(ppu, read_oam(ppu), 0xff);
+                mem->bus = ppu->latch;
                 return mem->bus;
             case PPU_DATA:
-                mem->bus = ppu->bus = read_ppu(ppu);
+                set_latch(ppu, read_ppu(ppu), 0xff);
+                mem->bus = ppu->latch;
                 return mem->bus;
             case PPU_CTRL:
             case PPU_MASK:
@@ -178,7 +179,7 @@ uint8_t read_mem(Memory* mem, uint16_t address){
             case PPU_ADDR:
             case OAM_ADDR:
                 // ppu open bus
-                mem->bus = ppu->bus;
+                mem->bus = ppu->latch;
                 return mem->bus;
             case JOY1:
                 mem->bus &= 0xe0;
