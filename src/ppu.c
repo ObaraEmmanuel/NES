@@ -3,7 +3,6 @@
 #include "ppu.h"
 #include "emulator.h"
 #include "utils.h"
-#include "mmu.h"
 #include "cpu6502.h"
 
 static void update_NMI(PPU* ppu, uint8_t delay);
@@ -149,26 +148,14 @@ void write_ppu(PPU* ppu, uint8_t value){
 }
 
 void dma(PPU* ppu, uint8_t address){
-    Memory* memory = &ppu->emulator->mem;
-    uint8_t* ptr = get_ptr(memory, address * 0x100);
-    // halt CPU for DMA and skip extra cycle if on odd cycle
-    do_DMA(&ppu->emulator->cpu, 513 + ppu->emulator->cpu.odd_cycle);
-    if(ptr == NULL) {
-        // Probably in PRG ROM so it is not possible to resolve a pointer
-        // due to bank switching, so we do it the slow hard way
-        for(int i = 0; i < 256; i++) {
-            ppu->OAM[(ppu->oam_address + i) & 0xff] = read_mem(memory, address * 0x100 + i);
-        }
-    }else {
-        // copy from OAM address to the end (256 bytes)
-        memcpy(ppu->OAM + ppu->oam_address, ptr, 256 - ppu->oam_address);
-        if(ppu->oam_address) {
-            // wrap around and copy from start to OAM address if OAM is not 0x00
-            memcpy(ppu->OAM, ptr + (256 - ppu->oam_address), ppu->oam_address);
-        }
-        // last value
-        memory->bus = ptr[255];
-    }
+    schedule_dma(
+        &ppu->emulator->cpu,
+        DMA_OAM,
+        0,
+        address * 0x100,
+        ppu->OAM,
+        256
+    );
 }
 
 uint8_t read_vram(PPU* ppu, uint16_t address){

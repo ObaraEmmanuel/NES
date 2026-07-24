@@ -9,8 +9,11 @@
 #define PRG_RAM_SIZE 0x2000
 #define MAX_SILENCE 150 // frames
 #define RESTART_THRESHOLD 3000 // 3 sec
+#define NTSC_DEFAULT_SPEED 16666
+#define PAL_DEFAULT_SPEED 19997
 
 static void NSF_NMI_hook(c6502* ctx, int phase);
+static void calculate_speeds(Mapper* mapper);
 
 static uint8_t read_PRG(Mapper*, uint16_t);
 static void write_PRG(Mapper*, uint16_t, uint8_t);
@@ -111,11 +114,12 @@ int load_info_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     }
 
     if(mapper->type == PAL) {
-        nsf->speed = 19997;
+        nsf->speed = PAL_DEFAULT_SPEED;
     }else {
-        nsf->speed = 16666;
+        nsf->speed = NTSC_DEFAULT_SPEED;
     }
-    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
+    calculate_speeds(mapper);
+    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / (float)nsf->speed);
 
     if(chunk[0x7]) {
         log_sound_chip_flags(chunk[0x7]);
@@ -190,6 +194,7 @@ int load_rate_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
     if(len > 4 && mapper->type == DENDY) {
         nsf->speed = (chunk[5] << 8) | chunk[4];
     }
+    calculate_speeds(mapper);
     return 0;
 }
 
@@ -364,6 +369,10 @@ int load_nsf(ROMData* rom_data, Mapper* mapper) {
     mapper->is_nsf = 1;
 
     NSF* nsf = calloc(1, sizeof(NSF));
+    if (nsf == NULL) {
+        LOG(ERROR, "Could not allocate NSF");
+        return -1;
+    }
     mapper->NSF = nsf;
 
     nsf->version = header[5];
@@ -406,7 +415,9 @@ int load_nsf(ROMData* rom_data, Mapper* mapper) {
     }else {
         nsf->speed = (header[0x6f] << 8) | header[0x6e];
     }
-    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / nsf->speed);
+
+    calculate_speeds(mapper);
+    LOG(INFO, "Play speed: %.2f Hz", 1000000.0f / (float)nsf->speed);
 
     if(header[0x7b]) {
         log_sound_chip_flags(header[0x7b]);
@@ -540,6 +551,24 @@ int load_nsf(ROMData* rom_data, Mapper* mapper) {
         nsf->IRQ_vector = read_PRG(mapper, 0xfffe) | read_PRG(mapper, 0xffff) << 8;
     }
     return 0;
+}
+
+static void calculate_speeds(Mapper* mapper) {
+    NSF* nsf = mapper->NSF;
+    if (!nsf->speed) {
+        // correct speed if not set
+        nsf->speed = mapper->type == PAL? PAL_DEFAULT_SPEED : NTSC_DEFAULT_SPEED;
+    }
+    nsf->ms_per_frame = (float)nsf->speed / 1000.0f;
+    if(mapper->type == PAL) {
+        nsf->cycles_per_frame = (size_t)((float)nsf->speed * 1.662607f);
+        // PAL has 70 scanlines (7459 cpu cycles) V-blank
+        nsf->nmi_cycle_start = nsf->cycles_per_frame - 7459;
+    }else {
+        // NTSC and others have 20 scanlines (2273 cpu cycles) V-blank
+        nsf->cycles_per_frame = (size_t)((float)nsf->speed * 1.789773f);
+        nsf->nmi_cycle_start = nsf->cycles_per_frame - 2273;
+    }
 }
 
 void nsf_execute(Emulator* emulator) {

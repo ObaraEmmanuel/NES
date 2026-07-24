@@ -38,11 +38,13 @@ typedef struct Emulator{
 
     uint8_t exit;
     uint8_t pause;
+    uint8_t PAL_check;
 } Emulator;
 
 
 void init_emulator(Emulator* emulator, int argc, char *argv[]);
 void reset_emulator(Emulator* emulator);
+void tick_master_clock(Emulator* emulator);
 void run_emulator(Emulator* emulator);
 void run_NSF_player(Emulator* emulator);
 void free_emulator(Emulator* emulator);

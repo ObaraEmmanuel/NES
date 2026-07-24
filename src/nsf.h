@@ -55,6 +55,11 @@ typedef struct NSF {
     uint8_t bank_init[8];
     uint8_t initializing;
     size_t prg_size;
+    // ---- timing ----
+    size_t cycles_per_frame;
+    size_t nmi_cycle_start;
+    float ms_per_frame;
+    size_t cycles;
 } NSF;
 
 int load_nsf(ROMData* rom_data, Mapper* mapper);

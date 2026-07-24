@@ -126,6 +126,7 @@ typedef struct PPU{
     uint8_t buffer;
 
     uint8_t render;
+    uint8_t enabled;
     uint8_t latch;
     uint16_t latch_decay;
 

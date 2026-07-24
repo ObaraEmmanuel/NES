@@ -150,6 +150,8 @@ static void update_target_period(Pulse* pulse);
 
 static void clock_dmc(APU* apu);
 
+static void schedule_dmc_dma(APU* apu, uint8_t delay);
+
 static void quarter_frame(APU *apu);
 
 static void half_frame(APU *apu);
@@ -458,6 +460,38 @@ float get_sample(APU *apu) {
     return amp > 1 ? 1 : amp;
 }
 
+static void schedule_dmc_dma(APU* apu, uint8_t delay) {
+    DMC* dmc = &apu->dmc;
+    schedule_dma(
+        &apu->emulator->cpu,
+        DMA_DMC,
+        delay,
+        dmc->current_addr,
+        &dmc->sample,
+        1
+    );
+}
+
+void dmc_complete(APU* apu) {
+    DMC* dmc = &apu->dmc;
+    dmc->empty = 0;
+    dmc->bytes_remaining--;
+    if(dmc->current_addr == 0xffff)
+        dmc->current_addr = 0x8000;
+    else
+        dmc->current_addr++;
+
+    if(dmc->bytes_remaining == 0) {
+        if(dmc->loop) {
+            dmc->current_addr = dmc->sample_addr;
+            dmc->bytes_remaining = dmc->sample_length;
+        }else if(dmc->IRQ_enable) {
+            dmc->interrupt = 1;
+            interrupt(&apu->emulator->cpu, APU_DMC_IRQ);
+        }
+    }
+}
+
 
 void set_status(APU *apu, uint8_t value) {
     apu->pulse1.enabled = (value & BIT_0) > 0;
@@ -473,6 +507,10 @@ void set_status(APU *apu, uint8_t value) {
     }else if(!apu->dmc.enabled) {
         apu->dmc.bytes_remaining = 0;
     }
+
+    if (apu->dmc.empty && apu->dmc.bytes_remaining > 0)
+        schedule_dmc_dma(apu, 3);
+
     apu->dmc.interrupt = 0;
     interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
 
@@ -627,33 +665,6 @@ void set_dmc_length(DMC* dmc, uint8_t value) {
 
 void clock_dmc(APU* apu) {
     DMC* dmc = &apu->dmc;
-
-    if(dmc->enabled && dmc->empty) {
-        if(dmc->bytes_remaining > 0) {
-            // halt CPU for DMA for 3 more cycles
-            do_DMA(&apu->emulator->cpu, 3);
-            dmc->sample = read_mem(&apu->emulator->mem, dmc->current_addr);
-            dmc->empty = 0;
-            dmc->bytes_remaining--;
-            if(dmc->current_addr == 0xffff)
-                dmc->current_addr = 0x8000;
-            else
-                dmc->current_addr++;
-            dmc->irq_set = 0;
-            interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
-        }
-        if(dmc->bytes_remaining == 0) {
-            if(dmc->loop) {
-                dmc->current_addr = dmc->sample_addr;
-                dmc->bytes_remaining = dmc->sample_length;
-            }else if(dmc->IRQ_enable && !dmc->irq_set) {
-                dmc->interrupt = 1;
-                dmc->irq_set = 1;
-                interrupt(&apu->emulator->cpu, APU_DMC_IRQ);
-            }
-        }
-    }
-
     if(dmc->rate_index > 0) {
         dmc->rate_index--;
         return;
@@ -674,6 +685,10 @@ void clock_dmc(APU* apu) {
         dmc->bits_remaining--;
     }
     if(dmc->bits_remaining == 0) {
+        if(dmc->enabled && dmc->bytes_remaining > 0) {
+            // scheduled to start on the next PUT cycle
+            schedule_dmc_dma(apu, 0);
+        }
         if(dmc->empty)
             dmc->silence = 1;
         else {

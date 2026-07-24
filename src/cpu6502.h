@@ -22,66 +22,74 @@ typedef enum{
 } ProcessorFlag;
 
 typedef enum {
-    ADC, //add with carry
-    AND, //and (with accumulator)
-    ASL, //arithmetic shift left
-    BCC, //branch on carry clear
-    BCS, //branch on carry set
-    BEQ, //branch on equal (zero set)
-    BIT, //bit test
-    BMI, //branch on minus (negative set)
-    BNE, //branch on not equal (zero clear)
-    BPL, //branch on plus (negative clear)
-    BRK, //break / interrupt
-    BVC, //branch on overflow clear
-    BVS, //branch on overflow set
-    CLC, //clear carry
-    CLD, //clear decimal
-    CLI, //clear interrupt disable
-    CLV, //clear overflow
-    CMP, //compare (with accumulator)
-    CPX, //compare with X
-    CPY, //compare with Y
-    DEC, //decrement
-    DEX, //decrement X
-    DEY, //decrement Y
-    EOR, //exclusive or (with accumulator)
-    INC, //increment
-    INX, //increment X
-    INY, //increment Y
-    JMP, //jump
-    JSR, //jump subroutine
-    LDA, //load accumulator
-    LDX, //load X
-    LDY, //load Y
-    LSR, //logical shift right
-    NOP, //no operation
-    ORA, //or with accumulator
-    PHA, //push accumulator
-    PHP, //push processor status (SR)
-    PLA, //pull accumulator
-    PLP, //pull processor status (SR)
-    ROL, //rotate left
-    ROR, //rotate right
-    RTI, //return from interrupt
-    RTS, //return from subroutine
-    SBC, //subtract with carry (USBC)
-    SEC, //set carry
-    SED, //set decimal
-    SEI, //set interrupt disable
-    STA, //store accumulator
-    STX, //store X
-    STY, //store Y
-    TAX, //transfer accumulator to X
-    TAY, //transfer accumulator to Y
-    TSX, //transfer stack pointer to X
-    TXA, //transfer X to accumulator
-    TXS, //transfer X to stack pointer
-    TYA, //transfer Y to accumulator
+    ADC = 0x00, // add with carry
+    AND, // and (with accumulator)
+    BIT, // bit test
+    CMP, // compare (with accumulator)
+    CPX, // compare with X
+    CPY, // compare with Y
+    EOR, // exclusive or (with accumulator)
+    LDA, // load accumulator
+    LDX, // load X
+    LDY, // load Y
+    ORA, // or with accumulator
+    SBC, // subtract with carry (USBC)
+
+    ASL = 0x10, // arithmetic shift left
+    DEC, // decrement
+    INC, // increment
+    LSR, // logical shift right
+    ROL, // rotate left
+    ROR, // rotate right
+
+    STA = 0x18, // 4 store accumulator
+    STX, // 4 store X
+    STY, // 4 store Y
+
+    BCC = 0x20, // branch on carry clear
+    BCS, // branch on carry set
+    BEQ, // branch on equal (zero set)
+    BMI, // branch on minus (negative set)
+    BNE, // branch on not equal (zero clear)
+    BPL, // branch on plus (negative clear)
+    BVC, // branch on overflow clear
+    BVS, // branch on overflow set
+
+    CLC = 0x28, // clear carry
+    CLD, // clear decimal
+    CLI, // clear interrupt disable
+    CLV, // clear overflow
+    SEC, // set carry
+    SED, // set decimal
+    SEI, // set interrupt disable
+
+    DEX = 0x30, // decrement X
+    DEY, // decrement Y
+    INX, // increment X
+    INY, // increment Y
+
+    PHA = 0x38, // push accumulator
+    PHP, // push processor status (SR)
+    PLA, // pull accumulator
+    PLP, // pull processor status (SR)
+
+    TAX = 0x40, // transfer accumulator to X
+    TAY, // transfer accumulator to Y
+    TSX, // transfer stack pointer to X
+    TXA, // transfer X to accumulator
+    TXS, // transfer X to stack pointer
+    TYA, // transfer Y to accumulator
+
+    BRK = 0x48, // break / interrupt
+    JMP, // jump
+    JSR, // jump subroutine
+    NOP, // no operation
+    RTI, // return from interrupt
+    RTS, // return from subroutine
 
     // unofficial
 
-    ALR, // ASR
+    ALR = 0x80, // ASR
     ANC,
     ANE, // XAA
     ARR,
@@ -109,6 +117,7 @@ typedef enum {
 typedef enum{
     NONE,
     IMPL,
+    SPEC,
     ACC,
     REL,
     IMT,
@@ -134,13 +143,13 @@ static const Instruction instructionLookup[256] =
 {
 //  HI\LO        0x0          0x1          0x2             0x3           0x4             0x5         0x6           0x7           0x8           0x9           0xA        0xB            0xC             0xD          0xE           0xF
 // ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-/*  0x0  */  {BRK, IMPL},{ORA, IDX_IND}, NIL_OP,     {SLO, IDX_IND}, {NOP, ZPG},   {ORA, ZPG},   {ASL, ZPG},   {SLO, ZPG},   {PHP, IMPL}, {ORA, IMT},   {ASL, ACC},  {ANC, IMT},   {NOP, ABS},   {ORA, ABS},   {ASL, ABS},   {SLO, ABS},
+/*  0x0  */  {BRK, SPEC},{ORA, IDX_IND}, NIL_OP,     {SLO, IDX_IND}, {NOP, ZPG},   {ORA, ZPG},   {ASL, ZPG},   {SLO, ZPG},   {PHP, SPEC}, {ORA, IMT},   {ASL, ACC},  {ANC, IMT},   {NOP, ABS},   {ORA, ABS},   {ASL, ABS},   {SLO, ABS},
 /*  0x1  */  {BPL, REL}, {ORA, IND_IDX}, NIL_OP,     {SLO, IND_IDX}, {NOP, ZPG_X}, {ORA, ZPG_X}, {ASL, ZPG_X}, {SLO, ZPG_X}, {CLC, IMPL}, {ORA, ABS_Y}, {NOP, IMPL}, {SLO, ABS_Y}, {NOP, ABS_X}, {ORA, ABS_X}, {ASL, ABS_X}, {SLO, ABS_X},
-/*  0x2  */  {JSR, ABS}, {AND, IDX_IND}, NIL_OP,     {RLA, IDX_IND}, {BIT, ZPG},   {AND, ZPG},   {ROL, ZPG},   {RLA, ZPG},   {PLP, IMPL}, {AND, IMT},   {ROL, ACC},  {ANC, IMT},   {BIT, ABS},   {AND, ABS},   {ROL, ABS},   {RLA, ABS},
+/*  0x2  */  {JSR, SPEC},{AND, IDX_IND}, NIL_OP,     {RLA, IDX_IND}, {BIT, ZPG},   {AND, ZPG},   {ROL, ZPG},   {RLA, ZPG},   {PLP, SPEC}, {AND, IMT},   {ROL, ACC},  {ANC, IMT},   {BIT, ABS},   {AND, ABS},   {ROL, ABS},   {RLA, ABS},
 /*  0x3  */  {BMI, REL}, {AND, IND_IDX}, NIL_OP,     {RLA, IND_IDX}, {NOP, ZPG_X}, {AND, ZPG_X}, {ROL, ZPG_X}, {RLA, ZPG_X}, {SEC, IMPL}, {AND, ABS_Y}, {NOP, IMPL}, {RLA, ABS_Y}, {NOP, ABS_X}, {AND, ABS_X}, {ROL, ABS_X}, {RLA, ABS_X},
-/*  0x4  */  {RTI, IMPL},{EOR, IDX_IND}, NIL_OP,     {SRE, IDX_IND}, {NOP, ZPG},   {EOR, ZPG},   {LSR, ZPG},   {SRE, ZPG},   {PHA, IMPL}, {EOR, IMT},   {LSR, ACC},  {ALR, IMT},   {JMP, ABS},   {EOR, ABS},   {LSR, ABS},   {SRE, ABS},
+/*  0x4  */  {RTI, SPEC},{EOR, IDX_IND}, NIL_OP,     {SRE, IDX_IND}, {NOP, ZPG},   {EOR, ZPG},   {LSR, ZPG},   {SRE, ZPG},   {PHA, SPEC}, {EOR, IMT},   {LSR, ACC},  {ALR, IMT},   {JMP, ABS},   {EOR, ABS},   {LSR, ABS},   {SRE, ABS},
 /*  0x5  */  {BVC, REL}, {EOR, IND_IDX}, NIL_OP,     {SRE, IND_IDX}, {NOP, ZPG_X}, {EOR, ZPG_X}, {LSR, ZPG_X}, {SRE, ZPG_X}, {CLI, IMPL}, {EOR, ABS_Y}, {NOP, IMPL}, {SRE, ABS_Y}, {NOP, ABS_X}, {EOR, ABS_X}, {LSR, ABS_X}, {SRE, ABS_X},
-/*  0x6  */  {RTS, IMPL},{ADC, IDX_IND}, NIL_OP,     {RRA, IDX_IND}, {NOP, ZPG},   {ADC, ZPG},   {ROR, ZPG},   {RRA, ZPG},   {PLA, IMPL}, {ADC, IMT},   {ROR, ACC},  {ARR, IMT},   {JMP, IND},   {ADC, ABS},   {ROR, ABS},   {RRA, ABS},
+/*  0x6  */  {RTS, SPEC},{ADC, IDX_IND}, NIL_OP,     {RRA, IDX_IND}, {NOP, ZPG},   {ADC, ZPG},   {ROR, ZPG},   {RRA, ZPG},   {PLA, SPEC}, {ADC, IMT},   {ROR, ACC},  {ARR, IMT},   {JMP, IND},   {ADC, ABS},   {ROR, ABS},   {RRA, ABS},
 /*  0x7  */  {BVS, REL}, {ADC, IND_IDX}, NIL_OP,     {RRA, IND_IDX}, {NOP, ZPG_X}, {ADC, ZPG_X}, {ROR, ZPG_X}, {RRA, ZPG_X}, {SEI, IMPL}, {ADC, ABS_Y}, {NOP, IMPL}, {RRA, ABS_Y}, {NOP, ABS_X}, {ADC, ABS_X}, {ROR, ABS_X}, {RRA, ABS_X},
 /*  0x8  */  {NOP, IMT}, {STA, IDX_IND}, {NOP, IMT}, {SAX, IDX_IND}, {STY, ZPG},   {STA, ZPG},   {STX, ZPG},   {SAX, ZPG},   {DEY, IMPL}, {NOP, IMT},   {TXA, IMPL}, {ANE, IMT},   {STY, ABS},   {STA, ABS},   {STX, ABS},   {SAX, ABS},
 /*  0x9  */  {BCC, REL}, {STA, IND_IDX}, NIL_OP,     {SHA, IND_IDX}, {STY, ZPG_X}, {STA, ZPG_X}, {STX, ZPG_Y}, {SAX, ZPG_Y}, {TYA, IMPL}, {STA, ABS_Y}, {TXS, IMPL}, {SHS, ABS_Y}, {SHY, ABS_X}, {STA, ABS_X}, {SHX, ABS_Y}, {SHA, ABS_Y},
@@ -152,51 +161,32 @@ static const Instruction instructionLookup[256] =
 /*  0xF  */  {BEQ, REL}, {SBC, IND_IDX}, NIL_OP,     {ISB, IND_IDX}, {NOP, ZPG_X}, {SBC, ZPG_X}, {INC, ZPG_X}, {ISB, ZPG_X}, {SED, IMPL}, {SBC, ABS_Y}, {NOP, IMPL}, {ISB, ABS_Y}, {NOP, ABS_X}, {SBC, ABS_X}, {INC, ABS_X}, {ISB, ABS_X}
 };
 
-
-static const uint8_t cycleLookup_frozen[256] = {
-// HI/LO 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-// -------------------------------------------------------
-/* 0 */  7, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 0, 4, 6, 0,
-/* 1 */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-/* 2 */  6, 6, 0, 0, 3, 3, 5, 0, 4, 2, 2, 0, 4, 4, 6, 0,
-/* 3 */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-/* 4 */  6, 6, 0, 0, 0, 3, 5, 0, 3, 2, 2, 0, 3, 4, 6, 0,
-/* 5 */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-/* 6 */  6, 6, 0, 0, 0, 3, 5, 0, 4, 2, 2, 0, 5, 4, 6, 0,
-/* 7 */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-/* 8 */  0, 6, 0, 0, 3, 3, 3, 0, 2, 0, 2, 0, 4, 4, 4, 0,
-/* 9 */  2, 6, 0, 0, 4, 4, 4, 0, 2, 5, 2, 0, 0, 5, 0, 0,
-/* A */  2, 6, 2, 0, 3, 3, 3, 0, 2, 2, 2, 0, 4, 4, 4, 0,
-/* B */  2, 5, 0, 0, 4, 4, 4, 0, 2, 4, 2, 0, 4, 4, 4, 0,
-/* C */  2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 0, 4, 4, 6, 0,
-/* D */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-/* E */  2, 6, 0, 0, 3, 3, 5, 0, 2, 2, 2, 2, 4, 4, 6, 0,
-/* F */  2, 5, 0, 0, 0, 4, 6, 0, 2, 4, 0, 0, 0, 4, 7, 0,
-};
-
-static const uint8_t cycleLookup[256] = {
-// HI/LO 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
-// -------------------------------------------------------
-/* 0 */  7, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
-/* 1 */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-/* 2 */  6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,
-/* 3 */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-/* 4 */  6, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,
-/* 5 */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-/* 6 */  6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
-/* 7 */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-/* 8 */  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
-/* 9 */  2, 6, 0, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
-/* A */  2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
-/* B */  2, 5, 0, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
-/* C */  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
-/* D */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-/* E */  2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
-/* F */  2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
-};
+/*
+cycles per instruction
+HI/LO 0  1  2  3  4  5  6  7  8  9  A  B  C  D  E  F
+-------------------------------------------------------
+0   | 7, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 4, 4, 6, 6,
+1   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+2   | 6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 4, 4, 6, 6,
+3   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+4   | 6, 6, 0, 8, 3, 3, 5, 5, 3, 2, 2, 2, 3, 4, 6, 6,
+5   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+6   | 6, 6, 0, 8, 3, 3, 5, 5, 4, 2, 2, 2, 5, 4, 6, 6,
+7   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+8   | 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+9   | 2, 6, 0, 6, 4, 4, 4, 4, 2, 5, 2, 5, 5, 5, 5, 5,
+A   | 2, 6, 2, 6, 3, 3, 3, 3, 2, 2, 2, 2, 4, 4, 4, 4,
+B   | 2, 5, 0, 5, 4, 4, 4, 4, 2, 4, 2, 4, 4, 4, 4, 4,
+C   | 2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+D   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+E   | 2, 6, 2, 8, 3, 3, 5, 5, 2, 2, 2, 2, 4, 4, 6, 6,
+F   | 2, 5, 0, 8, 4, 4, 6, 6, 2, 4, 2, 7, 4, 4, 7, 7,
+*/
 
 struct Emulator;
 struct Memory;
+struct PPU;
+struct APU;
 
 typedef enum {
     NOI               = 0,      // no interrupt
@@ -212,10 +202,6 @@ typedef enum {
 
 // Internal implementation states
 enum{
-    BRANCH_MODE       = 1,      // The current instruction is a branching instruction
-    BRANCH_TAKEN      = 1 << 1, // Branch instruction; branch taken
-    BRANCH_PAGE_BREAK = 1 << 2, // Page break encountered when taking branch
-    NMI_HIJACK        = 1 << 3, // NMI should hijack
     DMA_OCCURRED      = 1 << 4, // DMA occurred mid instruction
 };
 
@@ -230,29 +216,58 @@ typedef enum {
     CPU_SR_ANY        = 0b01100, // Flag: CPU_SR | CPU_NMI_SR
 } CPUMode;
 
+typedef enum DMA_Phase {
+    DMA_CLEAR = 0,
+    DMA_SCHEDULED,
+    DMA_ACTIVE = 0x80,
+    DMA_HALTING,
+    DMA_DUMMY,
+    DMA_ALIGNING,
+    DMA_READ,
+    DMA_WRITE,
+}DMA_Phase;
+
+typedef enum DMA_type {
+    DMA_OAM,
+    DMA_DMC,
+} DMA_Type;
+
+typedef struct DMA {
+    uint8_t* dst;
+    uint16_t src_address;
+    uint16_t length;
+    uint16_t index;
+    uint8_t buffer;
+    uint8_t schedule;
+    DMA_Phase phase;
+    DMA_Type type;
+} DMA;
+
 typedef struct c6502{
     size_t t_cycles;
     uint16_t pc;
     uint16_t address;
     uint16_t raw_address;        // address before any indexing is applied
     uint16_t sub_address;        // subroutine address
-    uint16_t dma_cycles;
     uint8_t sr_started;          // subroutine started
     uint8_t ac;
     uint8_t x;
     uint8_t y;
     uint8_t sr;
     uint8_t sp;
-    uint8_t cycles;
-    uint8_t odd_cycle;
     uint8_t mode;                 // Mode of execution. Use set_spu_mode to set
-    struct Emulator* emulator;
     uint8_t state;                // Internal implementation state. See above
     uint8_t interrupt;            // Current interrupt status
     uint8_t polled_interrupt;     // Interrupt status at poll time
     uint8_t NMI_line;
     const Instruction* instruction;
+
+    DMA oam;
+    DMA dmc;
+    struct Emulator* emulator;
     struct Memory* memory;
+    struct PPU* ppu;
+    struct APU* apu;
     void (*NMI_hook)(struct c6502*, int);
 } c6502;
 
@@ -261,6 +276,7 @@ void reset_cpu(c6502* ctx);
 void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt code);
 void interrupt_clear(c6502* ctx, Interrupt code);
+void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_t* dst, uint16_t len);
 void do_DMA(c6502* ctx, size_t cycles);
 uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
 void set_cpu_mode(c6502* ctx, CPUMode mode);

@@ -14,7 +14,7 @@
 static uint64_t PERIOD;
 static uint16_t TURBO_SKIP;
 
-void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
+void init_emulator(Emulator* emulator, int argc, char *argv[]){
     if(argc < 2) {
         LOG(ERROR, "Input file not provided");
         quit(EXIT_FAILURE);
@@ -84,20 +84,52 @@ void init_emulator(struct Emulator* emulator, int argc, char *argv[]){
     emulator->pause = 0;
 }
 
+void tick_master_clock(Emulator* emulator) {
+    emulator->cpu.t_cycles++;
+    if (emulator->ppu.enabled) {
+        execute_ppu(&emulator->ppu);
+        execute_ppu(&emulator->ppu);
+        execute_ppu(&emulator->ppu);
+        if (emulator->type == PAL) {
+            emulator->PAL_check++;
+            if (emulator->PAL_check == 5) {
+                // run extra PPU cycle on 5th cycle
+                execute_ppu(&emulator->ppu);
+                emulator->PAL_check = 0;
+            }
+        }
+    }
+    if (emulator->mapper.is_nsf) {
+        NSF* nsf = emulator->mapper.NSF;
 
-void run_emulator(struct Emulator* emulator){
+        if (nsf->flags & NSF_IRQ)
+            nsf_execute(emulator);
+
+        if (nsf->cycles == nsf->nmi_cycle_start) {
+            if ((nsf->flags & (NSF_NON_RETURN_INIT|NSF_NO_PLAY_SR)) == NSF_NON_RETURN_INIT) {
+                interrupt(&emulator->cpu, NMI);
+            }
+        }
+        nsf->cycles++;
+    }
+    execute_apu(&emulator->apu);
+}
+
+
+void run_emulator(Emulator* emulator){
     if(emulator->mapper.is_nsf) {
         run_NSF_player(emulator);
         return;
     }
 
-    struct JoyPad* joy1 = &emulator->mem.joy1;
-    struct JoyPad* joy2 = &emulator->mem.joy2;
-    struct PPU* ppu = &emulator->ppu;
-    struct c6502* cpu = &emulator->cpu;
-    struct APU* apu = &emulator->apu;
-    struct GraphicsContext* g_ctx = &emulator->g_ctx;
-    struct Timer* timer = &emulator->timer;
+    JoyPad* joy1 = &emulator->mem.joy1;
+    JoyPad* joy2 = &emulator->mem.joy2;
+    PPU* ppu = &emulator->ppu;
+    ppu->enabled = 1;
+    c6502* cpu = &emulator->cpu;
+    APU* apu = &emulator->apu;
+    GraphicsContext* g_ctx = &emulator->g_ctx;
+    Timer* timer = &emulator->timer;
     SDL_Event e;
     Timer frame_timer;
     init_timer(&frame_timer, PERIOD);
@@ -153,31 +185,8 @@ void run_emulator(struct Emulator* emulator){
 
         if(!emulator->pause){
             // if ppu.render is set a frame is complete
-            if(emulator->type == NTSC) {
-                while (!ppu->render) {
-                    execute_ppu(ppu);
-                    execute_ppu(ppu);
-                    execute_ppu(ppu);
-                    execute(cpu);
-                    execute_apu(apu);
-                }
-            }else{
-                // PAL
-                uint8_t check = 0;
-                while (!ppu->render) {
-                    execute_ppu(ppu);
-                    execute_ppu(ppu);
-                    execute_ppu(ppu);
-                    check++;
-                    if(check == 5) {
-                        // on the fifth run execute an extra ppu clock
-                        // this produces 3.2 scanlines per cpu clock
-                        execute_ppu(ppu);
-                        check = 0;
-                    }
-                    execute(cpu);
-                    execute_apu(apu);
-                }
+            while (!ppu->render) {
+                execute(cpu);
             }
 #if NAMETABLE_MODE
             render_name_tables(ppu, ppu->screen);
@@ -213,7 +222,7 @@ void reset_emulator(Emulator* emulator) {
     }
 }
 
-void run_NSF_player(struct Emulator* emulator) {
+void run_NSF_player(Emulator* emulator) {
     LOG(INFO, "Starting NSF player...");
     JoyPad* joy1 = &emulator->mem.joy1;
     JoyPad* joy2 = &emulator->mem.joy2;
@@ -226,20 +235,9 @@ void run_NSF_player(struct Emulator* emulator) {
     Timer* timer = &emulator->timer;
     SDL_Event e;
     Timer frame_timer;
-    PERIOD = 1000 * emulator->mapper.NSF->speed;
-    double ms_per_frame = emulator->mapper.NSF->speed / 1000.0;
+    PERIOD = 1000 * nsf->speed;
     init_timer(&frame_timer, PERIOD);
     mark_start(&frame_timer);
-    size_t cycles_per_frame, nmi_cycle_start;
-    if(emulator->type == PAL) {
-        cycles_per_frame = emulator->mapper.NSF->speed * 1.662607f;
-        // PAL has 70 scanlines (7459 cpu cycles) V-blank
-        nmi_cycle_start = cycles_per_frame - 7459;
-    }else {
-        // NTSC and others have 20 scanlines (2273 cpu cycles) V-blank
-        cycles_per_frame = emulator->mapper.NSF->speed * 1.789773f;
-        nmi_cycle_start = cycles_per_frame - 2273;
-    }
     uint8_t status1 = 0, status2 = 0;
 
     // initialize for the first song
@@ -325,8 +323,8 @@ void run_NSF_player(struct Emulator* emulator) {
                 run_cpu_subroutine(cpu, nsf->play_addr);
             }
 
-            size_t cycles = 0;
-            while (cycles < cycles_per_frame) {
+            nsf->cycles = 0;
+            while (nsf->cycles < nsf->cycles_per_frame) {
                 execute(cpu);
                 if (!(cpu->mode & CPU_SR_ANY)) {
                     if (nsf->flags & NSF_NON_RETURN_INIT && nsf->init_num == 0) {
@@ -341,17 +339,6 @@ void run_NSF_player(struct Emulator* emulator) {
                         }
                     }
                 }
-                if (nsf->flags & NSF_IRQ)
-                    nsf_execute(emulator);
-                if(!nsf->initializing) {
-                    execute_apu(apu);
-                }
-                if (cycles == nmi_cycle_start) {
-                    if ((nsf->flags & (NSF_NON_RETURN_INIT|NSF_NO_PLAY_SR)) == NSF_NON_RETURN_INIT) {
-                        interrupt(cpu, NMI);
-                    }
-                }
-                cycles++;
             }
 
             if ((nsf->flags & (NSF_NON_RETURN_INIT|NSF_NO_PLAY_SR)) == NSF_NON_RETURN_INIT) {
@@ -360,9 +347,9 @@ void run_NSF_player(struct Emulator* emulator) {
 
             render_NSF_graphics(&nsf_ctx);
             nsf_tick_frame(emulator);
+            queue_audio(apu, g_ctx);
             if(!nsf->initializing) {
-                queue_audio(apu, g_ctx);
-                nsf->tick += ms_per_frame;
+                nsf->tick += nsf->ms_per_frame;
             }
             if((cpu->sub_address == nsf->play_addr || nsf->init_num == 1) && nsf->initializing) {
                 nsf->initializing = 0;
@@ -382,7 +369,7 @@ void run_NSF_player(struct Emulator* emulator) {
 }
 
 
-void free_emulator(struct Emulator* emulator){
+void free_emulator(Emulator* emulator){
     LOG(DEBUG, "Starting emulator clean up");
     exit_APU();
     exit_ppu(&emulator->ppu);

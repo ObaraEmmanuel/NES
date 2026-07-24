@@ -81,7 +81,6 @@ typedef struct {
     uint16_t sample_length;
     uint16_t sample_addr;
     uint8_t interrupt;
-    uint8_t irq_set;
     uint16_t rate;
     uint16_t rate_index;
     // output unit
@@ -144,6 +143,7 @@ void init_APU(struct Emulator* emulator);
 void reset_APU(APU *apu);
 void exit_APU();
 void execute_apu(APU* apu);
+void dmc_complete(APU* apu);
 void set_status(APU* apu, uint8_t value);
 float get_sample(APU* apu);
 void queue_audio(APU* apu, struct GraphicsContext* ctx);
