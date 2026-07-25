@@ -82,6 +82,13 @@ void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_
         dma->phase = DMA_SCHEDULED;
 }
 
+void abort_dma(c6502* ctx, DMA_Type type) {
+    if (type == DMA_DMC)
+        ctx->dmc.phase = DMA_CLEAR;
+    else
+        ctx->oam.phase = DMA_CLEAR;
+}
+
 static void tick_dma(c6502* ctx, DMA* dma) {
     switch (dma->phase) {
         case DMA_SCHEDULED:

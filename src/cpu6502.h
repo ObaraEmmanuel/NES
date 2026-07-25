@@ -277,6 +277,7 @@ void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt code);
 void interrupt_clear(c6502* ctx, Interrupt code);
 void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_t* dst, uint16_t len);
+void abort_dma(c6502* ctx, DMA_Type type);
 void do_DMA(c6502* ctx, size_t cycles);
 uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
 void set_cpu_mode(c6502* ctx, CPUMode mode);

@@ -506,6 +506,8 @@ void set_status(APU *apu, uint8_t value) {
         apu->dmc.current_addr = apu->dmc.sample_addr;
     }else if(!apu->dmc.enabled) {
         apu->dmc.bytes_remaining = 0;
+        // explicit abort
+        abort_dma(&apu->emulator->cpu, DMA_DMC);
     }
 
     if (apu->dmc.empty && apu->dmc.bytes_remaining > 0)
