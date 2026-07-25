@@ -69,6 +69,9 @@ void reset_cpu(c6502* cpu){
 void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_t* dst, uint16_t len) {
     DMA* dma = type == DMA_DMC? &ctx->dmc : &ctx->oam;
     if (!(dma->phase == DMA_CLEAR)) {
+        if (dma->type == DMA_OAM)
+            // use most recent address anyway
+            dma->src_address = src;
         return;
     }
     dma->schedule = delay;
