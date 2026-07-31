@@ -5,7 +5,7 @@
 
 static uint8_t read(c6502* ctx, uint16_t address);
 static void write(c6502* ctx, uint16_t address, uint8_t value);
-static void tick_dma(c6502* ctx, DMA* dma);
+static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr);
 static uint16_t get_address(c6502* ctx);
 static uint16_t read_abs_address(c6502 *ctx, uint16_t offset);
 static uint16_t read_abs_address_(c6502 *ctx, uint16_t offset);
@@ -92,7 +92,7 @@ void abort_dma(c6502* ctx, DMA_Type type) {
         ctx->oam.phase = DMA_CLEAR;
 }
 
-static void tick_dma(c6502* ctx, DMA* dma) {
+static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
     switch (dma->phase) {
         case DMA_SCHEDULED:
             if (dma->schedule) {
@@ -119,8 +119,45 @@ static void tick_dma(c6502* ctx, DMA* dma) {
             else
                 dma->phase = DMA_READ;
             break;
-        case DMA_READ:
-            dma->buffer = read_mem(ctx->memory, dma->src_address + dma->index);
+        case DMA_READ: {
+            uint16_t effective_addr = dma->src_address + dma->index;
+            uint8_t apu_activated = bus_addr >= 0x4000 && bus_addr <= 0x401f;
+
+            if (apu_activated) {
+                // APU registers activated
+                uint16_t internal_addr = 0x4000 | (effective_addr & 0x1f);
+
+                switch (internal_addr) {
+                    case 0x4015:
+                        dma->buffer = read_mem(ctx->memory, internal_addr);
+                        if (effective_addr != internal_addr) {
+                            // external bus active so 4015 read affects open bus
+                            ctx->memory->bus = dma->buffer;
+                            read_mem(ctx->memory, effective_addr);
+                        }
+                        break;
+                    case 0x4016:
+                    case 0x4017:
+                        dma->buffer = read_mem(ctx->memory, internal_addr);
+                        if (effective_addr != internal_addr) {
+                            uint8_t extern_val = read_mem(ctx->memory, effective_addr);
+                            // bus conflicts (and external and internal bus results where not open bus)
+                            dma->buffer = extern_val & 0xe0 | (dma->buffer & 0x1f) & (extern_val & 0x1f);
+                        }
+                        break;
+                    default:
+                        dma->buffer = read_mem(ctx->memory, effective_addr);
+                        break;
+                }
+            } else {
+                // APU registers not activated
+                if (effective_addr >= 0x4000 && effective_addr <= 0x401f)
+                    // open bus
+                    dma->buffer = ctx->memory->bus;
+                else
+                    dma->buffer = read_mem(ctx->memory, effective_addr);
+            }
+
             if (dma->type == DMA_OAM)
                 dma->phase = DMA_WRITE;
             else {
@@ -131,6 +168,7 @@ static void tick_dma(c6502* ctx, DMA* dma) {
                 dmc_complete(ctx->apu);
             }
             break;
+        }
         case DMA_WRITE:
             dma->dst[dma->index++] = dma->buffer;
             if (dma->index >= dma->length) {
@@ -153,19 +191,19 @@ static uint8_t read(c6502* ctx, uint16_t address) {
         }
         if (ctx->dmc.phase == DMA_READ && ctx->oam.phase == DMA_READ) {
             ctx->oam.phase = DMA_ALIGNING;
-            tick_dma(ctx, &ctx->dmc);
+            tick_dma(ctx, &ctx->dmc, address);
         } else {
-            tick_dma(ctx, &ctx->dmc);
-            tick_dma(ctx, &ctx->oam);
+            tick_dma(ctx, &ctx->dmc, address);
+            tick_dma(ctx, &ctx->oam, address);
         }
         tick_master_clock(ctx->emulator);
         was_active = 1;
     }
     if (!was_active) {
         if (ctx->oam.phase == DMA_SCHEDULED)
-            tick_dma(ctx, &ctx->oam);
+            tick_dma(ctx, &ctx->oam, address);
         if (ctx->dmc.phase == DMA_SCHEDULED)
-            tick_dma(ctx, &ctx->dmc);
+            tick_dma(ctx, &ctx->dmc, address);
     } else
         ctx->state |= DMA_OCCURRED;
 
@@ -175,9 +213,9 @@ static uint8_t read(c6502* ctx, uint16_t address) {
 }
 static void write(c6502* ctx, uint16_t address, uint8_t value) {
     if (ctx->oam.phase == DMA_SCHEDULED)
-        tick_dma(ctx, &ctx->oam);
+        tick_dma(ctx, &ctx->oam, address);
     if (ctx->dmc.phase == DMA_SCHEDULED)
-        tick_dma(ctx, &ctx->dmc);
+        tick_dma(ctx, &ctx->dmc, address);
 
     write_mem(ctx->memory, address, value);
     tick_master_clock(ctx->emulator);
