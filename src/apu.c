@@ -93,10 +93,11 @@ static uint32_t PAL_frame_sequence[2][6] = {
 };
 
 typedef enum {
-    FRAME_NONE,                 // Do nothing
-    FRAME_QUARTER  = 1,         // Clock quarter frame
-    FRAME_HALF     = 1 << 1,    // Clock half frame
-    FRAME_IRQ      = 1 << 2     // Set frame IRQ flag
+    FRAME_NONE,                      // Do nothing
+    FRAME_QUARTER       = 1,         // Clock quarter frame
+    FRAME_HALF          = 1 << 1,    // Clock half frame
+    FRAME_IRQ           = 1 << 2,    // Set frame IRQ flag
+    FRAME_IRQ_INHIBIT   = 1 << 3     // Set frame IRQ flag
 } FrameDirective;
 
 static uint8_t frame_sequence_directives[2][6] = {
@@ -107,7 +108,7 @@ static uint8_t frame_sequence_directives[2][6] = {
         FRAME_QUARTER,
         FRAME_IRQ,
         FRAME_QUARTER | FRAME_HALF | FRAME_IRQ,
-        FRAME_IRQ,
+        FRAME_IRQ_INHIBIT,
     },
     // Mode 1
     {
@@ -243,11 +244,17 @@ void execute_apu(APU *apu) {
         }
     }
 
-    // assert frame IRQ line after delay
-    if (apu->irq_set_delay) {
-        apu->irq_set_delay--;
-        if (!apu->irq_set_delay) {
+    if (apu->irq_should_set) {
+        if (!apu->IRQ_inhibit)
             interrupt(&apu->emulator->cpu, APU_FRAME_IRQ);
+        apu->irq_should_set = 0;
+    }
+
+    if (apu->irq_clear_delay) {
+        apu->irq_clear_delay--;
+        if (!apu->irq_clear_delay) {
+            apu->frame_interrupt = 0;
+            interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
         }
     }
 
@@ -257,10 +264,15 @@ void execute_apu(APU *apu) {
             quarter_frame(apu);
         if (directive & FRAME_HALF)
             half_frame(apu);
-        if (directive & FRAME_IRQ && !apu->IRQ_inhibit) {
+        if (directive & FRAME_IRQ) {
             apu->frame_interrupt = 1;
             // We need to delay IRQ line assertion by one clock
-            apu->irq_set_delay = 1;
+            apu->irq_should_set = 1;
+        }
+        if (directive & FRAME_IRQ_INHIBIT) {
+            // frame interrupt set according to IRQ inhibit state
+            apu->frame_interrupt = !apu->IRQ_inhibit;
+            apu->irq_should_set = 1;
         }
         apu->sequence_step++;
         apu->sequencer++;
@@ -534,8 +546,7 @@ uint8_t read_apu_status(APU *apu) {
     status |= (apu->dmc.interrupt ? BIT_7 : 0);
     status |= (apu->dmc.bytes_remaining? BIT_4: 0);
     // clear frame interrupt
-    apu->frame_interrupt = 0;
-    interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
+    apu->irq_clear_delay = 1 + (apu->cycles & 1);
     return status;
 }
 
