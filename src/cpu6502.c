@@ -63,10 +63,11 @@ void reset_cpu(c6502* cpu){
     cpu->sr_started = 0;
     cpu->NMI_hook = NULL;
     cpu->dmc.phase = DMA_CLEAR;
-    cpu->oam.phase = DMA_CLEAR;
+    cpu->dmc.phase = DMA_CLEAR;
+    cpu->dmc.abort = 0;
 }
 
-void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_t* dst, uint16_t len) {
+void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_t len) {
     DMA* dma = type == DMA_DMC? &ctx->dmc : &ctx->oam;
     if (!(dma->phase == DMA_CLEAR)) {
         if (dma->type == DMA_OAM)
@@ -74,38 +75,25 @@ void schedule_dma(c6502* ctx, DMA_Type type, uint8_t delay, uint16_t src, uint8_
             dma->src_address = src;
         return;
     }
-    dma->schedule = delay;
     dma->src_address = src;
     dma->dst = dst;
     dma->length = len;
     dma->index = 0;
-    if (!delay)
-        dma->phase = DMA_HALTING;
-    else
-        dma->phase = DMA_SCHEDULED;
-}
-
-void abort_dma(c6502* ctx, DMA_Type type) {
-    if (type == DMA_DMC)
-        ctx->dmc.phase = DMA_CLEAR;
-    else
-        ctx->oam.phase = DMA_CLEAR;
+    dma->abort = 0;
+    dma->phase = DMA_HALTING;
 }
 
 static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
     switch (dma->phase) {
-        case DMA_SCHEDULED:
-            if (dma->schedule) {
-                dma->schedule--;
-                if (!dma->schedule)
-                    dma->phase = DMA_HALTING;
-            } else
-                dma->phase = DMA_HALTING;
-            break;
         case DMA_ALIGNING:
             dma->phase = DMA_READ;
             break;
         case DMA_HALTING:
+            if (dma->abort) {
+                dma->abort = 0;
+                dma->phase = DMA_CLEAR;
+                break;
+            }
             if (dma->type == DMA_DMC)
                 dma->phase = DMA_DUMMY;
             else if (ctx->apu->cycles & 1)
@@ -184,7 +172,7 @@ static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
 
 static uint8_t read(c6502* ctx, uint16_t address) {
     uint8_t was_active = 0;
-    while (ctx->dmc.phase & DMA_ACTIVE || ctx->oam.phase & DMA_ACTIVE) {
+    while (ctx->dmc.phase > DMA_CLEAR || ctx->oam.phase > DMA_CLEAR) {
         if (ctx->dmc.phase < DMA_READ && ctx->oam.phase < DMA_READ) {
             // dummy read
             read_mem(ctx->memory, address);
@@ -199,24 +187,17 @@ static uint8_t read(c6502* ctx, uint16_t address) {
         tick_master_clock(ctx->emulator);
         was_active = 1;
     }
-    if (!was_active) {
-        if (ctx->oam.phase == DMA_SCHEDULED)
-            tick_dma(ctx, &ctx->oam, address);
-        if (ctx->dmc.phase == DMA_SCHEDULED)
-            tick_dma(ctx, &ctx->dmc, address);
-    } else
-        ctx->state |= DMA_OCCURRED;
+    if (was_active) ctx->state |= DMA_OCCURRED;
 
     uint8_t val = read_mem(ctx->memory, address);
     tick_master_clock(ctx->emulator);
     return val;
 }
 static void write(c6502* ctx, uint16_t address, uint8_t value) {
-    if (ctx->oam.phase == DMA_SCHEDULED)
-        tick_dma(ctx, &ctx->oam, address);
-    if (ctx->dmc.phase == DMA_SCHEDULED)
-        tick_dma(ctx, &ctx->dmc, address);
-
+    if (ctx->dmc.abort) {
+        ctx->dmc.abort = 0;
+        ctx->dmc.phase = DMA_CLEAR;
+    }
     write_mem(ctx->memory, address, value);
     tick_master_clock(ctx->emulator);
 }

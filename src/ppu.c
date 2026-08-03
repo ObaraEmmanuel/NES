@@ -151,7 +151,6 @@ void dma(PPU* ppu, uint8_t address){
     schedule_dma(
         &ppu->emulator->cpu,
         DMA_OAM,
-        0,
         address * 0x100,
         ppu->OAM,
         256

@@ -92,6 +92,10 @@ typedef struct {
     uint8_t empty;
     uint16_t bytes_remaining;
     uint16_t current_addr;
+    // dma
+    uint8_t dma_scheduled;
+    uint8_t ready;
+    uint8_t toggle_delay;
 } DMC;
 
 typedef struct {

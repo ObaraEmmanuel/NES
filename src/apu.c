@@ -151,8 +151,6 @@ static void update_target_period(Pulse* pulse);
 
 static void clock_dmc(APU* apu);
 
-static void schedule_dmc_dma(APU* apu, uint8_t delay);
-
 static void quarter_frame(APU *apu);
 
 static void half_frame(APU *apu);
@@ -472,38 +470,6 @@ float get_sample(APU *apu) {
     return amp > 1 ? 1 : amp;
 }
 
-static void schedule_dmc_dma(APU* apu, uint8_t delay) {
-    DMC* dmc = &apu->dmc;
-    schedule_dma(
-        &apu->emulator->cpu,
-        DMA_DMC,
-        delay,
-        dmc->current_addr,
-        &dmc->sample,
-        1
-    );
-}
-
-void dmc_complete(APU* apu) {
-    DMC* dmc = &apu->dmc;
-    dmc->empty = 0;
-    dmc->bytes_remaining--;
-    if(dmc->current_addr == 0xffff)
-        dmc->current_addr = 0x8000;
-    else
-        dmc->current_addr++;
-
-    if(dmc->bytes_remaining == 0) {
-        if(dmc->loop) {
-            dmc->current_addr = dmc->sample_addr;
-            dmc->bytes_remaining = dmc->sample_length;
-        }else if(dmc->IRQ_enable) {
-            dmc->interrupt = 1;
-            interrupt(&apu->emulator->cpu, APU_DMC_IRQ);
-        }
-    }
-}
-
 
 void set_status(APU *apu, uint8_t value) {
     apu->pulse1.enabled = (value & BIT_0) > 0;
@@ -516,14 +482,14 @@ void set_status(APU *apu, uint8_t value) {
         // restart it
         apu->dmc.bytes_remaining = apu->dmc.sample_length;
         apu->dmc.current_addr = apu->dmc.sample_addr;
-    }else if(!apu->dmc.enabled) {
-        apu->dmc.bytes_remaining = 0;
-        // explicit abort
-        abort_dma(&apu->emulator->cpu, DMA_DMC);
+        if (apu->dmc.empty && apu->dmc.bytes_remaining > 0)
+            // schedule DMC DMA immediately
+            apu->dmc.dma_scheduled = 1;
     }
 
-    if (apu->dmc.empty && apu->dmc.bytes_remaining > 0)
-        schedule_dmc_dma(apu, 3);
+    // toggle DMC ready status after 2 or 3 cycles on a get or put cycle respectively.
+    if (apu->dmc.enabled != apu->dmc.ready)
+        apu->dmc.toggle_delay = 2 + (apu->cycles & 1);
 
     apu->dmc.interrupt = 0;
     interrupt_clear(&apu->emulator->cpu, APU_DMC_IRQ);
@@ -544,7 +510,7 @@ uint8_t read_apu_status(APU *apu) {
     status |= (apu->noise.l > 0 ? BIT_3 : 0);
     status |= (apu->frame_interrupt ? BIT_6 : 0);
     status |= (apu->dmc.interrupt ? BIT_7 : 0);
-    status |= (apu->dmc.bytes_remaining? BIT_4: 0);
+    status |= (apu->dmc.bytes_remaining && apu->dmc.enabled? BIT_4: 0);
     // clear frame interrupt
     apu->irq_clear_delay = 1 + (apu->cycles & 1);
     return status;
@@ -676,41 +642,87 @@ void set_dmc_length(DMC* dmc, uint8_t value) {
     dmc->sample_length = (uint16_t)value * 16 + 1;
 }
 
+void dmc_complete(APU* apu) {
+    DMC* dmc = &apu->dmc;
+    dmc->empty = 0;
+    if(dmc->current_addr == 0xffff)
+        dmc->current_addr = 0x8000;
+    else
+        dmc->current_addr++;
+
+    if(dmc->bytes_remaining == 1) {
+        if(dmc->loop) {
+            dmc->current_addr = dmc->sample_addr;
+            dmc->bytes_remaining = dmc->sample_length;
+        }else {
+            if(dmc->IRQ_enable) {
+                dmc->interrupt = 1;
+                interrupt(&apu->emulator->cpu, APU_DMC_IRQ);
+            }
+            // implicit stop
+            // leave bytes_remaining = 1 so DMA can still start and be aborted later
+            dmc->enabled = 0;
+            dmc->toggle_delay = 2 + (apu->cycles & 1);
+        }
+    } else if (dmc->bytes_remaining) {
+        dmc->bytes_remaining--;
+    }
+}
+
 void clock_dmc(APU* apu) {
     DMC* dmc = &apu->dmc;
+
     if(dmc->rate_index > 0) {
         dmc->rate_index--;
-        return;
-    }
-    dmc->rate_index = dmc->rate;
+    } else {
+        dmc->rate_index = dmc->rate;
 
-    if(dmc->bits_remaining > 0) {
-        // clamped counter update
-        if(!dmc->silence) {
-            if(dmc->bits & 1) {
-                dmc->counter+=2;
-                dmc->counter = dmc->counter > 127 ? 127 : dmc->counter;
+        if(dmc->bits_remaining > 0) {
+            // clamped counter update
+            if(!dmc->silence) {
+                if(dmc->bits & 1) {
+                    dmc->counter+=2;
+                    dmc->counter = dmc->counter > 127 ? 127 : dmc->counter;
+                }
+                else if(dmc->counter > 1)
+                    dmc->counter-=2;
+                dmc->bits >>= 1;
             }
-            else if(dmc->counter > 1)
-                dmc->counter-=2;
-            dmc->bits >>= 1;
+            dmc->bits_remaining--;
         }
-        dmc->bits_remaining--;
+        if(dmc->bits_remaining == 0) {
+            if(dmc->bytes_remaining > 0) {
+                // reload DMA is always scheduled when sample buffer becomes empty
+                // it will however only start if DMC is enabled and ready
+                dmc->dma_scheduled = 1;
+            }
+            if(dmc->empty)
+                dmc->silence = 1;
+            else {
+                dmc->bits = dmc->sample;
+                dmc->empty = 1;
+                dmc->silence = 0;
+            }
+            dmc->bits_remaining = 8;
+        }
     }
-    if(dmc->bits_remaining == 0) {
-        if(dmc->enabled && dmc->bytes_remaining > 0) {
-            // scheduled to start on the next PUT cycle
-            schedule_dmc_dma(apu, 0);
-        }
-        if(dmc->empty)
-            dmc->silence = 1;
-        else {
-            dmc->bits = dmc->sample;
-            dmc->empty = 1;
-            dmc->silence = 0;
-        }
-        dmc->bits_remaining = 8;
+
+    // scheduled dma only starts if DMC is ready
+    if (dmc->dma_scheduled && dmc->ready) {
+        schedule_dma(&apu->emulator->cpu, DMA_DMC, dmc->current_addr, &dmc->sample,1);
+        dmc->dma_scheduled = 0;
     }
+
+    // DMC ready status only changes 2 or 3 cycles after $4015 write or sample exhaustion
+    if (dmc->toggle_delay && --dmc->toggle_delay == 0) {
+        dmc->ready = dmc->enabled;
+        if (!dmc->ready) {
+            // abort DMC DMA
+            apu->emulator->cpu.dmc.abort = 1;
+            dmc->bytes_remaining = 0;
+        }
+    }
+
 }
 
 static void compute_mixer_LUT() {
