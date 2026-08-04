@@ -129,8 +129,10 @@ static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
                         dma->buffer = read_mem(ctx->memory, internal_addr);
                         if (effective_addr != internal_addr) {
                             uint8_t extern_val = read_mem(ctx->memory, effective_addr);
+                            // joypads bits always win open bus
+                            ctx->memory->bus = dma->buffer & 0x1f | extern_val & 0xe0;
                             // bus conflicts (and external and internal bus results where not open bus)
-                            dma->buffer = extern_val & 0xe0 | (dma->buffer & 0x1f) & (extern_val & 0x1f);
+                            dma->buffer = extern_val & 0xe0 | ((dma->buffer & 0x1f) & (extern_val & 0x1f));
                         }
                         break;
                     default:
@@ -1015,7 +1017,6 @@ static uint16_t get_address(c6502* ctx){
                     if(has_page_break(addr, addr + ctx->x)) {
                         // invalid read
                         read(ctx, (addr & 0xff00) | ((addr + ctx->x) & 0xff));
-                        // ctx->cycles++;
                     }
             }
             return addr + ctx->x;
@@ -1032,7 +1033,6 @@ static uint16_t get_address(c6502* ctx){
                     if(has_page_break(addr, addr + ctx->y)) {
                         // invalid read
                         read(ctx, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
-                        // ctx->cycles++;
                     }
             }
             return addr + ctx->y;
@@ -1069,7 +1069,6 @@ static uint16_t get_address(c6502* ctx){
                     if(has_page_break(addr, addr + ctx->y)) {
                         // invalid read
                         read(ctx, (addr & 0xff00) | ((addr + ctx->y) & 0xff));
-                        // ctx->cycles++;
                     }
             }
             return addr + ctx->y;
