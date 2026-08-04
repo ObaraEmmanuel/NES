@@ -13,16 +13,21 @@ void print_cpu_trace(const c6502* ctx){
     if(traces >= 8991 && !PROFILE)
         quit(1);
 #endif
-    char opcode_str[4], address_str[28], opcode_hex_str[9];
+    char address_str[28], opcode_hex_str[9];
     uint16_t addr, pc = ctx->pc, hi, lo;
     uint8_t opcode;
     opcode = read_mem(ctx->memory, pc++);
     const Instruction* instruction = &instructionLookup[opcode];
-    get_opcode(opcode_str, instruction->opcode);
+    const char* opcode_str = get_opcode(instruction->opcode);
 
-    switch (instruction->mode) {
+    AddressMode mode = instruction->mode;
+    if (instruction->opcode == JSR)
+        mode = ABS;
+
+    switch (mode) {
         case IMPL:
         case NONE:
+        case SPEC:
             sprintf(opcode_hex_str, "%02X      ", opcode);
             sprintf(address_str, "                          ");
             break;
@@ -150,224 +155,156 @@ void print_cpu_trace(const c6502* ctx){
         ctx->ac,
         ctx->x,
         ctx->y,
-        ctx->sr,
+        (ctx->sr & 0xef) | BIT_5,
         ctx->sp,
-        ctx->t_cycles + 6
+        ctx->t_cycles + 7
     );
     traces++;
 }
 
-void get_opcode(char* out, Opcode opcode){
+char* get_opcode(Opcode opcode){
     switch (opcode) {
         case ADC:
-            strcpy(out, "ADC");
-            break;
+            return "ADC";
         case AND:
-            strcpy(out, "AND");
-            break;
+            return "AND";
         case ASL:
-            strcpy(out, "ASL");
-            break;
+            return "ASL";
         case BCC:
-            strcpy(out, "BCC");
-            break;
+            return "BCC";
         case BCS:
-            strcpy(out, "BCS");
-            break;
+            return "BCS";
         case BEQ:
-            strcpy(out, "BEQ");
-            break;
+            return "BEQ";
         case BIT:
-            strcpy(out, "BIT");
-            break;
+            return "BIT";
         case BMI:
-            strcpy(out, "BMI");
-            break;
+            return "BMI";
         case BNE:
-            strcpy(out, "BNE");
-            break;
+            return "BNE";
         case BPL:
-            strcpy(out, "BPL");
-            break;
+            return "BPL";
         case BRK:
-            strcpy(out, "BRK");
-            break;
+            return "BRK";
         case BVC:
-            strcpy(out, "BVC");
-            break;
+            return "BVC";
         case BVS:
-            strcpy(out, "BVS");
-            break;
+            return "BVS";
         case CLC:
-            strcpy(out, "CLC");
-            break;
+            return "CLC";
         case CLD:
-            strcpy(out, "CLD");
-            break;
+            return "CLD";
         case CLI:
-            strcpy(out, "CLI");
-            break;
+            return "CLI";
         case CLV:
-            strcpy(out, "CLV");
-            break;
+            return "CLV";
         case CMP:
-            strcpy(out, "CMP");
-            break;
+            return "CMP";
         case CPX:
-            strcpy(out, "CPX");
-            break;
+            return "CPX";
         case CPY:
-            strcpy(out, "CPY");
-            break;
+            return "CPY";
         case DEC:
-            strcpy(out, "DEC");
-            break;
+            return "DEC";
         case DEX:
-            strcpy(out, "DEX");
-            break;
+            return "DEX";
         case DEY:
-            strcpy(out, "DEY");
-            break;
+            return "DEY";
         case EOR:
-            strcpy(out, "EOR");
-            break;
+            return "EOR";
         case INC:
-            strcpy(out, "INC");
-            break;
+            return "INC";
         case INX:
-            strcpy(out, "INX");
-            break;
+            return "INX";
         case INY:
-            strcpy(out, "INY");
-            break;
+            return "INY";
         case JMP:
-            strcpy(out, "JMP");
-            break;
+            return "JMP";
         case JSR:
-            strcpy(out, "JSR");
-            break;
+            return "JSR";
         case LDA:
-            strcpy(out, "LDA");
-            break;
+            return "LDA";
         case LDX:
-            strcpy(out, "LDX");
-            break;
+            return "LDX";
         case LDY:
-            strcpy(out, "LDY");
-            break;
+            return "LDY";
         case LSR:
-            strcpy(out, "LSR");
-            break;
+            return "LSR";
         case NOP:
-            strcpy(out, "NOP");
-            break;
+            return "NOP";
         case ORA:
-            strcpy(out, "ORA");
-            break;
+            return "ORA";
         case PHA:
-            strcpy(out, "PHA");
-            break;
+            return "PHA";
         case PHP:
-            strcpy(out, "PHP");
-            break;
+            return "PHP";
         case PLA:
-            strcpy(out, "PLA");
-            break;
+            return "PLA";
         case PLP:
-            strcpy(out, "PLP");
-            break;
+            return "PLP";
         case ROL:
-            strcpy(out, "ROL");
-            break;
+            return "ROL";
         case ROR:
-            strcpy(out, "ROR");
-            break;
+            return "ROR";
         case RTI:
-            strcpy(out, "RTI");
-            break;
+            return "RTI";
         case RTS:
-            strcpy(out, "RTS");
-            break;
+            return "RTS";
         case SBC:
-            strcpy(out, "SBC");
-            break;
+            return "SBC";
         case SEC:
-            strcpy(out, "SEC");
-            break;
+            return "SEC";
         case SED:
-            strcpy(out, "SED");
-            break;
+            return "SED";
         case SEI:
-            strcpy(out, "SEI");
-            break;
+            return "SEI";
         case STA:
-            strcpy(out, "STA");
-            break;
+            return "STA";
         case STX:
-            strcpy(out, "STX");
-            break;
+            return "STX";
         case STY:
-            strcpy(out, "STY");
-            break;
+            return "STY";
         case TAX:
-            strcpy(out, "TAX");
-            break;
+            return "TAX";
         case TAY:
-            strcpy(out, "TAY");
-            break;
+            return "TAY";
         case TSX:
-            strcpy(out, "TSX");
-            break;
+            return "TSX";
         case TXA:
-            strcpy(out, "TXA");
-            break;
+            return "TXA";
         case TXS:
-            strcpy(out, "TXS");
-            break;
+            return "TXS";
         case TYA:
-            strcpy(out, "TYA");
-            break;
+            return "TYA";
 
         // unofficial
 
         case ALR:
-            strcpy(out, "ALR");
-            break;
+            return "ALR";
         case ANC:
-            strcpy(out, "ANC");
-            break;
+            return "ANC";
         case ARR:
-            strcpy(out, "ARR");
-            break;
+            return "ARR";
         case AXS:
-            strcpy(out, "AXS");
-            break;
+            return "AXS";
         case LAX:
-            strcpy(out, "LAX");
-            break;
+            return "LAX";
         case SAX:
-            strcpy(out, "SAX");
-            break;
+            return "SAX";
         case DCP:
-            strcpy(out, "DCP");
-            break;
+            return "DCP";
         case ISB:
-            strcpy(out, "ISB");
-            break;
+            return "ISB";
         case RLA:
-            strcpy(out, "RLA");
-            break;
+            return "RLA";
         case RRA:
-            strcpy(out, "RRA");
-            break;
+            return "RRA";
         case SLO:
-            strcpy(out, "SLO");
-            break;
+            return "SLO";
         case SRE:
-            strcpy(out, "SRE");
-            break;
+            return "SRE";
         default:
-            break;
+            return "***";
     }
 }
 

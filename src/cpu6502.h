@@ -280,4 +280,4 @@ uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
 void set_cpu_mode(c6502* ctx, CPUMode mode);
 // trace.c
 void print_cpu_trace(const c6502* ctx);
-void get_opcode(char* out, Opcode opcode);
+char* get_opcode(Opcode opcode);
