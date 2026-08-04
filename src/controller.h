@@ -17,16 +17,14 @@ typedef enum KeyPad{
 } KeyPad;
 
 typedef struct JoyPad{
-    uint8_t strobe;
-    uint8_t index;
     uint16_t status;
+    uint8_t reg;
     uint8_t player;
 } JoyPad;
 
 
 void init_joypad(struct JoyPad* joyPad, uint8_t player);
 uint8_t read_joypad(struct JoyPad* joyPad);
-void write_joypad(struct JoyPad* joyPad, uint8_t data);
 void update_joypad(struct JoyPad* joyPad, SDL_Event* event);
 void turbo_trigger(struct JoyPad* joyPad);
 void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event);

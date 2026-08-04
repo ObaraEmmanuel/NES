@@ -11,6 +11,7 @@ void init_mem(Emulator* emulator){
     memset(mem->RAM, 0, RAM_SIZE);
     init_joypad(&mem->joy1, 0);
     init_joypad(&mem->joy2, 1);
+    mem->strobe = 0;
 }
 
 uint8_t* get_ptr(Memory* mem, uint16_t address){
@@ -75,8 +76,7 @@ void write_mem(Memory* mem, uint16_t address, uint8_t value){
                 set_latch(ppu, value, 0xff);
                 break;
             case JOY1:
-                write_joypad(&mem->joy1, value);
-                write_joypad(&mem->joy2, value);
+                mem->strobe = value & 1;
                 mem->bus = (old & 0xf0) | value & 0xf;
                 break;
             case APU_P1_CTRL:

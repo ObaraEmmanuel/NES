@@ -112,6 +112,12 @@ void tick_master_clock(Emulator* emulator) {
         }
         nsf->cycles++;
     }
+    if (emulator->mem.strobe && emulator->apu.cycles & 1) {
+        // controllers are strobed on a get cycle
+        emulator->mem.joy1.reg = emulator->mem.joy1.status & 0xff;
+        emulator->mem.joy2.reg = emulator->mem.joy2.status & 0xff;
+
+    }
     execute_apu(&emulator->apu);
 }
 

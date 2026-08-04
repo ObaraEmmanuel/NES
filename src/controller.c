@@ -1,31 +1,24 @@
 #include "controller.h"
 #include "gamepad.h"
+#ifdef __ANDROID__
 #include "touchpad.h"
+#endif
 
 
 void init_joypad(struct JoyPad* joyPad, uint8_t player){
-    joyPad->strobe = 0;
-    joyPad->index = 0;
     joyPad->status = 0;
+    joyPad->reg = 0;
     joyPad->player = player;
 }
 
-
 uint8_t read_joypad(struct JoyPad* joyPad){
-    if(joyPad->index > 7)
-        return 1;
-    uint8_t val = (joyPad->status & (1 << joyPad->index)) != 0;
-    if(!joyPad->strobe)
-        joyPad->index++;
+    uint8_t val = joyPad->reg & 1;
+    joyPad->reg >>= 1;
+    // refill BIT 7 with 1
+    joyPad->reg |= 0x80;
     return val;
 }
 
-
-void write_joypad(struct JoyPad* joyPad, uint8_t data){
-    joyPad->strobe = data & 1;
-    if(joyPad->strobe)
-        joyPad->index = 0;
-}
 
 void keyboard_mapper(struct JoyPad* joyPad, SDL_Event* event){
     uint16_t key = 0;
