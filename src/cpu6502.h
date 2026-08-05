@@ -253,6 +253,7 @@ typedef struct c6502{
     uint8_t y;
     uint8_t sr;
     uint8_t sp;
+    uint8_t ibus;
     uint8_t mode;                 // Mode of execution. Use set_spu_mode to set
     uint8_t state;                // Internal implementation state. See above
     uint8_t interrupt;            // Current interrupt status

@@ -119,7 +119,9 @@ static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
                     case 0x4015:
                         dma->buffer = read_mem(ctx->memory, internal_addr);
                         if (effective_addr != internal_addr) {
-                            // external bus active so 4015 read affects open bus
+                            // bus conflict where BIT 5 comes from external open bus and the rest from $4015
+                            dma->buffer = (dma->buffer & ~BIT_5) | (ctx->memory->bus & BIT_5);
+                            // the conflict value goes on the external bus
                             ctx->memory->bus = dma->buffer;
                             read_mem(ctx->memory, effective_addr);
                         }
@@ -177,7 +179,7 @@ static uint8_t read(c6502* ctx, uint16_t address) {
     while (ctx->dmc.phase > DMA_CLEAR || ctx->oam.phase > DMA_CLEAR) {
         if (ctx->dmc.phase < DMA_READ && ctx->oam.phase < DMA_READ) {
             // dummy read
-            read_mem(ctx->memory, address);
+            ctx->ibus = read_mem(ctx->memory, address);
         }
         if (ctx->dmc.phase == DMA_READ && ctx->oam.phase == DMA_READ) {
             ctx->oam.phase = DMA_ALIGNING;
@@ -191,15 +193,16 @@ static uint8_t read(c6502* ctx, uint16_t address) {
     }
     if (was_active) ctx->state |= DMA_OCCURRED;
 
-    uint8_t val = read_mem(ctx->memory, address);
+    ctx->ibus = read_mem(ctx->memory, address);
     tick_master_clock(ctx->emulator);
-    return val;
+    return ctx->ibus;
 }
 static void write(c6502* ctx, uint16_t address, uint8_t value) {
     if (ctx->dmc.abort) {
         ctx->dmc.abort = 0;
         ctx->dmc.phase = DMA_CLEAR;
     }
+    ctx->ibus = value;
     write_mem(ctx->memory, address, value);
     tick_master_clock(ctx->emulator);
 }

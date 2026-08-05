@@ -192,7 +192,9 @@ uint8_t read_mem(Memory* mem, uint16_t address){
             case APU_STATUS:
                 // BIT 5 is open bus
                 // reading from $4015 does not update the mem bus
-                return (read_apu_status(&mem->emulator->apu) & ~BIT_5) | (mem->bus & BIT_5);
+                // it however updates the internal bus
+                mem->emulator->cpu.ibus = (read_apu_status(&mem->emulator->apu) & ~BIT_5) | (mem->emulator->cpu.ibus & BIT_5);
+                return mem->emulator->cpu.ibus;
             default:
                 // open bus
                 return mem->bus;
