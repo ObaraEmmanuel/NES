@@ -574,6 +574,8 @@ void set_pulse_sweep(Pulse *pulse, uint8_t value) {
 
 void set_pulse_length_counter(Pulse *pulse, uint8_t value) {
     pulse->t.period = pulse->t.period & 0xff | (value & 0x7) << 8;
+    // phase reset
+    pulse->t.step = 0;
     if (pulse->enabled)
         pulse->l = length_counter_lookup[value >> 3];
     update_target_period(pulse);
