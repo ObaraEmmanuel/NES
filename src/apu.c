@@ -159,6 +159,12 @@ static void sample(APU* apu);
 
 static void set_frame_mode(APU* apu, uint8_t mode);
 
+static void update_length_counter(LengthCounter* counter);
+
+static void clock_length_counter(LengthCounter* counter);
+
+static void load_length_counter(LengthCounter* counter, uint8_t value);
+
 FILE *out_wav;
 
 void init_APU(struct Emulator *emulator) {
@@ -301,10 +307,39 @@ void execute_apu(APU *apu) {
     // triangle timer
     clock_triangle(&apu->triangle);
 
+    // update length counters
+    update_length_counter(&apu->pulse1.l);
+    update_length_counter(&apu->pulse2.l);
+    update_length_counter(&apu->noise.l);
+    update_length_counter(&apu->triangle.l);
+
     // sample
     sample(apu);
 
     apu->cycles++;
+}
+
+static void load_length_counter(LengthCounter* counter, uint8_t value) {
+    counter->new_counter = length_counter_lookup[value];
+    counter->prev_counter = counter->counter;
+}
+
+static void update_length_counter(LengthCounter* counter) {
+    if (counter->new_counter) {
+        if (counter->prev_counter == counter->counter)
+            counter->counter = counter->new_counter;
+        counter->new_counter = 0;
+    }
+    if (counter->halt != counter->new_halt) {
+        counter->halt = counter->new_halt;
+        if (counter->envelope != NULL)
+            counter->envelope->loop = counter->halt;
+    }
+}
+
+static void clock_length_counter(LengthCounter* counter) {
+    if (counter->counter && !counter->halt)
+        counter->counter--;
 }
 
 void quarter_frame(APU *apu) {
@@ -320,7 +355,7 @@ void quarter_frame(APU *apu) {
     else if (triangle->linear_counter)
         triangle->linear_counter--;
     // if halt is clear, clear linear reload flag
-    triangle->linear_reload_flag = triangle->halt ? triangle->linear_reload_flag : 0;
+    triangle->linear_reload_flag = triangle->l.halt ? triangle->linear_reload_flag : 0;
 }
 
 void half_frame(APU *apu) {
@@ -328,13 +363,11 @@ void half_frame(APU *apu) {
     length_sweep_pulse(&apu->pulse1);
     length_sweep_pulse(&apu->pulse2);
     // triangle length counter
-    if (!apu->triangle.halt && apu->triangle.length_counter) {
-        apu->triangle.length_counter--;
-    }
+    Triangle *triangle = &apu->triangle;
+    clock_length_counter(&triangle->l);
+
     // noise length counter
-    Noise *noise = &apu->noise;
-    if (noise->l && !noise->envelope.loop)
-        noise->l--;
+    clock_length_counter(&apu->noise.l);
 }
 
 void init_sampler(APU* apu, int frequency) {
@@ -448,18 +481,18 @@ void queue_audio(APU *apu, struct GraphicsContext *ctx) {
 float get_sample(APU *apu) {
     uint8_t pulse_out = 0, tnd_out = 0;
 
-    if (apu->pulse1.enabled && apu->pulse1.l && !apu->pulse1.mute)
+    if (apu->pulse1.enabled && apu->pulse1.l.counter && !apu->pulse1.mute)
         pulse_out += (apu->pulse1.const_volume ? apu->pulse1.envelope.period : apu->pulse1.envelope.step) * (duty[apu->
             pulse1.duty][apu->pulse1.t.step]);
 
-    if (apu->pulse2.enabled && apu->pulse2.l && !apu->pulse2.mute)
+    if (apu->pulse2.enabled && apu->pulse2.l.counter && !apu->pulse2.mute)
         pulse_out += (apu->pulse2.const_volume ? apu->pulse2.envelope.period : apu->pulse2.envelope.step) * (duty[apu->
             pulse2.duty][apu->pulse2.t.step]);
 
     if (apu->triangle.enabled && apu->triangle.sequencer.period > 1)
         tnd_out += tri_sequence[apu->triangle.sequencer.step] * 3;
 
-    if (apu->noise.enabled && !(apu->noise.shift & BIT_0) && apu->noise.l > 0)
+    if (apu->noise.enabled && !(apu->noise.shift & BIT_0) && apu->noise.l.counter > 0)
         tnd_out += 2 * (apu->noise.const_volume ? apu->noise.envelope.period : apu->noise.envelope.step);
 
     tnd_out += apu->dmc.counter;
@@ -496,18 +529,18 @@ void set_status(APU *apu, uint8_t value) {
 
 
     // reset length counters if disabled
-    apu->pulse1.l = apu->pulse1.enabled ? apu->pulse1.l : 0;
-    apu->pulse2.l = apu->pulse2.enabled ? apu->pulse2.l : 0;
-    apu->triangle.length_counter = apu->triangle.enabled ? apu->triangle.length_counter : 0;
-    apu->noise.l = apu->noise.enabled ? apu->noise.l : 0;
+    apu->pulse1.l.counter = apu->pulse1.enabled ? apu->pulse1.l.counter : 0;
+    apu->pulse2.l.counter = apu->pulse2.enabled ? apu->pulse2.l.counter : 0;
+    apu->triangle.l.counter = apu->triangle.enabled ? apu->triangle.l.counter : 0;
+    apu->noise.l.counter = apu->noise.enabled ? apu->noise.l.counter : 0;
 }
 
 
 uint8_t read_apu_status(APU *apu) {
-    uint8_t status = (apu->pulse1.l > 0);
-    status |= (apu->pulse2.l > 0 ? BIT_1 : 0);
-    status |= (apu->triangle.length_counter > 0 ? BIT_2 : 0);
-    status |= (apu->noise.l > 0 ? BIT_3 : 0);
+    uint8_t status = (apu->pulse1.l.counter > 0);
+    status |= (apu->pulse2.l.counter > 0 ? BIT_1 : 0);
+    status |= (apu->triangle.l.counter > 0 ? BIT_2 : 0);
+    status |= (apu->noise.l.counter > 0 ? BIT_3 : 0);
     status |= (apu->frame_interrupt ? BIT_6 : 0);
     status |= (apu->dmc.interrupt ? BIT_7 : 0);
     status |= (apu->dmc.bytes_remaining && apu->dmc.enabled? BIT_4: 0);
@@ -526,10 +559,12 @@ void set_frame_counter_ctrl(APU *apu, uint8_t value) {
         apu->frame_interrupt = 0;
         interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
     }
-    // In mode 1, quarter and half frame are clocked immediately
+
     if (apu->frame_mode == 1) {
-        quarter_frame(apu);
-        half_frame(apu);
+        // force immediate quarter and half frame clocking on next frame clock
+        // step 4 of mode 1 clocks both so force frame counter to that step
+        apu->sequence_step = 4;
+        apu->sequencer = apu->sequence[apu->sequence_step];
     }
     // Writing to 4017 on a PUT cycle delays sequencer reset by 4 cycles
     // If it is on a GET cycle, we delay by only 3 cycles
@@ -548,7 +583,7 @@ static void set_frame_mode(APU* apu, uint8_t mode) {
 
 void set_pulse_ctrl(Pulse *pulse, uint8_t value) {
     pulse->const_volume = (value & BIT_4) > 0;
-    pulse->envelope.loop = (value & BIT_5) > 0;
+    pulse->l.new_halt = (value & BIT_5) > 0;
     pulse->envelope.period = value & 0xF;
     pulse->envelope.counter = pulse->envelope.period;
     // reload divider step counter
@@ -577,14 +612,14 @@ void set_pulse_length_counter(Pulse *pulse, uint8_t value) {
     // phase reset
     pulse->t.step = 0;
     if (pulse->enabled)
-        pulse->l = length_counter_lookup[value >> 3];
+        load_length_counter(&pulse->l, value >> 3);
     update_target_period(pulse);
     pulse->envelope.step = 15;
 }
 
 void set_tri_counter(Triangle *triangle, uint8_t value) {
     triangle->linear_reload = value & 0x7f;
-    triangle->halt = (value & BIT_7) > 0;
+    triangle->l.new_halt = (value & BIT_7) > 0;
 }
 
 void set_tri_timer_low(Triangle *triangle, uint8_t value) {
@@ -595,12 +630,12 @@ void set_tri_length(Triangle *triangle, uint8_t value) {
     triangle->sequencer.period = triangle->sequencer.period & 0xff | (value & 0x7) << 8;
     triangle->linear_reload_flag = 1;
     if (triangle->enabled)
-        triangle->length_counter = length_counter_lookup[value >> 3];
+        load_length_counter(&triangle->l, value >> 3);
 }
 
 void set_noise_ctrl(Noise *noise, uint8_t value) {
     noise->const_volume = (value & BIT_4) > 0;
-    noise->envelope.loop = (value & BIT_5) > 0;
+    noise->l.new_halt = (value & BIT_5) > 0;
     noise->envelope.period = value & 0xF;
 }
 
@@ -615,7 +650,7 @@ void set_noise_period(APU* apu, uint8_t value) {
 
 void set_noise_length(Noise *noise, uint8_t value) {
     if (noise->enabled)
-        noise->l = length_counter_lookup[value >> 3];
+        load_length_counter(&noise->l, value >> 3);
     noise->envelope.step = 15;
 }
 
@@ -738,7 +773,6 @@ static void compute_mixer_LUT() {
 
 static void init_pulse(Pulse *pulse, uint8_t id) {
     pulse->id = id;
-    // start with large period until its set
     pulse->t.step = 0;
     pulse->t.from = 0;
     pulse->t.limit = 7;
@@ -746,6 +780,7 @@ static void init_pulse(Pulse *pulse, uint8_t id) {
     pulse->sweep.limit = 0;
     pulse->enabled = 0;
     pulse->sweep_reload = 0;
+    pulse->l.envelope = &pulse->envelope;
 }
 
 static void init_triangle(Triangle *triangle) {
@@ -753,13 +788,13 @@ static void init_triangle(Triangle *triangle) {
     triangle->sequencer.limit = 31;
     triangle->sequencer.from = 0;
     triangle->enabled = 0;
-    triangle->halt = 0;
 }
 
 static void init_noise(Noise *noise) {
     noise->enabled = 0;
     noise->timer.limit = 0;
     noise->shift = 1;
+    noise->l.envelope = &noise->envelope;
 }
 
 static void init_dmc(DMC* dmc) {
@@ -789,7 +824,7 @@ static uint8_t clock_triangle(Triangle *triangle) {
     }
 
     divider->counter = divider->period;
-    if (triangle->length_counter && triangle->linear_counter)
+    if (triangle->l.counter && triangle->linear_counter)
         divider->step++;
     if (divider->limit && divider->step > divider->limit)
         divider->step = divider->from;
@@ -839,6 +874,5 @@ static void length_sweep_pulse(Pulse *pulse) {
     }
 
     // length counter
-    if (pulse->l && !pulse->envelope.loop)
-        pulse->l--;
+    clock_length_counter(&pulse->l);
 }

@@ -33,8 +33,17 @@ typedef struct {
 } Divider;
 
 typedef struct {
+    uint8_t counter;
+    uint8_t halt;
+    uint8_t new_halt;
+    uint8_t prev_counter;
+    uint8_t new_counter;
+    Divider* envelope;
+} LengthCounter;
+
+typedef struct {
     Divider t;     // 11 bit timer
-    uint8_t l;      // length counter
+    LengthCounter l;      // length counter
     uint8_t id;     // pulse id whether 1 or 2
     uint8_t neg;
     uint8_t shift;
@@ -43,7 +52,6 @@ typedef struct {
     uint8_t duty;
     uint8_t const_volume;
     Divider envelope;
-    uint8_t envelope_loop;
     uint8_t enabled;
     uint8_t mute;
     uint16_t target_period;
@@ -53,23 +61,21 @@ typedef struct {
 
 typedef struct {
     Divider sequencer;
-    uint8_t length_counter;
+    LengthCounter l;
     uint8_t linear_reload;
     uint8_t linear_counter;
     uint8_t linear_reload_flag;
-    uint8_t halt;
     uint8_t enabled;
 } Triangle;
 
 
 typedef struct {
     Divider timer;
+    LengthCounter l;
     uint8_t mode;
-    uint8_t l;
     uint16_t shift;
     uint8_t const_volume;
     Divider envelope;
-    uint8_t envelope_loop;
     uint8_t enabled;
 } Noise;
 
