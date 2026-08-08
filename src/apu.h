@@ -36,7 +36,6 @@ typedef struct {
     uint8_t counter;
     uint8_t halt;
     uint8_t new_halt;
-    uint8_t prev_counter;
     uint8_t new_counter;
     Divider* envelope;
 } LengthCounter;
@@ -137,6 +136,7 @@ typedef struct APU{
     uint8_t reset_sequencer_delay;
     uint8_t irq_should_set;
     uint8_t irq_clear_delay;
+    uint8_t suppress_frame_unit;
     uint8_t sequence_step;
     uint32_t sequencer;
     uint32_t *sequence;

@@ -77,14 +77,14 @@ $4017=$80   -               -               -           -       -
 Step 1      Clock           -               -           7457    8313
 Step 2      Clock           Clock           -           14913   16627
 Step 3      Clock           -               -           22371   24939
-Step 4      -               -               -           29828   33253
+Step 4      -               -               -           29829   33253
 Step 5      Clock           Clock           -           37281   41565
             -               -               -           37282/0 41566/0
 */
 
 static uint32_t NTSC_frame_sequence[2][6] = {
     {7457, 14913, 22371, 29828, 29829, 29830},  // Mode 0
-    {7457, 14913, 22371, 29828, 37281, 37282}   // Mode 1
+    {7457, 14913, 22371, 29829, 37281, 37282}   // Mode 1
 };
 
 static uint32_t PAL_frame_sequence[2][6] = {
@@ -163,8 +163,6 @@ static void update_length_counter(LengthCounter* counter);
 
 static void clock_length_counter(LengthCounter* counter);
 
-static void load_length_counter(LengthCounter* counter, uint8_t value);
-
 FILE *out_wav;
 
 void init_APU(struct Emulator *emulator) {
@@ -193,6 +191,7 @@ void init_APU(struct Emulator *emulator) {
     init_audio_device(apu);
     SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
     set_status(apu, 0);
+    set_frame_mode(apu, 0);
     set_frame_counter_ctrl(apu, 0);
     // On power, it's as if $4017 was written to 10 cycles before
     // start of instructions.
@@ -208,6 +207,7 @@ void init_APU(struct Emulator *emulator) {
 
 void reset_APU(APU *apu) {
     set_status(apu, 0);
+    set_frame_mode(apu, 0);
     apu->triangle.sequencer.step = 0;
     apu->dmc.counter &= 1;
     apu->frame_interrupt = 0;
@@ -245,6 +245,12 @@ void execute_apu(APU *apu) {
         if (!apu->reset_sequencer_delay) {
             apu->sequencer = 0;
             apu->sequence_step = 0;
+            set_frame_mode(apu, apu->frame_mode);
+            if (apu->frame_mode == 1 && !apu->suppress_frame_unit) {
+                // immediately clock quarter and half frames
+                half_frame(apu);
+                quarter_frame(apu);
+            }
         }
     }
 
@@ -264,10 +270,12 @@ void execute_apu(APU *apu) {
 
     if (apu->sequencer == apu->sequence[apu->sequence_step]) {
         uint8_t directive = apu->directive[apu->sequence_step];
-        if (directive & FRAME_QUARTER)
-            quarter_frame(apu);
-        if (directive & FRAME_HALF)
-            half_frame(apu);
+        if (!apu->suppress_frame_unit) {
+            if (directive & FRAME_QUARTER)
+                quarter_frame(apu);
+            if (directive & FRAME_HALF)
+                half_frame(apu);
+        }
         if (directive & FRAME_IRQ) {
             apu->frame_interrupt = 1;
             // We need to delay IRQ line assertion by one clock
@@ -301,6 +309,9 @@ void execute_apu(APU *apu) {
         }
     }
 
+    if (apu->suppress_frame_unit)
+        apu->suppress_frame_unit--;
+
     // DMC
     clock_dmc(apu);
 
@@ -319,15 +330,9 @@ void execute_apu(APU *apu) {
     apu->cycles++;
 }
 
-static void load_length_counter(LengthCounter* counter, uint8_t value) {
-    counter->new_counter = length_counter_lookup[value];
-    counter->prev_counter = counter->counter;
-}
-
 static void update_length_counter(LengthCounter* counter) {
     if (counter->new_counter) {
-        if (counter->prev_counter == counter->counter)
-            counter->counter = counter->new_counter;
+        counter->counter = counter->new_counter;
         counter->new_counter = 0;
     }
     if (counter->halt != counter->new_halt) {
@@ -338,8 +343,11 @@ static void update_length_counter(LengthCounter* counter) {
 }
 
 static void clock_length_counter(LengthCounter* counter) {
-    if (counter->counter && !counter->halt)
+    if (counter->counter && !counter->halt) {
         counter->counter--;
+        // ignore any changes to length if made during a length clock
+        counter->new_counter = 0;
+    }
 }
 
 void quarter_frame(APU *apu) {
@@ -356,6 +364,8 @@ void quarter_frame(APU *apu) {
         triangle->linear_counter--;
     // if halt is clear, clear linear reload flag
     triangle->linear_reload_flag = triangle->l.halt ? triangle->linear_reload_flag : 0;
+    // suppress frame counter clocking for this and the next cycle
+    apu->suppress_frame_unit = 2;
 }
 
 void half_frame(APU *apu) {
@@ -368,6 +378,8 @@ void half_frame(APU *apu) {
 
     // noise length counter
     clock_length_counter(&apu->noise.l);
+    // suppress frame counter clocking for this and the next cycle
+    apu->suppress_frame_unit = 2;
 }
 
 void init_sampler(APU* apu, int frequency) {
@@ -553,18 +565,11 @@ uint8_t read_apu_status(APU *apu) {
 void set_frame_counter_ctrl(APU *apu, uint8_t value) {
     // $4017
     apu->IRQ_inhibit = (value & BIT_6) > 0;
-    set_frame_mode(apu, (value & BIT_7) > 0);
+    apu->frame_mode = (value & BIT_7) > 0;
     // clear interrupt if IRQ disable set
     if (apu->IRQ_inhibit) {
         apu->frame_interrupt = 0;
         interrupt_clear(&apu->emulator->cpu, APU_FRAME_IRQ);
-    }
-
-    if (apu->frame_mode == 1) {
-        // force immediate quarter and half frame clocking on next frame clock
-        // step 4 of mode 1 clocks both so force frame counter to that step
-        apu->sequence_step = 4;
-        apu->sequencer = apu->sequence[apu->sequence_step];
     }
     // Writing to 4017 on a PUT cycle delays sequencer reset by 4 cycles
     // If it is on a GET cycle, we delay by only 3 cycles
@@ -578,7 +583,6 @@ static void set_frame_mode(APU* apu, uint8_t mode) {
     else
         apu->sequence = NTSC_frame_sequence[mode];
     apu->directive = frame_sequence_directives[mode];
-    apu->frame_mode = mode;
 }
 
 void set_pulse_ctrl(Pulse *pulse, uint8_t value) {
@@ -612,7 +616,7 @@ void set_pulse_length_counter(Pulse *pulse, uint8_t value) {
     // phase reset
     pulse->t.step = 0;
     if (pulse->enabled)
-        load_length_counter(&pulse->l, value >> 3);
+        pulse->l.new_counter = length_counter_lookup[value >> 3];
     update_target_period(pulse);
     pulse->envelope.step = 15;
 }
@@ -630,7 +634,7 @@ void set_tri_length(Triangle *triangle, uint8_t value) {
     triangle->sequencer.period = triangle->sequencer.period & 0xff | (value & 0x7) << 8;
     triangle->linear_reload_flag = 1;
     if (triangle->enabled)
-        load_length_counter(&triangle->l, value >> 3);
+        triangle->l.new_counter = length_counter_lookup[value >> 3];
 }
 
 void set_noise_ctrl(Noise *noise, uint8_t value) {
@@ -650,7 +654,7 @@ void set_noise_period(APU* apu, uint8_t value) {
 
 void set_noise_length(Noise *noise, uint8_t value) {
     if (noise->enabled)
-        load_length_counter(&noise->l, value >> 3);
+        noise->l.new_counter = length_counter_lookup[value >> 3];
     noise->envelope.step = 15;
 }
 
