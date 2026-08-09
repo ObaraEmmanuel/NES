@@ -369,6 +369,7 @@ static void clear_oam(PPU* ppu) {
         // writes happen on even dots
         ppu->OAM_cache[(ppu->dots >> 1) - 1] = 0xff;
     ppu->sprite_eval_unit.buffer = 0xff;
+    ppu->sec_oam_address = (ppu->dots - 1) >> 1;
 }
 
 static void evaluate_sprites(PPU* ppu) {
@@ -381,7 +382,7 @@ static void evaluate_sprites(PPU* ppu) {
         // OAM clear complete, move on to sprite evaluation
         su->state = READ_OAM_Y;
         su->n = su->m = 0;
-        su->sec_oam_index = 0;
+        ppu->sec_oam_address = 0;
         su->oam_addr = ppu->oam_address;
     }
 
@@ -396,10 +397,10 @@ static void evaluate_sprites(PPU* ppu) {
             su->state = CMP_OAM_Y;
             break;
         case CMP_OAM_Y:
-            if (su->sec_oam_index < 32) {
-                ppu->OAM_cache[su->sec_oam_index] = su->buffer;
+            if (ppu->sec_oam_address < 32) {
+                ppu->OAM_cache[ppu->sec_oam_address] = su->buffer;
                 if (is_y_in_range(ppu, su->buffer)) {
-                    su->sec_oam_index++;
+                    ppu->sec_oam_address++;
                     su->state = READ_BYTE;
                     // read the next 3 bytes into secondary OAM
                     su->m++;
@@ -446,8 +447,8 @@ static void evaluate_sprites(PPU* ppu) {
             su->state = WRITE_BYTE;
             break;
         case WRITE_BYTE:
-            if (su->sec_oam_index < 32)
-                ppu->OAM_cache[su->sec_oam_index++] = su->buffer;
+            if (ppu->sec_oam_address < 32)
+                ppu->OAM_cache[ppu->sec_oam_address++] = su->buffer;
             if (--su->remaining == 0)
                 su->state = READ_OAM_Y;
             else
@@ -483,13 +484,21 @@ static void fetch_frame(PPU* ppu) {
             if (ppu->dots == 257) {
                 ppu->v &= ~HORIZONTAL_BITS;
                 ppu->v |= ppu->t & HORIZONTAL_BITS;
+                ppu->sec_oam_address = 0;
             }
             // load NT address
             pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
+
+            if (sprite_prefetch) {
+                ppu->sprite_buffer.y = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+            }
             break;
         case NT_READ: // 1
             // load NT byte;
             pu->NT = read_vram(ppu, pu->fetch_addr);
+            if (sprite_prefetch) {
+                ppu->sprite_buffer.tile = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+            }
             break;
         case AT_ADDR: // 2
             if (sprite_prefetch || pre_render)
@@ -498,28 +507,31 @@ static void fetch_frame(PPU* ppu) {
             else
                 // load AT address
                 pu->fetch_addr = 0x23C0 | ppu->v & 0x0C00 | ppu->v >> 4 & 0x38 | ppu->v >> 2 & 0x07;
+            if (sprite_prefetch) {
+                ppu->sprite_buffer.attr = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+                SpriteUnit* unit = ppu->sprite_units + ((ppu->dots - 257) >> 3);
+                unit->attr = ppu->sprite_buffer.attr;
+            }
             break;
         case AT_READ: // 3
             // load AT/NT byte
             pu->AT = read_vram(ppu, pu->fetch_addr);
             pu->AT >>= ppu->v >> 4 & 4 | ppu->v & 2;
+            if (sprite_prefetch) {
+                ppu->sprite_buffer.x = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address];
+                SpriteUnit* unit = ppu->sprite_units + ((ppu->dots - 257) >> 3);
+                unit->x = ppu->sprite_buffer.x;
+            }
             break;
         case BG_LSB_ADDR: // 4
             if (sprite_prefetch) {
                 // load sprite LSB addr
-                uint8_t sprite_index = (ppu->dots - 257) >> 3;
-                SpriteUnit* unit = ppu->sprite_units + sprite_index;
-                Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
-
-                unit->x = sprite->x;
-                unit->attr = sprite->attr;
-
-                uint8_t offset = ppu->scanlines - sprite->y;
+                uint8_t offset = ppu->scanlines - ppu->sprite_buffer.y;
                 if (ppu->ctrl & LONG_SPRITE) {
                     // 8x16 sprite
-                    uint16_t bank = sprite->tile & 1 ? 0x1000: 0;
-                    uint8_t tile = sprite->tile & 0xfe;
-                    uint8_t row = sprite->attr & FLIP_VERTICAL ? 15 - offset : offset;
+                    uint16_t bank = ppu->sprite_buffer.tile & 1 ? 0x1000: 0;
+                    uint8_t tile = ppu->sprite_buffer.tile & 0xfe;
+                    uint8_t row = ppu->sprite_buffer.attr & FLIP_VERTICAL ? 15 - offset : offset;
 
                     if (row >= 8) {
                         tile++;
@@ -530,9 +542,9 @@ static void fetch_frame(PPU* ppu) {
                 } else {
                     // 8x8 sprite
                     uint16_t bank = ppu->ctrl & SPRITE_TABLE ? 0x1000: 0;
-                    uint8_t row = sprite->attr & FLIP_VERTICAL ? 7 - offset : offset;
+                    uint8_t row = ppu->sprite_buffer.attr & FLIP_VERTICAL ? 7 - offset : offset;
 
-                    pu->fetch_addr = bank + sprite->tile * 16 + row;
+                    pu->fetch_addr = bank + ppu->sprite_buffer.tile * 16 + row;
                 }
             } else {
                 // load BG LSB addr
@@ -561,6 +573,7 @@ static void fetch_frame(PPU* ppu) {
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_MSB = read_vram(ppu, pu->fetch_addr);
                 Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
+                ppu->sec_oam_address++;
 
                 if (!is_y_in_range(ppu, sprite->y)) {
                     // sprite is not in range
@@ -609,6 +622,12 @@ static void fetch_frame(PPU* ppu) {
 
 void execute_ppu(PPU* ppu) {
     if (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render) {
+        if (ppu->corrupt_oam_row && ppu->render_status) {
+            ppu->corrupt_oam_row &= 0x1f;
+            memcpy(ppu->OAM + (ppu->corrupt_oam_row << 3), ppu->OAM, 8);
+            ppu->OAM_cache[ppu->corrupt_oam_row] = ppu->OAM_cache[0];
+            ppu->corrupt_oam_row = 0;
+        }
         if (ppu->dots == 0) {
             // do dot 0 stuff
         } else {
@@ -674,6 +693,12 @@ void execute_ppu(PPU* ppu) {
         ppu->render_state_delay--;
         if(ppu->render_state_delay == 0) {
             ppu->render_status = (ppu->mask & RENDER_BITS) > 0;
+            if (!ppu->render_status && ppu->sec_oam_address & 0x1f && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render)) {
+                ppu->corrupt_oam_row = ppu->sec_oam_address & 0x1f;
+                if (ppu->dots < 64 && ppu->dots <= 256)
+                    // round up to nearest multiple of 4
+                    ppu->corrupt_oam_row = (ppu->corrupt_oam_row + 3) & 0xfc;
+            }
         }
     }
 

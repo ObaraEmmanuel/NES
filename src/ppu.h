@@ -61,7 +61,6 @@ typedef enum SpriteEvalState {
 typedef struct SpriteEvalMachine {
     SpriteEvalState state;
     uint8_t buffer;
-    uint8_t sec_oam_index;
     uint8_t n;
     uint8_t m;
     uint8_t remaining;
@@ -108,6 +107,7 @@ typedef struct PPU{
     uint8_t render_state_delay;
     uint8_t supress_vblank;
     uint8_t nmi_delay;
+    uint8_t corrupt_oam_row;
     size_t dots;
     size_t scanlines;
     uint16_t pre_render;
@@ -115,6 +115,7 @@ typedef struct PPU{
     PictureUnit p_unit;
     SpriteEvalMachine sprite_eval_unit;
     SpriteUnit sprite_units[8];
+    Sprite sprite_buffer;
     uint8_t should_inc_hori_v;
     uint8_t should_inc_vert_v;
 
@@ -123,6 +124,7 @@ typedef struct PPU{
     uint8_t x;
     uint8_t w;
     uint8_t oam_address;
+    uint8_t sec_oam_address;
     uint8_t buffer;
 
     uint8_t render;
