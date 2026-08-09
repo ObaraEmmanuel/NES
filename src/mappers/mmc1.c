@@ -68,7 +68,7 @@ static uint8_t read_PRG(Mapper *mapper, uint16_t address) {
 
 static void write_PRG(Mapper *mapper, uint16_t address, uint8_t value) {
     MMC1_t *mmc1 = mapper->extension;
-    uint8_t same_cycle = mapper->emulator->cpu.t_cycles == mmc1->cpu_cycle;
+    uint8_t next_cycle = mapper->emulator->cpu.t_cycles - mmc1->cpu_cycle == 1;
     mmc1->cpu_cycle = mapper->emulator->cpu.t_cycles;
     if (value & REG_RESET) {
         // reset
@@ -76,8 +76,8 @@ static void write_PRG(Mapper *mapper, uint16_t address, uint8_t value) {
         mmc1->PRG_mode = 3;
         set_PRG_banks(mmc1, mapper);
     } else {
-        // ignore consequtive writes
-        if (same_cycle)
+        // ignore consecutive writes
+        if (next_cycle)
             return;
         mmc1->reg = (mmc1->reg >> 1) | ((value & BIT_0) << 5);
 
