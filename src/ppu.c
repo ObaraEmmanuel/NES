@@ -295,8 +295,6 @@ static uint8_t get_bg_pixel(PPU *ppu) {
 }
 
 static uint8_t get_sprite_pixel(PPU* ppu) {
-    if (ppu->scanlines == 0)
-        return 0;
     uint8_t pattern = 0;
     SpriteUnit* priority_unit = NULL;
     for (int i = 0; i < 8; i++) {
@@ -361,7 +359,7 @@ static uint8_t get_pixel(PPU* ppu) {
 }
 
 static uint8_t is_y_in_range(PPU* ppu, uint8_t y) {
-    return ppu->scanlines - y < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
+    return (ppu->scanlines & 0xff) - y < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
 }
 
 static void clear_oam(PPU* ppu) {
@@ -526,7 +524,7 @@ static void fetch_frame(PPU* ppu) {
         case BG_LSB_ADDR: // 4
             if (sprite_prefetch) {
                 // load sprite LSB addr
-                uint8_t offset = ppu->scanlines - ppu->sprite_buffer.y;
+                uint8_t offset = (ppu->scanlines & 0xff) - ppu->sprite_buffer.y;
                 if (ppu->ctrl & LONG_SPRITE) {
                     // 8x16 sprite
                     uint16_t bank = ppu->sprite_buffer.tile & 1 ? 0x1000: 0;
