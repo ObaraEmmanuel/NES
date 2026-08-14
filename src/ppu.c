@@ -14,6 +14,7 @@ static uint8_t get_sprite_pixel(PPU* ppu);
 static uint8_t get_pixel(PPU* ppu);
 static void inc_hori_v(PPU* ppu);
 static void inc_vert_v(PPU* ppu);
+static void inc_v(PPU* ppu);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -123,28 +124,20 @@ void set_scroll(PPU* ppu, uint8_t coord){
 }
 
 uint8_t read_ppu(PPU* ppu){
-    uint8_t prev_buff = ppu->buffer, data;
-    ppu->buffer = read_vram(ppu, ppu->v);
+    uint8_t data = ppu->read_buffer;
+    if (ppu->v >= 0x3F00)
+        // read palette value immediately since it exists internally in PPU
+        data = read_vram(ppu, ppu->v);
 
-    if(ppu->v >= 0x3F00) {
-        data = ppu->buffer;
-        // read underlying nametable mirrors into buffer
-        // 0x3f00 - 0x3fff maps to 0x2f00 - 0x2fff
-        ppu->buffer = read_vram(ppu, ppu->v & 0xefff);
-    }else
-        data = prev_buff;
-
-    // reading during rendering increments both
-    if (ppu->render_status &&  (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render))
-        ppu->should_inc_vert_v = ppu->should_inc_hori_v = 1;
-    else
-        ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
+    // set-up buffer after 4 ppu clocks
+    ppu->read_to_buffer = 4;
     return data;
 }
 
 void write_ppu(PPU* ppu, uint8_t value){
-    write_vram(ppu, ppu->v, value);
-    ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
+    // write to VRAM after 4 ppu clocks
+    ppu->write_to_buffer = 4;
+    ppu->write_val = value;
 }
 
 void dma(PPU* ppu, uint8_t address){
@@ -274,6 +267,14 @@ static void inc_vert_v(PPU* ppu) {
 
         ppu->v = (ppu->v & ~COARSE_Y) | (coarse_y << 5);
     }
+}
+
+static void inc_v(PPU* ppu) {
+    if (ppu->render_status &&  (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render))
+        // glitchy increment of both vertical and horizontal
+        ppu->should_inc_vert_v = ppu->should_inc_hori_v = 1;
+    else
+        ppu->should_inc_v = 1;
 }
 
 static uint8_t get_bg_pixel(PPU *ppu) {
@@ -504,16 +505,20 @@ static void fetch_frame(PPU* ppu) {
     if (ppu->dots > 320) {
         ppu->sprite_eval_unit.buffer = ppu->OAM_cache[0];
     }
+    if (!(phase & 1))
+        pu->has_set_addr = 1;
+    else
+        pu->has_set_addr = 0;
 
     switch (phase) {
         case NT_ADDR: // 0
+            // load NT address
+            ppu->bus = 0x2000 | ppu->v & 0xFFF;
             if (ppu->dots == 257) {
                 ppu->v &= ~HORIZONTAL_BITS;
                 ppu->v |= ppu->t & HORIZONTAL_BITS;
                 ppu->sec_oam_address = 0;
             }
-            // load NT address
-            pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
 
             if (sprite_prefetch) {
                 ppu->sprite_buffer.y = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
@@ -521,7 +526,8 @@ static void fetch_frame(PPU* ppu) {
             break;
         case NT_READ: // 1
             // load NT byte;
-            pu->NT = read_vram(ppu, pu->fetch_addr);
+            ppu->bus = ppu->bus & 0xff00 | read_vram(ppu, ppu->bus);
+            pu->NT = ppu->bus & 0xff;
             if (sprite_prefetch) {
                 ppu->sprite_buffer.tile = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
             }
@@ -529,10 +535,10 @@ static void fetch_frame(PPU* ppu) {
         case AT_ADDR: // 2
             if (sprite_prefetch || pre_render)
                 // load NT address
-                pu->fetch_addr = 0x2000 | ppu->v & 0xFFF;
+                ppu->bus = 0x2000 | ppu->v & 0xFFF;
             else
                 // load AT address
-                pu->fetch_addr = 0x23C0 | ppu->v & 0x0C00 | ppu->v >> 4 & 0x38 | ppu->v >> 2 & 0x07;
+                ppu->bus = 0x23C0 | ppu->v & 0x0C00 | ppu->v >> 4 & 0x38 | ppu->v >> 2 & 0x07;
             if (sprite_prefetch) {
                 uint8_t is_sprite_zero = ppu->sec_oam_address == ppu->sprite_eval_unit.sprite_zero_addr;
                 ppu->sprite_buffer.attr = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
@@ -543,7 +549,8 @@ static void fetch_frame(PPU* ppu) {
             break;
         case AT_READ: // 3
             // load AT/NT byte
-            pu->AT = read_vram(ppu, pu->fetch_addr);
+            ppu->bus = ppu->bus & 0xff00 | read_vram(ppu, ppu->bus);
+            pu->AT = ppu->bus & 0xFF;
             pu->AT >>= ppu->v >> 4 & 4 | ppu->v & 2;
             if (sprite_prefetch) {
                 ppu->sprite_buffer.x = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address];
@@ -566,40 +573,45 @@ static void fetch_frame(PPU* ppu) {
                         row -= 8;
                     }
 
-                    pu->fetch_addr = bank + tile * 16 + row;
+                    ppu->bus = bank + tile * 16 + row;
                 } else {
                     // 8x8 sprite
                     uint16_t bank = ppu->ctrl & SPRITE_TABLE ? 0x1000: 0;
                     uint8_t row = ppu->sprite_buffer.attr & FLIP_VERTICAL ? 7 - offset : offset;
 
-                    pu->fetch_addr = bank + ppu->sprite_buffer.tile * 16 + row;
+                    ppu->bus = bank + ppu->sprite_buffer.tile * 16 + row;
                 }
             } else {
                 // load BG LSB addr
-                pu->fetch_addr = pu->NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
+                ppu->bus = pu->NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
             }
+            // address will be reused later so save it
+            // the next read will corrupt lower byte
+            ppu->last_addr = ppu->bus;
             break;
         case BG_LSB_READ: // 5
+            ppu->bus = ppu->bus & 0xff00 | read_vram(ppu, ppu->bus);
             if (sprite_prefetch) {
                 // load sprite LSB byte
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
-                unit->pattern_LSB = read_vram(ppu, pu->fetch_addr);
+                unit->pattern_LSB = ppu->bus & 0xff;
             }else {
                 // load BG LSB byte
-                pu->BG_LSB = read_vram(ppu, pu->fetch_addr);
+                pu->BG_LSB = ppu->bus & 0xff;
             }
             break;
         case BG_MSB_ADDR: // 6
             // load BG MSB / sprite MSB addr
-            pu->fetch_addr = pu->fetch_addr + 8;
+            ppu->bus = ppu->last_addr + 8;
             break;
         case BG_MSB_READ: // 7
+            ppu->bus = ppu->bus & 0xff00 | read_vram(ppu, ppu->bus);
             if (sprite_prefetch) {
                 // load sprite MSB byte
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
-                unit->pattern_MSB = read_vram(ppu, pu->fetch_addr);
+                unit->pattern_MSB = ppu->bus & 0xff;
                 Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
                 ppu->sec_oam_address++;
 
@@ -610,7 +622,7 @@ static void fetch_frame(PPU* ppu) {
                 }
             }else {
                 // load BG MSB byte
-                pu->BG_MSB = read_vram(ppu, pu->fetch_addr);
+                pu->BG_MSB = ppu->bus & 0xff;
             }
 
             if (ppu->dots == 256) {
@@ -649,6 +661,11 @@ static void fetch_frame(PPU* ppu) {
 }
 
 void execute_ppu(PPU* ppu) {
+    if (ppu->should_inc_v) {
+        ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
+        ppu->should_inc_v = 0;
+    }
+
     if (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render) {
         if (ppu->corrupt_oam_row && ppu->render_status) {
             ppu->corrupt_oam_row &= 0x1f;
@@ -682,6 +699,52 @@ void execute_ppu(PPU* ppu) {
                 fetch_frame(ppu);
         }
     }
+
+    if (ppu->read_to_buffer) {
+        switch (ppu->read_to_buffer) {
+            case 3:
+                // place read_address on bus if fetch unit has not already
+                if (!ppu->p_unit.has_set_addr)
+                    // read underlying nametable mirrors if v is pointing to palette address
+                    // in that case 0x3f00 - 0x3fff maps to 0x2f00 - 0x2fff
+                    ppu->bus = ppu->v >= 0x3f00 ? ppu->v & 0xefff : ppu->v;
+                break;
+            case 2:
+                // increment v on next cycle
+                inc_v(ppu);
+                break;
+            case 1:
+                // read to buffer
+                ppu->read_buffer = read_vram(ppu, ppu->bus);
+                break;
+            default:
+                break;
+        }
+        ppu->read_to_buffer--;
+    }
+
+    if (ppu->write_to_buffer) {
+        switch (ppu->write_to_buffer) {
+            case 3:
+                // place write_address on bus
+                if (!ppu->p_unit.has_set_addr)
+                    ppu->bus = ppu->v;
+                break;
+            case 2:
+                // increment v on next cycle
+                inc_v(ppu);
+                break;
+            case 1:
+                // write value to VRAM
+                write_vram(ppu, ppu->bus, ppu->write_val);
+                ppu->bus = ppu->bus & 0xff00 | ppu->write_val;
+                break;
+            default:
+                break;
+        }
+        ppu->write_to_buffer--;
+    }
+    ppu->p_unit.has_set_addr = 0;
 
     if(ppu->scanlines == 241 && ppu->dots == 1) {
         // set v-blank

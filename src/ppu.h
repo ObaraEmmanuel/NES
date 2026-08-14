@@ -70,7 +70,8 @@ typedef struct SpriteEvalMachine {
 }SpriteEvalMachine;
 
 typedef struct PictureUnit {
-    uint16_t fetch_addr;
+    // uint16_t fetch_addr;
+    uint8_t has_set_addr;
     uint8_t NT;
     uint8_t AT;
     uint8_t BG_LSB;
@@ -118,6 +119,7 @@ typedef struct PPU{
     SpriteEvalMachine sprite_eval_unit;
     SpriteUnit sprite_units[8];
     Sprite sprite_buffer;
+    uint8_t should_inc_v;
     uint8_t should_inc_hori_v;
     uint8_t should_inc_vert_v;
 
@@ -127,7 +129,12 @@ typedef struct PPU{
     uint8_t w;
     uint8_t oam_address;
     uint8_t sec_oam_address;
-    uint8_t buffer;
+    uint16_t bus;
+    uint16_t last_addr;
+    uint8_t read_buffer;
+    uint8_t read_to_buffer;
+    uint8_t write_to_buffer;
+    uint8_t write_val;
 
     uint8_t render;
     uint8_t enabled;
