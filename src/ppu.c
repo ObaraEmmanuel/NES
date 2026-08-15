@@ -21,6 +21,7 @@ static size_t screen_size;
 void init_ppu(struct Emulator* emulator){
     to_pixel_format(nes_palette_raw, nes_palette, 64, ABGR8888);
     PPU* ppu = &emulator->ppu;
+    memset(ppu, 0, sizeof(PPU));
 #if NAMETABLE_MODE
     screen_size = sizeof(uint32_t) * VISIBLE_SCANLINES * VISIBLE_DOTS * 4;
 #else
@@ -30,13 +31,6 @@ void init_ppu(struct Emulator* emulator){
     ppu->emulator = emulator;
     ppu->mapper = &emulator->mapper;
     ppu->pre_render = emulator->type == NTSC ? NTSC_SCANLINES_PER_FRAME : PAL_SCANLINES_PER_FRAME;
-
-    memset(ppu->palette, 0, sizeof(ppu->palette));
-    memset(ppu->OAM_cache, 0, sizeof(ppu->OAM_cache));
-    memset(ppu->V_RAM, 0, sizeof(ppu->V_RAM));
-    memset(ppu->OAM, 0, sizeof(ppu->OAM));
-    ppu->oam_address = 0;
-    ppu->v = 0;
     reset_ppu(ppu);
 }
 
@@ -45,16 +39,16 @@ void reset_ppu(PPU* ppu){
     ppu->should_inc_vert_v = ppu->should_inc_hori_v = 0;
     ppu->dots = 1;
     ppu->scanlines = 261;
-    ppu->w = 1;
+    ppu->w = 0;
     ppu->ctrl &= ~0xFC;
     ppu->mask = 0;
     ppu->status = 0;
-    ppu->frames = 1;
+    ppu->frames = 0;
     ppu->render_state_delay = 0;
     ppu->render_status = 0;
     ppu->supress_vblank = 0;
-    memset(ppu->OAM_cache, 0, 8);
-    memset(ppu->screen, 0, screen_size);
+    memset(ppu->OAM_cache, 0, sizeof(ppu->OAM_cache));
+    memset(ppu->OAM, 0, sizeof(ppu->OAM));
 }
 
 void exit_ppu(PPU* ppu) {
@@ -72,17 +66,17 @@ void set_latch(PPU* ppu, uint8_t value, uint8_t mask) {
 }
 
 void set_address(PPU* ppu, uint8_t address){
-    if(ppu->w){
+    if(!ppu->w){
         // first write
         ppu->t &= 0xff;
         ppu->t |= (address & 0x3f) << 8; // store only upto bit 14
-        ppu->w = 0;
+        ppu->w = 1;
     }else{
         // second write
         ppu->t &= 0xff00;
         ppu->t |= address;
         ppu->v = ppu->t;
-        ppu->w = 1;
+        ppu->w = 0;
     }
 }
 
@@ -109,17 +103,17 @@ void write_oam(PPU* ppu, uint8_t value){
 }
 
 void set_scroll(PPU* ppu, uint8_t coord){
-    if(ppu->w){
+    if(!ppu->w){
         // first write
         ppu->t &= ~X_SCROLL_BITS;
         ppu->t |= (coord >> 3) & X_SCROLL_BITS;
         ppu->x = coord & 0x7;
-        ppu->w = 0;
+        ppu->w = 1;
     }else{
         // second write
         ppu->t &= ~Y_SCROLL_BITS;
         ppu->t |= ((coord & 0x7) << 12) | ((coord & 0xF8) << 2);
-        ppu->w = 1;
+        ppu->w = 0;
     }
 }
 
@@ -198,7 +192,7 @@ void write_vram(PPU* ppu, uint16_t address, uint8_t value){
 
 uint8_t read_status(PPU* ppu){
     uint8_t status = ppu->status;
-    ppu->w = 1;
+    ppu->w = 0;
     ppu->status &= ~BIT_7; // reset v_blank
     if (ppu->scanlines == 241 && (ppu->dots == 1 || ppu->dots == 2 || ppu->dots == 3))
         ppu->supress_vblank = 1;
