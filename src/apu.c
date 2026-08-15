@@ -750,7 +750,7 @@ void clock_dmc(APU* apu) {
 
     // scheduled dma only starts if DMC is ready
     if (dmc->dma_scheduled && dmc->ready) {
-        schedule_dma(&apu->emulator->cpu, DMA_DMC, dmc->current_addr, &dmc->sample,1);
+        schedule_dma(&apu->emulator->cpu, DMA_DMC, dmc->current_addr, &dmc->sample,1, 0);
         dmc->dma_scheduled = 0;
     }
 

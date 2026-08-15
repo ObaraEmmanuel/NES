@@ -235,6 +235,7 @@ typedef struct DMA {
     uint16_t src_address;
     uint16_t length;
     uint16_t index;
+    uint16_t offset;
     uint8_t buffer;
     uint8_t abort;
     DMA_Phase phase;
@@ -275,7 +276,7 @@ void reset_cpu(c6502* ctx);
 void execute(c6502* ctx);
 void interrupt(c6502* ctx, Interrupt code);
 void interrupt_clear(c6502* ctx, Interrupt code);
-void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_t len);
+void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_t len, uint16_t offset);
 void do_DMA(c6502* ctx, size_t cycles);
 uint8_t run_cpu_subroutine(c6502* ctx, uint16_t address);
 void set_cpu_mode(c6502* ctx, CPUMode mode);

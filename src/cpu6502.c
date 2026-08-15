@@ -67,7 +67,7 @@ void reset_cpu(c6502* cpu){
     cpu->dmc.abort = 0;
 }
 
-void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_t len) {
+void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_t len, uint16_t offset) {
     DMA* dma = type == DMA_DMC? &ctx->dmc : &ctx->oam;
     if (!(dma->phase == DMA_CLEAR)) {
         if (dma->type == DMA_OAM)
@@ -76,8 +76,9 @@ void schedule_dma(c6502* ctx, DMA_Type type, uint16_t src, uint8_t* dst, uint16_
         return;
     }
     dma->src_address = src;
-    dma->dst = dst;
     dma->length = len;
+    dma->offset = offset > len ? len : offset;
+    dma->dst = dst;
     dma->index = 0;
     dma->abort = 0;
     dma->phase = DMA_HALTING;
@@ -161,13 +162,19 @@ static void tick_dma(c6502* ctx, DMA* dma, uint16_t bus_addr) {
             }
             break;
         }
-        case DMA_WRITE:
-            dma->dst[dma->index++] = dma->buffer;
-            if (dma->index >= dma->length) {
+        case DMA_WRITE: {
+            uint16_t effective_index = dma->offset + dma->index;
+            if (effective_index >= dma->length)
+                effective_index -= dma->length;
+
+            dma->dst[effective_index] = dma->buffer;
+
+            if (++dma->index >= dma->length) {
                 dma->phase = DMA_CLEAR;
             } else
                 dma->phase = DMA_READ;
             break;
+        }
         case DMA_CLEAR:
         default:
             break;

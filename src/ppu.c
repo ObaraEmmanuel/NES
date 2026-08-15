@@ -140,7 +140,8 @@ void dma(PPU* ppu, uint8_t address){
         DMA_OAM,
         address * 0x100,
         ppu->OAM,
-        256
+        256,
+        ppu->oam_address
     );
 }
 
