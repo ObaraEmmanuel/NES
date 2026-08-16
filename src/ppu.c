@@ -295,24 +295,21 @@ static uint8_t get_sprite_pixel(PPU* ppu) {
     SpriteUnit* priority_unit = NULL;
     for (int i = 0; i < 8; i++) {
         SpriteUnit* unit = &ppu->sprite_units[i];
-        if (unit->x != 0) {
-            unit->x--;
-            continue;
-        }
-
-        uint8_t pattern_bits = 0;
-        if (unit->attr & FLIP_HORIZONTAL) {
-            pattern_bits = unit->pattern_LSB & 1 | (unit->pattern_MSB & 1) << 1;
-            unit->pattern_LSB >>= 1;
-            unit->pattern_MSB >>= 1;
-        } else {
-            pattern_bits = unit->pattern_LSB >> 7 | (unit->pattern_MSB >> 7) << 1;
-            unit->pattern_LSB <<= 1;
-            unit->pattern_MSB <<= 1;
-        }
-        if (pattern_bits && priority_unit == NULL) {
-            priority_unit = unit;
-            pattern = pattern_bits;
+        if (unit->halted || unit->x == 0) {
+            uint8_t pattern_bits = 0;
+            if (unit->attr & FLIP_HORIZONTAL) {
+                pattern_bits = unit->pattern_LSB & 1 | (unit->pattern_MSB & 1) << 1;
+                unit->pattern_LSB >>= 1;
+                unit->pattern_MSB >>= 1;
+            } else {
+                pattern_bits = unit->pattern_LSB >> 7 | (unit->pattern_MSB >> 7) << 1;
+                unit->pattern_LSB <<= 1;
+                unit->pattern_MSB <<= 1;
+            }
+            if (pattern_bits && priority_unit == NULL) {
+                priority_unit = unit;
+                pattern = pattern_bits;
+            }
         }
     }
 
@@ -551,6 +548,7 @@ static void fetch_frame(PPU* ppu) {
                 ppu->sprite_buffer.x = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address];
                 SpriteUnit* unit = ppu->sprite_units + ((ppu->dots - 257) >> 3);
                 unit->x = ppu->sprite_buffer.x;
+                unit->halted = 1;
             }
             break;
         case BG_LSB_ADDR: // 4
@@ -656,6 +654,17 @@ static void fetch_frame(PPU* ppu) {
 }
 
 void execute_ppu(PPU* ppu) {
+    // update render status
+    if (ppu->render_state_delay && --ppu->render_state_delay == 0) {
+        ppu->render_status = (ppu->mask & RENDER_BITS) > 0;
+        if (!ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render)) {
+            ppu->corrupt_oam_row = ppu->sec_oam_address & 0x1f;
+            if (ppu->dots < 64 && ppu->dots <= 256)
+                // round up to nearest multiple of 4
+                ppu->corrupt_oam_row = (ppu->corrupt_oam_row + 3) & 0xfc;
+        }
+    }
+
     if (ppu->should_inc_v) {
         ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
         ppu->should_inc_v = 0;
@@ -677,7 +686,7 @@ void execute_ppu(PPU* ppu) {
                 if (ppu->render_status) {
                     if (ppu->dots <= 64)
                         clear_oam(ppu);
-                    else if (ppu->dots <= 256)
+                    else
                         evaluate_sprites(ppu);
                     pixel_addr = 0x3f00 | get_pixel(ppu);
                 } else if ((ppu->v & 0x3fff) > 0x3f00) {
@@ -692,6 +701,24 @@ void execute_ppu(PPU* ppu) {
             if (ppu->render_status)
                 // tile and attr pre-fetch
                 fetch_frame(ppu);
+        }
+
+        for (int i = 0; i < 8; i++) {
+            SpriteUnit* unit = ppu->sprite_units + i;
+            if (!unit->halted && unit->x) {
+                if (--unit->x == 0) unit->halted = 1;
+            }
+        }
+
+        if (ppu->shift_start_delay && --ppu->shift_start_delay == 0) {
+            for (int i = 0; i < 8; i++) {
+               ppu->sprite_units[i].halted = 0;
+            }
+        }
+
+        if (ppu->render_status && ppu->dots == 340) {
+            // tell sprite shifter to go
+            ppu->shift_start_delay = 1;
         }
     }
 
@@ -774,34 +801,14 @@ void execute_ppu(PPU* ppu) {
         }
     }
 
-    // update render status
-    if (ppu->render_state_delay) {
-        ppu->render_state_delay--;
-        if(ppu->render_state_delay == 0) {
-            ppu->render_status = (ppu->mask & RENDER_BITS) > 0;
-            if (!ppu->render_status && ppu->sec_oam_address & 0x1f && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render)) {
-                ppu->corrupt_oam_row = ppu->sec_oam_address & 0x1f;
-                if (ppu->dots < 64 && ppu->dots <= 256)
-                    // round up to nearest multiple of 4
-                    ppu->corrupt_oam_row = (ppu->corrupt_oam_row + 3) & 0xfc;
-            }
-        }
-    }
-
     //update NMI delay
-    if (ppu->nmi_delay) {
-        ppu->nmi_delay--;
-        if(ppu->nmi_delay == 0) {
-            update_NMI(ppu, 0);
-        }
+    if (ppu->nmi_delay && --ppu->nmi_delay == 0) {
+        update_NMI(ppu, 0);
     }
 
     // open bus decay delay
-    if (ppu->latch_decay) {
-        ppu->latch_decay--;
-        if (ppu->latch_decay == 0) {
-            ppu->latch = 0;
-        }
+    if (ppu->latch_decay && --ppu->latch_decay == 0) {
+        ppu->latch = 0;
     }
 
     // increment dots and scanlines

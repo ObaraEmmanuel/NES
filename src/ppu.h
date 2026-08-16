@@ -87,6 +87,7 @@ typedef struct SpriteUnit {
     uint8_t attr;
     uint8_t pattern_LSB;
     uint8_t pattern_MSB;
+    uint8_t halted;
 } SpriteUnit;
 
 typedef struct Sprite {
@@ -122,6 +123,7 @@ typedef struct PPU{
     uint8_t should_inc_v;
     uint8_t should_inc_hori_v;
     uint8_t should_inc_vert_v;
+    uint8_t shift_start_delay;
 
     uint16_t v;
     uint16_t t;
