@@ -18,7 +18,7 @@ static uint8_t read_CHR(Mapper *mapper, uint16_t address);
 static void write_CHR(Mapper *mapper, uint16_t address, uint8_t value);
 static uint8_t read_ROM(Mapper *mapper, uint16_t address);
 static void write_ROM(Mapper *mapper, uint16_t address, uint8_t value);
-static void on_scanline(Mapper *mapper);
+static void set_bus(Mapper * mapper, uint16_t addr);
 
 static int select_mapper(Mapper *mapper) {
     // load generic implementations
@@ -28,7 +28,7 @@ static int select_mapper(Mapper *mapper) {
     mapper->write_CHR = write_CHR;
     mapper->read_ROM = read_ROM;
     mapper->write_ROM = write_ROM;
-    mapper->on_scanline = on_scanline;
+    mapper->set_bus = set_bus;
     mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
 
     switch (mapper->mapper_num) {
@@ -91,7 +91,8 @@ void set_mirroring(Mapper *mapper, Mirroring mirroring) {
     mapper->mirroring = mirroring;
 }
 
-static void on_scanline(Mapper *mapper) {
+static void set_bus(Mapper * mapper, uint16_t addr) {
+    // Used to monitor cartridge bus changes used for clocking
 }
 
 static uint8_t read_ROM(Mapper *mapper, uint16_t address) {

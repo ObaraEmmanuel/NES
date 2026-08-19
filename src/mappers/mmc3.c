@@ -12,12 +12,14 @@ typedef struct {
     uint8_t PRG_mode;
     uint8_t CHR_inversion;
     uint8_t next_bank_data;
+    uint8_t a12;
     uint8_t IRQ_latch;
     uint8_t IRQ_counter;
     uint8_t IRQ_cleared;
     uint8_t IRQ_enabled;
     uint32_t PRG_clamp;
     uint32_t CHR_clamp;
+    size_t cycles;
 } MMC3_t;
 
 
@@ -29,14 +31,16 @@ static uint8_t read_CHR(Mapper * mapper, uint16_t addr);
 
 static void write_bank_data(Mapper *mapper, uint8_t val);
 
-static void on_scanline(Mapper* mapper);
+static void on_filtered_a12(Mapper* mapper);
+
+static void set_bus(Mapper * mapper, uint16_t addr);
 
 
 int load_MMC3(Mapper *mapper) {
     mapper->read_PRG = read_PRG;
     mapper->write_PRG = write_PRG;
     mapper->read_CHR = read_CHR;
-    mapper->on_scanline = on_scanline;
+    mapper->set_bus = set_bus;
     MMC3_t *mmc3 = calloc(1, sizeof(MMC3_t));
     mapper->extension = mmc3;
     // PRG banks in 8k chunks
@@ -62,8 +66,20 @@ int load_MMC3(Mapper *mapper) {
     return 0;
 }
 
-static void on_scanline(Mapper* mapper) {
-    // TODO cycle-accurate A12 based IRQ
+static void set_bus(Mapper *mapper, uint16_t addr) {
+    MMC3_t *mmc3 = mapper->extension;
+    uint8_t a12 = (addr & 0x1000) > 0;
+    if (a12 > mmc3->a12) {
+        if (mapper->emulator->cpu.t_cycles - mmc3->cycles >= 3) {
+            // clock counter
+            on_filtered_a12(mapper);
+        }
+    }
+    if (a12) mmc3->cycles = mapper->emulator->cpu.t_cycles;
+    mmc3->a12 = a12;
+}
+
+static void on_filtered_a12(Mapper* mapper) {
     MMC3_t *mmc3 = mapper->extension;
 
     if(mmc3->IRQ_cleared || !mmc3->IRQ_counter) {
@@ -73,8 +89,9 @@ static void on_scanline(Mapper* mapper) {
         mmc3->IRQ_counter--;
     }
 
-    if(!mmc3->IRQ_counter && mmc3->IRQ_enabled)
+    if (!mmc3->IRQ_counter && mmc3->IRQ_enabled) {
         interrupt(&mapper->emulator->cpu, MAPPER_IRQ);
+    }
 }
 
 uint8_t read_PRG(Mapper *mapper, uint16_t addr) {

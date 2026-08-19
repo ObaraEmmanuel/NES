@@ -76,6 +76,7 @@ void set_address(PPU* ppu, uint8_t address){
         ppu->t &= 0xff00;
         ppu->t |= address;
         ppu->v = ppu->t;
+        ppu->mapper->set_bus(ppu->mapper, ppu->v);
         ppu->w = 0;
     }
 }
@@ -497,10 +498,6 @@ static void fetch_frame(PPU* ppu) {
     if (ppu->dots > 320) {
         ppu->sprite_eval_unit.buffer = ppu->OAM_cache[0];
     }
-    if (!(phase & 1))
-        pu->has_set_addr = 1;
-    else
-        pu->has_set_addr = 0;
 
     switch (phase) {
         case NT_ADDR: // 0
@@ -554,7 +551,10 @@ static void fetch_frame(PPU* ppu) {
         case BG_LSB_ADDR: // 4
             if (sprite_prefetch) {
                 // load sprite LSB addr
-                uint8_t offset = (ppu->scanlines & 0xff) - ppu->sprite_buffer.y;
+                uint8_t offset = 0;
+                if (is_y_in_range(ppu, ppu->sprite_buffer.y))
+                    offset = (ppu->scanlines & 0xff) - ppu->sprite_buffer.y;
+
                 if (ppu->ctrl & LONG_SPRITE) {
                     // 8x16 sprite
                     uint16_t bank = ppu->sprite_buffer.tile & 1 ? 0x1000: 0;
@@ -605,10 +605,9 @@ static void fetch_frame(PPU* ppu) {
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_MSB = ppu->bus & 0xff;
-                Sprite* sprite = (Sprite*)ppu->OAM_cache + sprite_index;
                 ppu->sec_oam_address++;
 
-                if (!is_y_in_range(ppu, sprite->y)) {
+                if (!is_y_in_range(ppu, ppu->sprite_buffer.y)) {
                     // sprite is not in range
                     unit->pattern_MSB = 0;
                     unit->pattern_LSB = 0;
@@ -642,6 +641,12 @@ static void fetch_frame(PPU* ppu) {
             break;
     }
 
+    if (!(phase & 1)) {
+        pu->has_set_addr = 1;
+        ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+    } else
+        pu->has_set_addr = 0;
+
     // glitchy increments on $2007 read
     if (ppu->should_inc_hori_v) {
         inc_hori_v(ppu);
@@ -668,6 +673,7 @@ void execute_ppu(PPU* ppu) {
     if (ppu->should_inc_v) {
         ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
         ppu->should_inc_v = 0;
+        ppu->mapper->set_bus(ppu->mapper, ppu->v);
     }
 
     if (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render) {
@@ -785,9 +791,6 @@ void execute_ppu(PPU* ppu) {
             // reset v-blank and sprite zero hit
             ppu->status &= ~V_BLANK;
             update_NMI(ppu, 0);
-        }
-        else if(ppu->dots == 260 && ppu->render_status) {
-            ppu->mapper->on_scanline(ppu->mapper);
         }
         else if(ppu->dots >= 280 && ppu->dots <= 304 && ppu->render_status){
             ppu->v &= ~VERTICAL_BITS;
