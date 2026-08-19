@@ -58,6 +58,7 @@ typedef struct Mapper {
     MapperFormat format;
     uint16_t name_table_map[4];
     uint32_t clamp;
+    uint32_t PRG_RAM_clamp;
     uint16_t mapper_num;
     uint8_t submapper;
     uint8_t is_nsf;

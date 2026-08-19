@@ -30,6 +30,7 @@ static int select_mapper(Mapper *mapper) {
     mapper->write_ROM = write_ROM;
     mapper->set_bus = set_bus;
     mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
+    mapper->PRG_RAM_clamp = mapper->RAM_size - 1;
 
     switch (mapper->mapper_num) {
         case 0: return 0;
@@ -104,7 +105,7 @@ static uint8_t read_ROM(Mapper *mapper, uint16_t address) {
     if (address < 0x8000) {
         // PRG ram
         if (mapper->PRG_RAM != NULL)
-            return mapper->PRG_RAM[address - 0x6000];
+            return mapper->PRG_RAM[address - 0x6000 & mapper->PRG_RAM_clamp];
 
         LOG(DEBUG, "Attempted to read from non existent PRG RAM");
         return mapper->emulator->mem.bus;
@@ -123,7 +124,7 @@ static void write_ROM(Mapper *mapper, uint16_t address, uint8_t value) {
     if (address < 0x8000) {
         // extended ram
         if (mapper->PRG_RAM != NULL)
-            mapper->PRG_RAM[address - 0x6000] = value;
+            mapper->PRG_RAM[address - 0x6000 & mapper->PRG_RAM_clamp] = value;
         else {
             LOG(DEBUG, "Attempted to write to non existent PRG RAM");
         }
