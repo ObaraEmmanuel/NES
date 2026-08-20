@@ -551,28 +551,18 @@ static void fetch_frame(PPU* ppu) {
         case BG_LSB_ADDR: // 4
             if (sprite_prefetch) {
                 // load sprite LSB addr
-                uint8_t offset = 0;
-                if (is_y_in_range(ppu, ppu->sprite_buffer.y))
-                    offset = (ppu->scanlines & 0xff) - ppu->sprite_buffer.y;
+                uint8_t offset = (ppu->scanlines & 0xff) - ppu->sprite_buffer.y;
 
                 if (ppu->ctrl & LONG_SPRITE) {
                     // 8x16 sprite
-                    uint16_t bank = ppu->sprite_buffer.tile & 1 ? 0x1000: 0;
-                    uint8_t tile = ppu->sprite_buffer.tile & 0xfe;
-                    uint8_t row = ppu->sprite_buffer.attr & FLIP_VERTICAL ? 15 - offset : offset;
-
-                    if (row >= 8) {
-                        tile++;
-                        row -= 8;
-                    }
-
-                    ppu->bus = bank + tile * 16 + row;
+                    if (ppu->sprite_buffer.attr & FLIP_VERTICAL)
+                        offset ^= 15;
+                    ppu->bus = (((ppu->sprite_buffer.tile & 0x1) << 12) | ((ppu->sprite_buffer.tile & ~0x1) << 4)) + ((offset & 0x8) << 1) + (offset & 0x7);
                 } else {
                     // 8x8 sprite
-                    uint16_t bank = ppu->ctrl & SPRITE_TABLE ? 0x1000: 0;
-                    uint8_t row = ppu->sprite_buffer.attr & FLIP_VERTICAL ? 7 - offset : offset;
-
-                    ppu->bus = bank + ppu->sprite_buffer.tile * 16 + row;
+                    if (ppu->sprite_buffer.attr & FLIP_VERTICAL)
+                        offset ^= 7;
+                    ppu->bus = ((ppu->ctrl & SPRITE_TABLE ? 0x1000: 0) | (ppu->sprite_buffer.tile << 4)) + (offset & 0x7);
                 }
             } else {
                 // load BG LSB addr
@@ -684,7 +674,10 @@ void execute_ppu(PPU* ppu) {
             ppu->corrupt_oam_row = 0;
         }
         if (ppu->dots == 0) {
-            // do dot 0 stuff
+            if (ppu->scanlines <= VISIBLE_SCANLINES && ppu->render_status) {
+                ppu->bus = ppu->p_unit.NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
+                ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+            }
         } else {
             // dots 1 - 256, scanline 0 - 239 (render region)
             if (ppu->scanlines < VISIBLE_SCANLINES && ppu->dots <= VISIBLE_DOTS) {
@@ -773,6 +766,11 @@ void execute_ppu(PPU* ppu) {
         ppu->write_to_buffer--;
     }
     ppu->p_unit.has_set_addr = 0;
+
+    if (ppu->scanlines == 240 && ppu->dots == 0 && ppu->render_status) {
+        ppu->bus = ppu->p_unit.NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
+        ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+    }
 
     if(ppu->scanlines == 241 && ppu->dots == 1) {
         // set v-blank
