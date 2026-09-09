@@ -15,6 +15,7 @@ static uint8_t get_pixel(PPU* ppu);
 static void inc_hori_v(PPU* ppu);
 static void inc_vert_v(PPU* ppu);
 static void inc_v(PPU* ppu);
+static void inc_sec_oam_addr(PPU* ppu);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -273,6 +274,11 @@ static void inc_v(PPU* ppu) {
         ppu->should_inc_v = 1;
 }
 
+static void inc_sec_oam_addr(PPU* ppu) {
+    if (ppu->sec_oam_address < 32)
+        ppu->sec_oam_address++;
+}
+
 static uint8_t get_bg_pixel(PPU *ppu) {
     if (!(ppu->mask & SHOW_BG))
         return 0;
@@ -357,11 +363,13 @@ static uint8_t is_y_in_range(PPU* ppu, uint8_t y) {
 }
 
 static void clear_oam(PPU* ppu) {
-    if (!(ppu->dots & 1))
-        // writes happen on even dots
-        ppu->OAM_cache[(ppu->dots >> 1) - 1] = 0xff;
+    if (ppu->dots & 1)
+        // writes happen on odd dots since we have the 1 dot ppu delay
+        ppu->OAM_cache[ppu->sec_oam_address & 0x1f] = 0xff;
+    else
+        inc_sec_oam_addr(ppu);
+
     ppu->sprite_eval_unit.buffer = 0xff;
-    ppu->sec_oam_address = (ppu->dots - 1) >> 1;
 }
 
 static void evaluate_sprites(PPU* ppu) {
@@ -374,9 +382,8 @@ static void evaluate_sprites(PPU* ppu) {
         // OAM clear complete, move on to sprite evaluation
         su->state = READ_OAM_Y;
         su->n = su->m = 0;
-        ppu->sec_oam_address = 0;
         su->oam_addr = ppu->oam_address;
-        su->sprite_zero_addr = 0xff;
+        su->has_sprite_zero = 0;
         su->has_overflown = 0;
     }
 
@@ -441,8 +448,8 @@ static void evaluate_sprites(PPU* ppu) {
             }
             // bits 2 - 4 of attr byte are unimplemented and should be zero
             su->buffer = ppu->OAM[addr] & ((addr & 0x03) == 0x02 ? 0xE3 : 0xFF);
-            if (su->n == 0 && su->remaining == 2) {
-                su->sprite_zero_addr = ppu->sec_oam_address;
+            if (su->n == 0 && su->remaining == 3) {
+                su->has_sprite_zero = 1;
             }
             if (su->m > 3) {
                 su->m = 0;
@@ -496,7 +503,7 @@ static void fetch_frame(PPU* ppu) {
         ppu->oam_address = 0;
     }
     if (ppu->dots > 320) {
-        ppu->sprite_eval_unit.buffer = ppu->OAM_cache[0];
+        ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];
     }
 
     switch (phase) {
@@ -506,11 +513,11 @@ static void fetch_frame(PPU* ppu) {
             if (ppu->dots == 257) {
                 ppu->v &= ~HORIZONTAL_BITS;
                 ppu->v |= ppu->t & HORIZONTAL_BITS;
-                ppu->sec_oam_address = 0;
             }
 
             if (sprite_prefetch) {
-                ppu->sprite_buffer.y = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+                ppu->sprite_buffer.y = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];
+                inc_sec_oam_addr(ppu);
             }
             break;
         case NT_READ: // 1
@@ -518,7 +525,8 @@ static void fetch_frame(PPU* ppu) {
             ppu->bus = ppu->bus & 0xff00 | read_vram(ppu, ppu->bus);
             pu->NT = ppu->bus & 0xff;
             if (sprite_prefetch) {
-                ppu->sprite_buffer.tile = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+                ppu->sprite_buffer.tile = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];
+                inc_sec_oam_addr(ppu);
             }
             break;
         case AT_ADDR: // 2
@@ -529,11 +537,11 @@ static void fetch_frame(PPU* ppu) {
                 // load AT address
                 ppu->bus = 0x23C0 | ppu->v & 0x0C00 | ppu->v >> 4 & 0x38 | ppu->v >> 2 & 0x07;
             if (sprite_prefetch) {
-                uint8_t is_sprite_zero = ppu->sec_oam_address == ppu->sprite_eval_unit.sprite_zero_addr;
-                ppu->sprite_buffer.attr = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address++];
+                ppu->sprite_buffer.attr = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];
+                inc_sec_oam_addr(ppu);
                 SpriteUnit* unit = ppu->sprite_units + ((ppu->dots - 257) >> 3);
                 // use unimplemented BIT 2 to mark spite zero
-                unit->attr = ppu->sprite_buffer.attr | (is_sprite_zero ? BIT_2 : 0);
+                unit->attr = ppu->sprite_buffer.attr | (ppu->dots == 259 && ppu->sprite_eval_unit.has_sprite_zero ? BIT_2 : 0);
             }
             break;
         case AT_READ: // 3
@@ -542,7 +550,7 @@ static void fetch_frame(PPU* ppu) {
             pu->AT = ppu->bus & 0xFF;
             pu->AT >>= ppu->v >> 4 & 4 | ppu->v & 2;
             if (sprite_prefetch) {
-                ppu->sprite_buffer.x = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address];
+                ppu->sprite_buffer.x = ppu->sprite_eval_unit.buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];
                 SpriteUnit* unit = ppu->sprite_units + ((ppu->dots - 257) >> 3);
                 unit->x = ppu->sprite_buffer.x;
                 unit->halted = 1;
@@ -595,7 +603,7 @@ static void fetch_frame(PPU* ppu) {
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_MSB = ppu->bus & 0xff;
-                ppu->sec_oam_address++;
+                inc_sec_oam_addr(ppu);
 
                 if (!is_y_in_range(ppu, ppu->sprite_buffer.y)) {
                     // sprite is not in range
@@ -715,9 +723,17 @@ void execute_ppu(PPU* ppu) {
             }
         }
 
-        if (ppu->render_status && ppu->dots == 340) {
-            // tell sprite shifter to go
-            ppu->shift_start_delay = 1;
+        if (ppu->render_status) {
+            if (ppu->dots == 340) {
+                // tell sprite shifter to go
+                ppu->shift_start_delay = 1;
+                // reset secondary OAM address
+                ppu->sec_oam_address = 0;
+            } else if (ppu->dots == 256 || ppu->dots == 64) {
+                // reset secondary OAM address
+                ppu->sec_oam_address = 0;
+            }
+
         }
     }
 

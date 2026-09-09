@@ -64,7 +64,7 @@ typedef struct SpriteEvalMachine {
     uint8_t n;
     uint8_t m;
     uint8_t remaining;
-    uint8_t sprite_zero_addr;
+    uint8_t has_sprite_zero;
     uint8_t has_overflown;
     uint16_t oam_addr;
 }SpriteEvalMachine;
