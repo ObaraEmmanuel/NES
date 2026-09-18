@@ -10,13 +10,17 @@ int load_CNROM(Mapper *mapper) {
     mapper->read_CHR = read_CHR;
     mapper->write_CHR = write_CHR;
     mapper->CHR_ptrs[0] = mapper->CHR_ROM;
+    // store chr mask in chr reg 0
+    // the mask ensures CHR wraps around correctly
+    mapper->CHR_regs[0] = next_power_of_2(mapper->CHR_banks) - 1;
+    if (mapper->submapper == 2)
+        LOG(WARN, "Requires unimplemented AND bus conflicts");
     return 0;
 }
 
 static void write_PRG(Mapper *mapper, uint16_t address, uint8_t value) {
-    // 8k CHR bank selected determined by bit 0 - 1 or 0 - 2 if oversized
-    uint8_t mask = mapper->CHR_banks > 4? 0xf : 0x3;
-    mapper->CHR_ptrs[0] = mapper->CHR_ROM + 0x2000 * (value & mask);
+    // 8k CHR bank selected determined by value
+    mapper->CHR_ptrs[0] = mapper->CHR_ROM + 0x2000 * (value & mapper->CHR_regs[0]);
 }
 
 static uint8_t read_CHR(Mapper *mapper, uint16_t address) {
