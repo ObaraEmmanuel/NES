@@ -2,7 +2,6 @@
 
 #include <SDL.h>
 #include "utils.h"
-#include "apu.h"
 #include "emulator.h"
 
 typedef struct NSFGraphicsContext {

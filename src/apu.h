@@ -3,19 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#include "biquad.h"
-
-#define SAMPLING_FREQUENCY 48000
-// should be able to store samples produced in 1/60th of a second
-// for the target sampling frequency
-// higher sampling frequency will need a bigger buffer
-#define AUDIO_BUFF_SIZE 1024
-#define STATS_WIN_SIZE 20
-#define AVERAGE_DOWNSAMPLING 0
-#define NOMINAL_QUEUE_SIZE 6000
-
 struct Emulator;
-struct GraphicsContext;
 
 enum {
     TIMER_HIGH = 0x7,
@@ -103,36 +91,18 @@ typedef struct {
     uint8_t toggle_delay;
 } DMC;
 
-typedef struct {
-    uint16_t factor_index;
-    uint16_t target_factor;
-    uint16_t equilibrium_factor;
-    uint16_t max_factor;
-    size_t samples;
-    size_t max_period;
-    size_t min_period;
-    size_t period;
-    size_t counter;
-    size_t index;
-    size_t max_index;
-} Sampler;
-
 
 typedef struct APU{
     struct Emulator* emulator;
-    int16_t buff[AUDIO_BUFF_SIZE];
-    size_t stat_window[STATS_WIN_SIZE];
     Pulse pulse1;
     Pulse pulse2;
     Triangle triangle;
     Noise noise;
     DMC dmc;
-    Sampler sampler;
     uint8_t frame_mode;
     uint8_t status;
     uint8_t IRQ_inhibit;
     uint8_t frame_interrupt;
-    uint8_t audio_start;
     uint8_t reset_sequencer_delay;
     uint8_t irq_should_set;
     uint8_t irq_clear_delay;
@@ -142,22 +112,15 @@ typedef struct APU{
     uint32_t *sequence;
     uint8_t *directive;
     size_t cycles;
-    float stat;
-    size_t stat_index;
-    Biquad filter;
-    Biquad aa_filter;
-    float volume;
 } APU;
 
 
 void init_APU(struct Emulator* emulator);
 void reset_APU(APU *apu);
-void exit_APU();
 void execute_apu(APU* apu);
 void dmc_complete(APU* apu);
 void set_status(APU* apu, uint8_t value);
 float get_sample(APU* apu);
-void queue_audio(APU* apu, struct GraphicsContext* ctx);
 uint8_t read_apu_status(APU* apu);
 void set_frame_counter_ctrl(APU* apu, uint8_t value);
 

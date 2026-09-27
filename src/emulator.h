@@ -6,6 +6,7 @@
 #include "apu.h"
 #include "mapper.h"
 #include "gfx.h"
+#include "mixer.h"
 #include "timers.h"
 
 
@@ -30,6 +31,7 @@ typedef struct Emulator{
     Memory mem;
     Mapper mapper;
     GraphicsContext g_ctx;
+    Mixer mixer;
     Timer timer;
 
     TVSystem type;

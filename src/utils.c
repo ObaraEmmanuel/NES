@@ -159,17 +159,6 @@ int SDL_RenderFillCircle(SDL_Renderer * renderer, int x, int y, int radius) {
     return status;
 }
 
-void SDL_PauseAudio(SDL_AudioStream* stream, const int flag) {
-    SDL_AudioDeviceID dev = SDL_GetAudioStreamDevice(stream);
-    int paused = SDL_AudioDevicePaused(dev);
-    if(paused == flag)
-        return;
-    if(flag)
-        SDL_PauseAudioDevice(dev);
-    else
-        SDL_ResumeAudioDevice(dev);
-}
-
 
 void to_pixel_format(const uint32_t* restrict in, uint32_t* restrict out, size_t size, ColorFormat format){
     for(int i = 0; i < size; i++) {

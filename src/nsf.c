@@ -592,9 +592,8 @@ void nsf_tick_frame(struct Emulator* emulator) {
     if (MAX_SILENCE < 0)
         return;
     int silent = 1;
-    const APU* apu = &emulator->apu;
     for(size_t i =0; i < AUDIO_BUFF_SIZE; i++) {
-        if (apu->buff[i] != 0) {
+        if (&emulator->mixer.buff[i] != 0) {
             silent = 0;
             break;
         }
@@ -709,9 +708,9 @@ void init_song(Emulator* emulator, size_t song_number) {
     memset(emulator->mem.RAM, 0, RAM_SIZE);
     init_cpu(emulator);
     set_cpu_mode(&emulator->cpu, CPU_WAIT_IRQ);
-    emulator->apu.audio_start = 0;
-    emulator->apu.sampler.index = 0;
-    SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
+    emulator->mixer.audio_start = 0;
+    emulator->mixer.sampler.index = 0;
+    pause_audio(&emulator->mixer, 1);
 
     for(size_t i = 0; i < 14; i++) {
         write_mem(&emulator->mem, 0x4000 + i, 0);
@@ -735,7 +734,7 @@ void init_song(Emulator* emulator, size_t song_number) {
         if(nsf->fade != NULL)
             nsf->tick_max += nsf->fade[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
     }
-    emulator->apu.volume = 1;
+    emulator->mixer.volume = 1;
     nsf->init_num = 0; // first init call
     if (nsf->flags & NSF_NON_RETURN_INIT) {
         emulator->cpu.y = 0x80;

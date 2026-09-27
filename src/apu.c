@@ -1,13 +1,9 @@
-#include <stdio.h>
 #include "apu.h"
 #include "emulator.h"
-#include "gfx.h"
 #include "utils.h"
-#include "biquad.h"
 
 #define TND_LUT_SIZE 203
 #define PULSE_LUT_SIZE 31
-#define AUDIO_TO_FILE 0
 
 
 static const uint8_t length_counter_lookup[32] = {
@@ -127,8 +123,6 @@ static float pulse_LUT[PULSE_LUT_SIZE];
 
 static void compute_mixer_LUT();
 
-static void init_audio_device(const APU* apu);
-
 static void init_pulse(Pulse *pulse, uint8_t id);
 
 static void init_triangle(Triangle *triangle);
@@ -136,8 +130,6 @@ static void init_triangle(Triangle *triangle);
 static void init_noise(Noise *noise);
 
 static void init_dmc(DMC* dmc);
-
-static void init_sampler(APU* apu, int frequency);
 
 static void length_sweep_pulse(Pulse *pulse);
 
@@ -155,41 +147,28 @@ static void quarter_frame(APU *apu);
 
 static void half_frame(APU *apu);
 
-static void sample(APU* apu);
-
 static void set_frame_mode(APU* apu, uint8_t mode);
 
 static void update_length_counter(LengthCounter* counter);
 
 static void clock_length_counter(LengthCounter* counter);
 
-FILE *out_wav;
 
 void init_APU(struct Emulator *emulator) {
     memset(&emulator->apu, 0, sizeof(APU));
     compute_mixer_LUT();
     APU *apu = &emulator->apu;
-    apu->volume = 1;
     apu->emulator = emulator;
     apu->cycles = 0;
     apu->sequencer = 0;
     apu->reset_sequencer_delay = 0;
-    apu->audio_start = 0;
     apu->IRQ_inhibit = 0;
-
-    // For keeping track of queue_size statistics for use by the adaptive sampler
-    memset(apu->stat_window, 0, sizeof(apu->stat_window));
-    apu->stat = 0;
-    apu->stat_index = 0;
 
     init_pulse(&apu->pulse1, 1);
     init_pulse(&apu->pulse2, 2);
     init_triangle(&apu->triangle);
     init_noise(&apu->noise);
     init_dmc(&apu->dmc);
-    init_sampler(apu, SAMPLING_FREQUENCY);
-    init_audio_device(apu);
-    SDL_PauseAudio(emulator->g_ctx.audio_stream, 1);
     set_status(apu, 0);
     set_frame_mode(apu, 0);
     set_frame_counter_ctrl(apu, 0);
@@ -200,9 +179,6 @@ void init_APU(struct Emulator *emulator) {
     apu->sequence_step = 0;
     // suppress normal delay logic which is already factored in above
     apu->reset_sequencer_delay = 0;
-#if AUDIO_TO_FILE
-    out_wav = fopen("test-aud.raw", "wb");
-#endif
 }
 
 void reset_APU(APU *apu) {
@@ -216,26 +192,6 @@ void reset_APU(APU *apu) {
     apu->sequencer = 10 - 3;
     apu->sequence_step = 0;
     apu->reset_sequencer_delay = 0;
-}
-
-void init_audio_device(const APU* apu) {
-
-    const SDL_AudioSpec spec = {
-        .format = SDL_AUDIO_S16,
-        .channels = 1,
-        .freq = SAMPLING_FREQUENCY
-    };
-
-    apu->emulator->g_ctx.audio_stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, &spec, NULL, NULL);
-    if (apu->emulator->g_ctx.audio_stream == NULL) {
-        LOG(ERROR , SDL_GetError());
-        quit(EXIT_FAILURE);
-    }
-}
-
-void exit_APU() {
-    if (out_wav)
-        fclose(out_wav);
 }
 
 void execute_apu(APU *apu) {
@@ -324,9 +280,6 @@ void execute_apu(APU *apu) {
     update_length_counter(&apu->noise.l);
     update_length_counter(&apu->triangle.l);
 
-    // sample
-    sample(apu);
-
     apu->cycles++;
 }
 
@@ -380,113 +333,6 @@ void half_frame(APU *apu) {
     clock_length_counter(&apu->noise.l);
     // suppress frame counter clocking for this and the next cycle
     apu->suppress_frame_unit = 2;
-}
-
-void init_sampler(APU* apu, int frequency) {
-    float cycles_per_frame = apu->emulator->type == PAL? 33247.5: 29780.5;
-    float rate = apu->emulator->type == PAL? 50.0f : 60.0f;
-    Sampler* sampler = &apu->sampler;
-    // Q = 0.707 => BW = 1.414 (1 octave)
-    biquad_init(&apu->filter, HPF, 0, 20, frequency, 1);
-    // anti-aliasing filter.
-    biquad_init(&apu->aa_filter, LPF, 0, 20000, cycles_per_frame * rate, 1);
-
-    sampler->max_period = cycles_per_frame * rate / frequency;
-    sampler->min_period = sampler->max_period - 1;
-    sampler->period = sampler->min_period;
-    sampler->index = 0;
-    sampler->max_index = AUDIO_BUFF_SIZE;
-    sampler->samples = 0;
-    sampler->counter = 0;
-    sampler->factor_index = 0;
-    // basically the precision with which we vary the sampling rate
-    // 100 ->2 d.p, 1000->3 d.p, etc.
-    sampler->max_factor = 100;
-    // this may need to be calibrated to suit the current sampling frequency
-    // the current equilibrium is for 48000 hz
-    sampler->target_factor = sampler->equilibrium_factor = 48;
-}
-
-
-void sample(APU* apu) {
-    float sample = biquad(get_sample(apu), &apu->aa_filter);
-#if AVERAGE_DOWNSAMPLING
-    static float avg = -1;
-    // average samples in a bin
-    if(avg < 0)
-        avg = sample;
-    else
-        avg = (avg + sample)/2;
-#endif
-
-    Sampler* sampler = &apu->sampler;
-    sampler->counter++;
-    if(sampler->counter >= sampler->period) {
-#if AVERAGE_DOWNSAMPLING
-        apu->buff[sampler->index++] = 32767 * biquad(avg, &apu->filter);
-        // begin fresh average for the next bin
-        avg = -1;
-#else
-
-        apu->buff[sampler->index++] = 32000 * biquad(sample, &apu->filter) * apu->volume;
-#endif
-        if(sampler->index >= sampler->max_index) {
-            sampler->index = 0;
-        }
-        sampler->samples++;
-        sampler->counter = 0;
-        if(apu->sampler.factor_index <= apu->sampler.target_factor) {
-            sampler->period = sampler->max_period;
-        }else {
-            sampler->period = sampler->min_period;
-        }
-        sampler->factor_index++;
-        if(sampler->factor_index > sampler->max_factor) {
-            sampler->factor_index = 0;
-        }
-    }
-}
-
-
-void queue_audio(APU *apu, struct GraphicsContext *ctx) {
-    uint32_t queue_size = SDL_GetAudioStreamQueued(ctx->audio_stream);
-    apu->stat = apu->stat - apu->stat_window[apu->stat_index] + queue_size;
-    apu->stat_window[apu->stat_index++] = queue_size;
-    if(apu->stat_index >= STATS_WIN_SIZE)
-        apu->stat_index = 0;
-
-    size_t avg = apu->stat / STATS_WIN_SIZE;
-    // printf("queue size %d, avg: %llu \n", queue_size, avg);
-
-    // From here we tweak the sampling rate ever so slightly to prevent underruns and runaway latency
-    // by minimising deviation from the nominal queue size with a bit of control engineering
-    float delta_f, error = (float)avg - NOMINAL_QUEUE_SIZE;
-    Sampler* s = &apu->sampler;
-    if(error >= 0) {
-        delta_f = (s->max_factor - s->equilibrium_factor) * error / NOMINAL_QUEUE_SIZE;
-    }else {
-        delta_f = (s->equilibrium_factor * error / NOMINAL_QUEUE_SIZE);
-    }
-    // printf("delta %f, error %f \n", delta_f, error);
-    s->target_factor = s->equilibrium_factor + delta_f;
-    if(s->target_factor > s->max_factor) {
-        s->target_factor = s->max_factor;
-    }
-    // printf("target_f %d \n", s->target_factor);
-
-    SDL_PutAudioStreamData(ctx->audio_stream, apu->buff, s->index * 2);
-    // wait till queue is filled to prevent early onset underruns
-    if(!apu->audio_start && queue_size >= NOMINAL_QUEUE_SIZE) {
-        SDL_PauseAudio(apu->emulator->g_ctx.audio_stream, 0);
-        apu->audio_start = 1;
-    }
-#if AUDIO_TO_FILE
-    if(out_wav)
-        fwrite(apu->buff, 2, s->index, out_wav);
-#endif
-    memset(apu->buff, 0, AUDIO_BUFF_SIZE * 2);
-    // reset sampler
-    s->index = 0;
 }
 
 

@@ -3,13 +3,14 @@
 #include "touchpad.h"
 #include "controller.h"
 #include "gfx.h"
-#include <stdlib.h>
 #include "mapper.h"
 #include "nsf.h"
 #include "timers.h"
 #include "debugtools.h"
 #include "utils.h"
 #include "nsf_gfx.h"
+
+#include <stdlib.h>
 
 static uint64_t PERIOD;
 static uint16_t TURBO_SKIP;
@@ -73,6 +74,7 @@ void init_emulator(Emulator* emulator, int argc, char *argv[]){
     get_graphics_context(g_ctx);
     SDL_SetWindowTitle(g_ctx->window, get_file_name(argv[1]));
 
+    init_mixer(emulator);
     init_mem(emulator);
     init_ppu(emulator);
     init_cpu(emulator);
@@ -119,6 +121,7 @@ void tick_master_clock(Emulator* emulator) {
 
     }
     execute_apu(&emulator->apu);
+    sample(&emulator->mixer);
 }
 
 
@@ -133,8 +136,8 @@ void run_emulator(Emulator* emulator){
     PPU* ppu = &emulator->ppu;
     ppu->enabled = 1;
     c6502* cpu = &emulator->cpu;
-    APU* apu = &emulator->apu;
     GraphicsContext* g_ctx = &emulator->g_ctx;
+    Mixer* mixer = &emulator->mixer;
     Timer* timer = &emulator->timer;
     SDL_Event e;
     Timer frame_timer;
@@ -199,7 +202,7 @@ void run_emulator(Emulator* emulator){
 #endif
             render_graphics(g_ctx, ppu->screen);
             ppu->render = 0;
-            queue_audio(apu, g_ctx);
+            queue_audio(mixer);
             mark_end(timer);
             adjusted_wait(timer);
         }else{
@@ -233,9 +236,8 @@ void run_NSF_player(Emulator* emulator) {
     JoyPad* joy1 = &emulator->mem.joy1;
     JoyPad* joy2 = &emulator->mem.joy2;
     c6502* cpu = &emulator->cpu;
-    APU* apu = &emulator->apu;
     NSF* nsf = emulator->mapper.NSF;
-    GraphicsContext* g_ctx = &emulator->g_ctx;
+    Mixer* mixer = &emulator->mixer;
     NSFGraphicsContext nsf_ctx = {0};
     init_NSF_graphics(emulator, &nsf_ctx);
     Timer* timer = &emulator->timer;
@@ -316,9 +318,9 @@ void run_NSF_player(Emulator* emulator) {
                 } else if(nsf->fade != NULL) {
                     // fade
                     int fade_dur = nsf->fade[nsf->current_song == 0 ? 0 : nsf->current_song - 1];
-                    apu->volume = (nsf->tick - track_dur) / (float)fade_dur;
+                    mixer->volume = (nsf->tick - track_dur) / (float)fade_dur;
                     // clamp to range (0,1) then invert
-                    apu->volume = 1 - (apu->volume < 0 ? 0 : apu->volume > 1 ? 1 : apu->volume);
+                    mixer->volume = 1 - (mixer->volume < 0 ? 0 : mixer->volume > 1 ? 1 : mixer->volume);
                 }
             }
         }
@@ -353,7 +355,7 @@ void run_NSF_player(Emulator* emulator) {
 
             render_NSF_graphics(&nsf_ctx);
             nsf_tick_frame(emulator);
-            queue_audio(apu, g_ctx);
+            queue_audio(mixer);
             if(!nsf->initializing) {
                 nsf->tick += nsf->ms_per_frame;
             }
@@ -377,11 +379,11 @@ void run_NSF_player(Emulator* emulator) {
 
 void free_emulator(Emulator* emulator){
     LOG(DEBUG, "Starting emulator clean up");
-    exit_APU();
     exit_ppu(&emulator->ppu);
     free_mapper(&emulator->mapper);
     ANDROID_FREE_TOUCH_PAD();
-    free_graphics(&emulator->g_ctx);
+    free_mixer(&emulator->mixer);
     release_timer(&emulator->timer);
+    free_graphics(&emulator->g_ctx); // must always be last
     LOG(DEBUG, "Emulator session successfully terminated");
 }

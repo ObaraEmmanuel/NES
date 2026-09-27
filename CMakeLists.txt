@@ -8,6 +8,9 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   add_compile_definitions(DEBUGGING_ENABLED)
 endif()
 
+# General configuration
+add_compile_definitions(DISABLE_AUDIO=0)
+
 if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)
 endif()
@@ -49,6 +52,7 @@ set (SRC
         src/nsf.c
         src/nsf_gfx.c
         src/biquad.c
+        src/mixer.c
 
         src/mappers/axrom.c
         src/mappers/cnrom.c

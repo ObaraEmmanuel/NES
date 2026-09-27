@@ -61,13 +61,12 @@ void render_NSF_graphics(NSFGraphicsContext* nsf_ctx) {
     int offset_x = 0, offset_y = 0, width = g_ctx->width * g_ctx->scale, height = g_ctx->height * g_ctx->scale;
 #endif
 
-    APU* apu = &nsf_ctx->emulator->apu;
     complx* v = nsf_ctx->samples;
     const NSF* nsf = nsf_ctx->emulator->mapper.NSF;
     int silent = 1;
     // convert audio buffer to complex values for FFT
     for(size_t i =0; i < AUDIO_BUFF_SIZE; i++) {
-        v[i].Re = apu->buff[i];
+        v[i].Re = nsf_ctx->emulator->mixer.buff[i];
         v[i].Im = 0;
     }
 

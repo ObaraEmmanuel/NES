@@ -7,7 +7,6 @@ typedef struct GraphicsContext{
     SDL_Window* window;
     SDL_Renderer* renderer;
     SDL_Texture* texture;
-    SDL_AudioStream* audio_stream;
     TTF_Font* font;
     SDL_FRect dest;
     int width;

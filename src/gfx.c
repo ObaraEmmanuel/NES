@@ -117,7 +117,6 @@ void free_graphics(GraphicsContext* ctx){
     SDL_DestroyTexture(ctx->texture);
     SDL_DestroyRenderer(ctx->renderer);
     SDL_DestroyWindow(ctx->window);
-    SDL_DestroyAudioStream(ctx->audio_stream);
     SDL_Quit();
     LOG(DEBUG, "Graphics clean up complete");
 }
