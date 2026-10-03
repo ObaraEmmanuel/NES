@@ -4,7 +4,7 @@
 
 #include <string.h>
 
-#if DISABLE_AUDIO
+#ifdef DISABLE_AUDIO
 
 void init_mixer(Emulator* emulator){}
 void sample(Mixer* mixer){}

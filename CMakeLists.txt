@@ -9,7 +9,11 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug")
 endif()
 
 # General configuration
-add_compile_definitions(DISABLE_AUDIO=0)
+option(DISABLE_AUDIO "Disable audio output" OFF)
+
+if (DISABLE_AUDIO)
+  add_compile_definitions(nes PRIVATE DISABLE_AUDIO)
+endif ()
 
 if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)

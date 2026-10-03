@@ -12,7 +12,7 @@
 #define AVERAGE_DOWNSAMPLING 0
 #define NOMINAL_QUEUE_SIZE 6000
 
-#if DISABLE_AUDIO
+#ifdef DISABLE_AUDIO
 // no need to allocate so much memory that is not going to be used
 #define AUDIO_BUFF_SIZE 1
 #define STATS_WIN_SIZE 1
@@ -46,7 +46,7 @@ typedef struct {
     Sampler sampler;
     float volume;
     uint8_t audio_start;
-#if DISABLE_AUDIO == 0
+#ifndef DISABLE_AUDIO
     SDL_AudioStream* audio_stream;
     float stat;
     size_t stat_index;
