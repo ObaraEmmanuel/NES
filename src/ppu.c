@@ -16,6 +16,7 @@ static void inc_hori_v(PPU* ppu);
 static void inc_vert_v(PPU* ppu);
 static void inc_v(PPU* ppu);
 static void inc_sec_oam_addr(PPU* ppu);
+static uint8_t read_masked_oam(PPU* ppu);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -90,18 +91,19 @@ uint8_t read_oam(PPU* ppu){
     if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render)) {
         return ppu->sprite_eval_unit.buffer;
     }
-    // bits 2-4 of the attr byte (byte 2 of 4) are unimplemented and always read back as 0
-    return ppu->OAM[ppu->oam_address] & ((ppu->oam_address & 0x03) == 0x02 ? 0xE3 : 0xFF);
+
+    return read_masked_oam(ppu);
 }
 
 void write_oam(PPU* ppu, uint8_t value){
     if (ppu->render_status && (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render)) {
         // glitchy OAM increment bumping only the upper 6 bits
+        // we'll mask with 0xfffc and not just 0xfc to keep upper byte intact for overflow detection
         ppu->oam_address += 4;
-        ppu->oam_address &= 0xfc;
+        ppu->oam_address &= 0xfffc;
         return;
     }
-    ppu->OAM[ppu->oam_address++] = value;
+    ppu->OAM[ppu->oam_address++ & 0xff] = value;
 }
 
 void set_scroll(PPU* ppu, uint8_t coord){
@@ -372,31 +374,32 @@ static void clear_oam(PPU* ppu) {
     ppu->sprite_eval_unit.buffer = 0xff;
 }
 
+static uint8_t read_masked_oam(PPU* ppu) {
+    // bits 2 - 4 of attr byte are unimplemented and should be zero
+    return ppu->OAM[ppu->oam_address & 0xff] & ((ppu->oam_address & 0x03) == 0x02 ? 0xE3 : 0xFF);
+}
+
 static void evaluate_sprites(PPU* ppu) {
     // sprite evaluation
     SpriteEvalMachine* su = &ppu->sprite_eval_unit;
-    uint16_t addr = 0;
 
     // finish OAM clear and start evaluation
     if (ppu->dots == 65) {
         // OAM clear complete, move on to sprite evaluation
         su->state = READ_OAM_Y;
-        su->n = su->m = 0;
-        su->oam_addr = ppu->oam_address;
         su->has_sprite_zero = 0;
         su->has_overflown = 0;
     }
 
     switch (su->state) {
         case READ_OAM_Y:
-            addr = (su->n << 2 | su->m) + su->oam_addr;
-            if (addr >= 256) {
+            if (ppu->oam_address >= 256) {
                 su->state = OAM_EOF;
-                su->buffer = ppu->OAM[0];
-                su->n = 1;
+                su->buffer = read_masked_oam(ppu);
+                ppu->oam_address = ppu->oam_address + 4 & 0xfc;
                 break;
             }
-            su->buffer = ppu->OAM[addr] & ((addr & 0x03) == 0x02 ? 0xE3 : 0xFF);
+            su->buffer = read_masked_oam(ppu);
             su->state = CMP_OAM_Y;
             break;
         case CMP_OAM_Y:
@@ -405,14 +408,18 @@ static void evaluate_sprites(PPU* ppu) {
                 if (is_y_in_range(ppu, su->buffer)) {
                     ppu->sec_oam_address++;
                     su->state = READ_BYTE;
+                    ppu->oam_address++;
                     // read the next 3 bytes into secondary OAM
-                    su->m++;
                     su->remaining = 3;
+                    // if this is the first sprite being processed, set sprite zero flag
+                    if (ppu->dots == 66)
+                        su->has_sprite_zero = 1;
                 } else {
                     su->state = READ_OAM_Y;
-                    su->n++;
-                    // not necessary but just in case
-                    su->m = 0;
+                    // reset the lower 2 bits after the +4 to align OAM
+                    // we use 0xfffc instead of 0xfc because OAM address can go beyond 0xff
+                    // to allow detection of OAM overflow condition later
+                    ppu->oam_address = ppu->oam_address + 4 & 0xfffc;
                 }
             } else {
                 // sprite overflow
@@ -420,18 +427,17 @@ static void evaluate_sprites(PPU* ppu) {
                     ppu->status |= SPRITE_OVERFLOW;
                     su->has_overflown = 1;
                     su->state = READ_BYTE;
+                    ppu->oam_address++;
                     // read the next 3 bytes
-                    su->m++;
-                    if (su->m > 3) {
-                        su->m = 0;
-                        su->n++;
-                    }
                     su->remaining = 3;
                 } else {
                     su->state = READ_OAM_Y;
-                    // incorrectly increment both n and m
-                    su->m = (su->m + 1) & 3;
-                    su->n++;
+                    if ((ppu->oam_address & 0x03) == 3)
+                        // glitchy +1 increment when misaligned OAM lands on the X value
+                        ppu->oam_address++;
+                    else
+                        // glitchy increment of both inner (+1) and outer pointers (+4)
+                        ppu->oam_address = ppu->oam_address + 5;
                 }
                 // sec OAM writes converted to reads if it is full
                 // sec OAM address points to 0 when full
@@ -439,22 +445,19 @@ static void evaluate_sprites(PPU* ppu) {
             }
             break;
         case READ_BYTE:
-            addr = (su->n << 2 | su->m++) + su->oam_addr;
-            if (addr >= 256) {
+            if (ppu->oam_address >= 256) {
                 su->state = OAM_EOF;
-                su->buffer = ppu->OAM[0];
-                su->n = 1;
+                su->buffer = read_masked_oam(ppu);
+                ppu->oam_address = ppu->oam_address + 4 & 0xfc;
                 break;
             }
-            // bits 2 - 4 of attr byte are unimplemented and should be zero
-            su->buffer = ppu->OAM[addr] & ((addr & 0x03) == 0x02 ? 0xE3 : 0xFF);
-            if (su->n == 0 && su->remaining == 3) {
-                su->has_sprite_zero = 1;
-            }
-            if (su->m > 3) {
-                su->m = 0;
-                su->n++;
-            }
+
+            su->buffer = read_masked_oam(ppu);
+            ppu->oam_address++;
+            if (su->remaining == 1 && !is_y_in_range(ppu, su->buffer))
+                // if X position is not in range, reset lower 2 bits of OAM address
+                ppu->oam_address &= 0xfffc;
+
             su->state = WRITE_BYTE;
             break;
         case WRITE_BYTE:
@@ -474,8 +477,9 @@ static void evaluate_sprites(PPU* ppu) {
             break;
         case OAM_EOF:
             if(ppu->dots & 1){
-                addr = (su->n++ << 2) + su->oam_addr;
-                su->buffer = ppu->OAM[addr & 0xff];
+                su->buffer = read_masked_oam(ppu);
+                // normal +4 increment with lower 2 bits masked
+                ppu->oam_address = ppu->oam_address + 4 & 0xfc;
             } else {
                 // sec OAM writes converted to reads from its last address
                 su->buffer = ppu->OAM_cache[ppu->sec_oam_address & 0x1f];

@@ -61,12 +61,9 @@ typedef enum SpriteEvalState {
 typedef struct SpriteEvalMachine {
     SpriteEvalState state;
     uint8_t buffer;
-    uint8_t n;
-    uint8_t m;
     uint8_t remaining;
     uint8_t has_sprite_zero;
     uint8_t has_overflown;
-    uint16_t oam_addr;
 }SpriteEvalMachine;
 
 typedef struct PictureUnit {
@@ -129,7 +126,7 @@ typedef struct PPU{
     uint16_t t;
     uint8_t x;
     uint8_t w;
-    uint8_t oam_address;
+    uint16_t oam_address;
     uint8_t sec_oam_address;
     uint16_t bus;
     uint16_t last_addr;
