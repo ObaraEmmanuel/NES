@@ -43,20 +43,20 @@ int load_MMC1(Mapper *mapper) {
     mmc1->reg = REG_INIT;
     mmc1->PRG_mode = 3;
     mmc1->cpu_cycle = -1;
-    // PRG banks in 8k chunks
-    mmc1->PRG_clamp = next_power_of_2(mapper->PRG_banks);
+    // PRG banks in 16k chunks
+    mmc1->PRG_clamp = next_power_of_2(mapper->PRG_size / 0x4000);
     mmc1->PRG_clamp = mmc1->PRG_clamp > 0 ? mmc1->PRG_clamp - 1 : 0;
-    // CHR banks in 1k chunks
-    mmc1->CHR_clamp = next_power_of_2(mapper->CHR_banks * 2);
+    // CHR banks in 4k chunks
+    mmc1->CHR_clamp = next_power_of_2(mapper->CHR_size / 0x1000);
     mmc1->CHR_clamp = mmc1->CHR_clamp > 0 ? mmc1->CHR_clamp - 1 : 0;
 
-    if (mapper->CHR_banks) {
+    if (mapper->CHR_size) {
         mmc1->CHR_bank1 = mapper->CHR_ROM;
         mmc1->CHR_bank2 = mmc1->CHR_bank1 + 0x1000;
     }
 
     mmc1->PRG_bank1 = mapper->PRG_ROM;
-    mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
+    mmc1->PRG_bank2 = mapper->PRG_ROM + mapper->PRG_size - 0x4000;
     return 0;
 }
 
@@ -163,10 +163,11 @@ static void set_PRG_banks(MMC1_t *mmc1, Mapper *mapper) {
         case 3:
             // fix second bank switch first bank
             mmc1->PRG_bank1 = mapper->PRG_ROM + 0x4000 * mmc1->PRG_reg;
-            if (mapper->PRG_banks > 16)
+            if (mapper->PRG_size > 0x40000)
+                // greater than 16 16KB banks
                 mmc1->PRG_bank2 = mapper->PRG_ROM + (((mmc1->PRG_reg & BIT_4) > 0) + 1) * 0x40000 - 0x4000;
             else
-                mmc1->PRG_bank2 = mapper->PRG_ROM + (mapper->PRG_banks - 1) * 0x4000;
+                mmc1->PRG_bank2 = mapper->PRG_ROM + mapper->PRG_size - 0x4000;
             break;
         default:
             break;

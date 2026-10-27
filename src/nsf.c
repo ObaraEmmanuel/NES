@@ -144,8 +144,8 @@ int load_data_chunk(uint32_t len, Mapper* mapper, const uint8_t* buf) {
             // ensure size is a multiple of 4kb
             prg_size = (prg_size / 0x1000 + 1) * 0x1000;
         }
-        mapper->PRG_banks = prg_size / 0X1000;
-        LOG(INFO, "PRG banks: %llu", mapper->PRG_banks);
+        mapper->PRG_size = prg_size;
+        LOG(INFO, "PRG size: %lluKB", mapper->PRG_size);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
         memcpy(mapper->PRG_ROM + padding, buf, len);
@@ -478,8 +478,8 @@ int load_nsf(ROMData* rom_data, Mapper* mapper) {
             prg_size = (prg_size / 0x1000 + 1) * 0x1000;
 
         }
-        mapper->PRG_banks = prg_size / 0X1000;
-        LOG(DEBUG, "PRG banks: %llu", mapper->PRG_banks);
+        mapper->PRG_size = prg_size;
+        LOG(DEBUG, "PRG size: %lluKB", mapper->PRG_size / 1024);
         mapper->PRG_ROM = malloc(prg_size);
         memset(mapper->PRG_ROM, 0, prg_size);
         memcpy(mapper->PRG_ROM + padding, rom_data->rom + offset, data_len);

@@ -48,8 +48,8 @@ typedef struct Mapper {
     uint8_t *CHR_ptrs[8];
     uint8_t PRG_regs[8];
     uint8_t CHR_regs[8];
-    uint16_t PRG_banks;
-    uint16_t CHR_banks;
+    uint64_t PRG_size;
+    uint64_t CHR_size;
     size_t CHR_RAM_size;
     uint8_t RAM_banks;
     size_t RAM_size;

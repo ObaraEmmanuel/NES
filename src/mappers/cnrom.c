@@ -11,8 +11,8 @@ int load_CNROM(Mapper *mapper) {
     mapper->write_CHR = write_CHR;
     mapper->CHR_ptrs[0] = mapper->CHR_ROM;
     // store chr mask in chr reg 0
-    // the mask ensures CHR wraps around correctly
-    mapper->CHR_regs[0] = next_power_of_2(mapper->CHR_banks) - 1;
+    // the mask ensures CHR wraps around correctly with 8KB banks
+    mapper->CHR_regs[0] = next_power_of_2(mapper->CHR_size / 0x2000) - 1;
     if (mapper->submapper == 2)
         LOG(WARN, "Requires unimplemented AND bus conflicts");
     return 0;

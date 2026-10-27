@@ -19,7 +19,7 @@ int load_VRC1(Mapper *mapper) {
     mapper->read_PRG = read_PRG;
     mapper->read_CHR = read_CHR;
     // Fix last 8k bank
-    mapper->PRG_ptrs[3] = mapper->PRG_ROM + (mapper->PRG_banks * 2 - 1) * 0x2000;
+    mapper->PRG_ptrs[3] = mapper->PRG_ROM + mapper->PRG_size - 0x2000;
     // Init all PRG banks to first bank
     mapper->PRG_ptrs[0] = mapper->PRG_ptrs[1] = mapper->PRG_ptrs[2] = mapper->PRG_ROM;
     // Initialize both banks to the first bank

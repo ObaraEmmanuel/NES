@@ -52,14 +52,14 @@ int load_MMC3(Mapper *mapper) {
     MMC3_t *mmc3 = calloc(1, sizeof(MMC3_t));
     mapper->extension = mmc3;
     // PRG banks in 8k chunks
-    mmc3->PRG_clamp = next_power_of_2(mapper->PRG_banks * 2);
+    mmc3->PRG_clamp = next_power_of_2(mapper->PRG_size / 0x2000);
     mmc3->PRG_clamp = mmc3->PRG_clamp > 0 ? mmc3->PRG_clamp - 1: 0;
     // CHR banks in 1k chunks
-    mmc3->CHR_clamp = next_power_of_2(mapper->CHR_banks * 8);
+    mmc3->CHR_clamp = next_power_of_2(mapper->CHR_size / 0x400);
     mmc3->CHR_clamp = mmc3->CHR_clamp > 0 ? mmc3->CHR_clamp - 1: 0;
 
     // last bank
-    mmc3->PRG_bank_ptrs[3] = mapper->PRG_ROM + (mapper->PRG_banks) * 0x4000 - 0x2000;
+    mmc3->PRG_bank_ptrs[3] = mapper->PRG_ROM + mapper->PRG_size - 0x2000;
     // 2nd last bank
     mmc3->PRG_bank_ptrs[2] = mmc3->PRG_bank_ptrs[3] - 0x2000;
 
@@ -306,7 +306,7 @@ void write_bank_data(Mapper *mapper, uint8_t val) {
 }
 
 uint8_t read_CHR(Mapper *mapper, uint16_t addr) {
-    if(!mapper->CHR_banks) {
+    if(!mapper->CHR_size) {
         return mapper->CHR_ROM[addr];
     }
     MMC3_t *mmc3 = mapper->extension;

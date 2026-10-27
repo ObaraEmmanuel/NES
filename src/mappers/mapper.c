@@ -29,7 +29,7 @@ static int select_mapper(Mapper *mapper) {
     mapper->read_ROM = read_ROM;
     mapper->write_ROM = write_ROM;
     mapper->set_bus = set_bus;
-    mapper->clamp = (mapper->PRG_banks * 0x4000) - 1;
+    mapper->clamp = next_power_of_2(mapper->PRG_size) - 1;
     mapper->PRG_RAM_clamp = mapper->RAM_size - 1;
 
     switch (mapper->mapper_num) {
@@ -261,8 +261,10 @@ int load_data(ROMData *rom_data, Mapper *mapper) {
         LOG(INFO, "Possibly using iNES (archaic) format");
     }
 
-    mapper->PRG_banks = header[4];
-    mapper->CHR_banks = header[5];
+    uint64_t PRG_banks = header[4];
+    uint64_t CHR_banks = header[5];
+    uint32_t PRG_bank_size = 0x4000;
+    uint32_t CHR_bank_size = 0x2000;
 
     if (header[6] & BIT_1) {
         LOG(INFO, "Uses Battery backed save RAM 8KB");
@@ -304,8 +306,23 @@ int load_data(ROMData *rom_data, Mapper *mapper) {
         mapper->mapper_num |= ((header[8] & 0xf) << 8);
         mapper->submapper = header[8] >> 4;
 
-        mapper->PRG_banks |= ((header[9] & 0x0f) << 8);
-        mapper->CHR_banks |= ((header[9] & 0xf0) << 4);
+        if ((header[9] & 0x0f) == 0xf) {
+            // use exponent notation
+            // bank value = [EEEE EEMM]; E - exponent, M - multiplier
+            // bank size = 2^E * (M * 2 + 1)
+            PRG_banks = next_power_of_2((1 << (PRG_banks >> 2)) * ((PRG_banks & 0x3) * 2 + 1));
+            // This makes the bank contain the actual size in bytes
+            PRG_bank_size = 1;
+        } else
+            PRG_banks |= ((header[9] & 0x0f) << 8);
+
+        if ((header[9] & 0xf0) == 0xf0) {
+            // use exponent notation
+            CHR_banks = next_power_of_2((1 << (CHR_banks >> 2)) * ((CHR_banks & 0x3) * 2 + 1));
+            CHR_bank_size = 1;
+        } else
+            CHR_banks |= ((header[9] & 0xf0) << 4);
+
 
         if (header[10] & 0xf)
             mapper->RAM_size = (64 << (header[10] & 0xf));
@@ -352,7 +369,7 @@ int load_data(ROMData *rom_data, Mapper *mapper) {
     }
 
     if (mapper->format != NES2) {
-        if (!mapper->CHR_banks) {
+        if (!CHR_banks) {
             mapper->CHR_RAM_size = 0x2000;
             LOG(INFO, "CHR-ROM Not specified, Assuming 8kb CHR-RAM");
         }
@@ -365,17 +382,19 @@ int load_data(ROMData *rom_data, Mapper *mapper) {
         }
     }
 
-    LOG(INFO, "PRG banks (16KB): %u", mapper->PRG_banks);
-    LOG(INFO, "CHR banks (8KB): %u", mapper->CHR_banks);
+    mapper->PRG_size = PRG_banks * PRG_bank_size;
+    mapper->CHR_size = CHR_banks * CHR_bank_size;
 
-    mapper->PRG_ROM = malloc(0x4000 * mapper->PRG_banks);
-    memcpy(mapper->PRG_ROM, rom_data->rom + offset, 0x4000 * mapper->PRG_banks);
-    offset += 0x4000 * mapper->PRG_banks;
+    LOG(INFO, "PRG size: %uKB", mapper->PRG_size / 1024);
+    LOG(INFO, "CHR size: %uKB", mapper->CHR_size / 1024);
 
-    if (mapper->CHR_banks) {
-        mapper->CHR_ROM = malloc(0x2000 * mapper->CHR_banks);
-        memcpy(mapper->CHR_ROM, rom_data->rom + offset, 0x2000 * mapper->CHR_banks);
-        // offset += 0x2000 * mapper->CHR_banks;
+    mapper->PRG_ROM = malloc(mapper->PRG_size);
+    memcpy(mapper->PRG_ROM, rom_data->rom + offset, mapper->PRG_size);
+    offset += mapper->PRG_size;
+
+    if (mapper->CHR_size) {
+        mapper->CHR_ROM = malloc(mapper->CHR_size);
+        memcpy(mapper->CHR_ROM, rom_data->rom + offset, mapper->CHR_size);
     } else {
         if (!mapper->CHR_RAM_size) {
             LOG(INFO, "No CHR-RAM or CHR-ROM specified, Using 8kb CHR-RAM");
