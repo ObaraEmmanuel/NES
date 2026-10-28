@@ -10,10 +10,20 @@ endif()
 
 # General configuration
 option(DISABLE_AUDIO "Disable audio output" OFF)
+option(UNLOCK_FPS "Removes FPS caps to tv standard e.g. 60Hz for NTSC" OFF)
 
 if (DISABLE_AUDIO)
   add_compile_definitions(nes PRIVATE DISABLE_AUDIO)
 endif ()
+
+if (UNLOCK_FPS)
+  add_compile_definitions(nes PRIVATE DISABLE_AUDIO)
+  add_compile_definitions(nes PRIVATE UNLOCK_FPS)
+endif ()
+
+message(STATUS "NES was configured as follows:")
+message(STATUS "  Disable audio:  ${DISABLE_AUDIO}")
+message(STATUS "  Unlock FPS:     ${UNLOCK_FPS}")
 
 if(MSVC)
   add_definitions(-D_CRT_SECURE_NO_WARNINGS)

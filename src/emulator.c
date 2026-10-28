@@ -204,7 +204,9 @@ void run_emulator(Emulator* emulator){
             ppu->render = 0;
             queue_audio(mixer);
             mark_end(timer);
+#ifndef UNLOCK_FPS
             adjusted_wait(timer);
+#endif
         }else{
             wait(IDLE_SLEEP);
         }
@@ -364,7 +366,9 @@ void run_NSF_player(Emulator* emulator) {
                 nsf->tick = 0;
             }
             mark_end(timer);
+#ifndef UNLOCK_FPS
             adjusted_wait(timer);
+#endif
         }else{
             wait(IDLE_SLEEP);
         }

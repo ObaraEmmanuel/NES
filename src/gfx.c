@@ -19,7 +19,9 @@ void get_graphics_context(GraphicsContext* ctx){
         SDL_INIT_SENSOR
     );
     TTF_Init();
+#ifndef UNLOCK_FPS
     SDL_SetHint(SDL_HINT_RENDER_VSYNC, "1");
+#endif
 #ifdef __ANDROID__
     ctx->font = TTF_OpenFont("asap.ttf", (int)(ctx->screen_height * 0.05));
     if(ctx->font == NULL){
