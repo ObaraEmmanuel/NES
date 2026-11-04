@@ -6,17 +6,19 @@
 #include "cpu6502.h"
 
 static void update_NMI(PPU* ppu, uint8_t delay);
-static uint8_t is_y_in_range(PPU* ppu, uint8_t y);
+static int is_y_in_range(PPU* ppu, uint8_t y);
 static void clear_oam(PPU* ppu);
 static void evaluate_sprites(PPU* ppu);
-static uint8_t get_bg_pixel(PPU *ppu);
-static uint8_t get_sprite_pixel(PPU* ppu);
-static uint8_t get_pixel(PPU* ppu);
+static uint32_t get_bg_pixel(PPU *ppu);
+static uint32_t get_sprite_pixel(PPU* ppu);
+static uint32_t get_pixel(PPU* ppu);
 static void inc_hori_v(PPU* ppu);
 static void inc_vert_v(PPU* ppu);
 static void inc_v(PPU* ppu);
 static void inc_sec_oam_addr(PPU* ppu);
 static uint8_t read_masked_oam(PPU* ppu);
+static void set_bus(PPU* ppu, uint16_t addr);
+static uint8_t flip(uint8_t b);
 uint32_t nes_palette[64];
 static size_t screen_size;
 
@@ -67,6 +69,11 @@ void set_latch(PPU* ppu, uint8_t value, uint8_t mask) {
         ppu->latch_decay = 60000;
 }
 
+static void set_bus(PPU* ppu, uint16_t addr) {
+    if (ppu->mapper->set_bus)
+        ppu->mapper->set_bus(ppu->mapper, addr);
+}
+
 void set_address(PPU* ppu, uint8_t address){
     if(!ppu->w){
         // first write
@@ -78,7 +85,7 @@ void set_address(PPU* ppu, uint8_t address){
         ppu->t &= 0xff00;
         ppu->t |= address;
         ppu->v = ppu->t;
-        ppu->mapper->set_bus(ppu->mapper, ppu->v);
+        set_bus(ppu, ppu->v);
         ppu->w = 0;
     }
 }
@@ -163,7 +170,7 @@ uint8_t read_vram(PPU* ppu, uint16_t address){
 
     if(address < 0x4000) {
         // palette RAM provide first 6 bits and remaining 2 bits are open bus
-        uint8_t val = ppu->palette[(address - 0x3F00) % 0x20] & 0x3f | (ppu->latch & 0xc0);
+        uint8_t val = ppu->palette[(address - 0x3F00) & 0x1f] & 0x3f | (ppu->latch & 0xc0);
         if (ppu->mask & 0x1)
             // greyscale mode; lower 4 bits = 0000
             return val & 0xf0;
@@ -184,7 +191,7 @@ void write_vram(PPU* ppu, uint16_t address, uint8_t value){
     }
 
     else if(address < 0x4000) {
-        address = (address - 0x3F00) % 0x20;
+        address = (address - 0x3F00) & 0x1f;
         if(address % 4 == 0) {
             ppu->palette[address] = value;
             ppu->palette[address ^ 0x10] = value;
@@ -234,6 +241,13 @@ static void update_NMI(PPU* ppu, uint8_t delay) {
     ppu->supress_vblank = 0;
 }
 
+static uint8_t flip(uint8_t b) {
+    b = (b & 0xF0) >> 4 | (b & 0x0F) << 4;
+    b = (b & 0xCC) >> 2 | (b & 0x33) << 2;
+    b = (b & 0xAA) >> 1 | (b & 0x55) << 1;
+    return b;
+}
+
 static void inc_hori_v(PPU* ppu) {
     // inc horizontal V
     if ((ppu->v & COARSE_X) == 31) {
@@ -281,7 +295,7 @@ static void inc_sec_oam_addr(PPU* ppu) {
         ppu->sec_oam_address++;
 }
 
-static uint8_t get_bg_pixel(PPU *ppu) {
+static uint32_t get_bg_pixel(PPU *ppu) {
     if (!(ppu->mask & SHOW_BG))
         return 0;
 
@@ -289,9 +303,9 @@ static uint8_t get_bg_pixel(PPU *ppu) {
         return 0;
 
     const PictureUnit* pu = &ppu->p_unit;
-    const uint16_t bit_mux = 0x8000 >> ppu->x;
-    const uint8_t pattern = (pu->pattern_LSB & bit_mux ? 1 : 0) | (pu->pattern_MSB & bit_mux ? 0b10 : 0);
-    const uint8_t palette = (pu->attr_LSB & bit_mux ? 1 : 0) | (pu->attr_MSB & bit_mux ? 0b10 : 0);
+    const uint32_t bit_mux = 0x8000 >> ppu->x;
+    const uint32_t pattern = (pu->pattern_LSB & bit_mux ? 1 : 0) | (pu->pattern_MSB & bit_mux ? 0b10 : 0);
+    const uint32_t palette = (pu->attr_LSB & bit_mux ? 1 : 0) | (pu->attr_MSB & bit_mux ? 0b10 : 0);
 
     if (!pattern)
         return 0;
@@ -299,22 +313,17 @@ static uint8_t get_bg_pixel(PPU *ppu) {
     return palette << 2 | pattern;
 }
 
-static uint8_t get_sprite_pixel(PPU* ppu) {
-    uint8_t pattern = 0;
+static uint32_t get_sprite_pixel(PPU* ppu) {
+    uint32_t pattern = 0;
     SpriteUnit* priority_unit = NULL;
     for (int i = 0; i < 8; i++) {
         SpriteUnit* unit = &ppu->sprite_units[i];
+        if (!(unit->pattern_LSB | unit->pattern_MSB)) continue;
         if (unit->halted || unit->x == 0) {
-            uint8_t pattern_bits = 0;
-            if (unit->attr & FLIP_HORIZONTAL) {
-                pattern_bits = unit->pattern_LSB & 1 | (unit->pattern_MSB & 1) << 1;
-                unit->pattern_LSB >>= 1;
-                unit->pattern_MSB >>= 1;
-            } else {
-                pattern_bits = unit->pattern_LSB >> 7 | (unit->pattern_MSB >> 7) << 1;
-                unit->pattern_LSB <<= 1;
-                unit->pattern_MSB <<= 1;
-            }
+            const uint8_t pattern_bits = unit->pattern_LSB & 1 | (unit->pattern_MSB & 1) << 1;
+            unit->pattern_LSB >>= 1;
+            unit->pattern_MSB >>= 1;
+
             if (pattern_bits && priority_unit == NULL) {
                 priority_unit = unit;
                 pattern = pattern_bits;
@@ -334,9 +343,9 @@ static uint8_t get_sprite_pixel(PPU* ppu) {
     return 0x10 | (priority_unit->attr & 3) << 2 | pattern | priority_unit->attr & BIT_5 | (priority_unit->attr & BIT_2 ? BIT_6 : 0);
 }
 
-static uint8_t get_pixel(PPU* ppu) {
-    uint8_t sprite_pixel = get_sprite_pixel(ppu);
-    uint8_t bg_pixel = get_bg_pixel(ppu);
+static uint32_t get_pixel(PPU* ppu) {
+    uint32_t sprite_pixel = get_sprite_pixel(ppu);
+    uint32_t bg_pixel = get_bg_pixel(ppu);
 
     switch ((bg_pixel > 0) << 1 | (sprite_pixel > 0)) {
         case 0b00:
@@ -360,7 +369,7 @@ static uint8_t get_pixel(PPU* ppu) {
     }
 }
 
-static uint8_t is_y_in_range(PPU* ppu, uint8_t y) {
+static int is_y_in_range(PPU* ppu, uint8_t y) {
     return (ppu->scanlines & 0xff) - y < 8 << (ppu->ctrl & LONG_SPRITE? 1 : 0);
 }
 
@@ -492,8 +501,8 @@ static void fetch_frame(PPU* ppu) {
     PPUPhase phase = (ppu->dots - 1) & 7;
     PictureUnit* pu = &ppu->p_unit;
 
-    uint8_t sprite_prefetch = ppu->dots > 256 && ppu->dots <= 320;
-    uint8_t pre_render = ppu->dots >= 337;
+    uint32_t sprite_prefetch = ppu->dots > 256 && ppu->dots <= 320;
+    uint32_t pre_render = ppu->dots >= 337;
 
     // clock bg output shift registers
     if (ppu->dots <= 256 || (ppu->dots > 320 && ppu->dots < 337)) {
@@ -591,6 +600,7 @@ static void fetch_frame(PPU* ppu) {
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_LSB = ppu->bus & 0xff;
+                unit->pattern_LSB = !(unit->attr & FLIP_HORIZONTAL) ? flip(unit->pattern_LSB) : unit->pattern_LSB;
             }else {
                 // load BG LSB byte
                 pu->BG_LSB = ppu->bus & 0xff;
@@ -607,6 +617,7 @@ static void fetch_frame(PPU* ppu) {
                 uint8_t sprite_index = (ppu->dots - 257) >> 3;
                 SpriteUnit* unit = ppu->sprite_units + sprite_index;
                 unit->pattern_MSB = ppu->bus & 0xff;
+                unit->pattern_MSB = !(unit->attr & FLIP_HORIZONTAL) ? flip(unit->pattern_MSB) : unit->pattern_MSB;
                 inc_sec_oam_addr(ppu);
 
                 if (!is_y_in_range(ppu, ppu->sprite_buffer.y)) {
@@ -645,7 +656,7 @@ static void fetch_frame(PPU* ppu) {
 
     if (!(phase & 1)) {
         pu->has_set_addr = 1;
-        ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+        set_bus(ppu, ppu->bus);
     } else
         pu->has_set_addr = 0;
 
@@ -675,7 +686,7 @@ void execute_ppu(PPU* ppu) {
     if (ppu->should_inc_v) {
         ppu->v += ((ppu->ctrl & BIT_2) ? 32 : 1);
         ppu->should_inc_v = 0;
-        ppu->mapper->set_bus(ppu->mapper, ppu->v);
+        set_bus(ppu, ppu->v);
     }
 
     if (ppu->scanlines < VISIBLE_SCANLINES || ppu->scanlines == ppu->pre_render) {
@@ -688,7 +699,7 @@ void execute_ppu(PPU* ppu) {
         if (ppu->dots == 0) {
             if (ppu->scanlines <= VISIBLE_SCANLINES && ppu->render_status) {
                 ppu->bus = ppu->p_unit.NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
-                ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+                set_bus(ppu, ppu->bus);
             }
         } else {
             // dots 1 - 256, scanline 0 - 239 (render region)
@@ -705,9 +716,10 @@ void execute_ppu(PPU* ppu) {
                     pixel_addr = ppu->v & 0x3fff;
                 }
                 // only consider 6-bits from palette RAM since upper 2 bits are open bus
-                pixel_addr = read_vram(ppu, pixel_addr) & 0x3f;
+                uint8_t idx = ppu->palette[pixel_addr & 0x1f];
+                if (ppu->mask & 0x1) idx &= 0x30;
                 // output pixel to output buffer
-                ppu->screen[ppu->scanlines * 256 + ppu->dots - 1] = nes_palette[pixel_addr];
+                ppu->screen[ppu->scanlines * 256 + ppu->dots - 1] = nes_palette[idx & 0x3f];
             }
             if (ppu->render_status)
                 // tile and attr pre-fetch
@@ -789,7 +801,7 @@ void execute_ppu(PPU* ppu) {
 
     if (ppu->scanlines == 240 && ppu->dots == 0 && ppu->render_status) {
         ppu->bus = ppu->p_unit.NT << 4 | ppu->v >> 12 & 0x7 | (ppu->ctrl & BG_TABLE) << 8;
-        ppu->mapper->set_bus(ppu->mapper, ppu->bus);
+        set_bus(ppu, ppu->bus);
     }
 
     if(ppu->scanlines == 241 && ppu->dots == 1) {

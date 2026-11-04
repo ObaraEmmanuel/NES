@@ -28,7 +28,7 @@ static int select_mapper(Mapper *mapper) {
     mapper->write_CHR = write_CHR;
     mapper->read_ROM = read_ROM;
     mapper->write_ROM = write_ROM;
-    mapper->set_bus = set_bus;
+    mapper->set_bus = NULL;
     mapper->clamp = next_power_of_2(mapper->PRG_size) - 1;
     mapper->PRG_RAM_clamp = mapper->RAM_size - 1;
 

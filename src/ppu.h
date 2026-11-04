@@ -109,9 +109,9 @@ typedef struct PPU{
     uint8_t supress_vblank;
     uint8_t nmi_delay;
     uint8_t corrupt_oam_row;
-    size_t dots;
-    size_t scanlines;
-    uint16_t pre_render;
+    uint32_t dots;
+    uint32_t scanlines;
+    uint32_t pre_render;
 
     PictureUnit p_unit;
     SpriteEvalMachine sprite_eval_unit;
