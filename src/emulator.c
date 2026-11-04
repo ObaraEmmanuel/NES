@@ -6,7 +6,6 @@
 #include "mapper.h"
 #include "nsf.h"
 #include "timers.h"
-#include "debugtools.h"
 #include "utils.h"
 #include "nsf_gfx.h"
 

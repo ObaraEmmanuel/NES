@@ -50,7 +50,6 @@ set (SRC
         src/apu.c
         src/controller.c
         src/cpu6502.c
-        src/debugtools.c
         src/emulator.c
         src/gamepad.c
         src/genie.c

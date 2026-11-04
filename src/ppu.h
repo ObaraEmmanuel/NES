@@ -177,5 +177,4 @@ void set_address(PPU* ppu, uint8_t address);
 void set_oam_address(PPU* ppu, uint8_t address);
 uint8_t read_oam(PPU* ppu);
 void write_oam(PPU* ppu, uint8_t value);
-uint8_t read_vram(PPU* ppu, uint16_t address);
-void write_vram(PPU* ppu, uint16_t address, uint8_t value);
+void render_name_tables(struct PPU* ppu, uint32_t* screen);
