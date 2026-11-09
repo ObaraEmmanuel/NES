@@ -31,6 +31,13 @@ over time. Any help is welcome.
     - [x] Triangle channel
     - [x] Noise channel
     - [x] Delta Modulation Channel
+    - [ ] VRC6 audio
+    - [ ] VRC7 audio
+    - [ ] FDS audio
+    - [ ] MMC5 audio
+    - [ ] Namco 163 audio
+    - [ ] Sunsoft 5B audio
+    - [ ] VT02+ audio
 * Gaming input
     - [x] Keyboard input
     - [ ] Keyboard (multiplayer)
@@ -55,8 +62,16 @@ over time. Any help is welcome.
     - [x] \#4   MMC3
     - [ ] \#5   MMC5
     - [x] \#7   AxROM
+    - [ ] \#9   MMC2
+    - [ ] \#10  MMC4
     - [x] \#11  Color Dreams
+    - [x] \#13  CPROM
+    - [x] \#46  Color Dreams 46
     - [x] \#66  GNROM
+    - [x] \#75  VRC1
+    - [x] \#94  UN1ROM
+    - [x] \#180 
+    - [x] \#185 
 * Game genie (for cheat codes)
     
 ## What can be played
